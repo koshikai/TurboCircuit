@@ -41,6 +41,8 @@ public class RaceManager : MonoBehaviour
     public Kart Player { get; private set; }
     public List<Kart> Karts { get; } = new List<Kart>();
     public RaceAudio Audio { get; private set; }
+    public Light Sun { get; private set; }
+    public int SelectedCourse { get; private set; }
     public bool RaceRunning => state == State.Racing || state == State.Results;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
@@ -88,30 +90,30 @@ public class RaceManager : MonoBehaviour
         cam.nearClipPlane = 0.2f;
         camGo.AddComponent<AudioListener>();
 
-        var sun = new GameObject("Sun").AddComponent<Light>();
-        sun.type = LightType.Directional;
-        sun.intensity = 1.25f;
-        sun.color = new Color(1f, 0.96f, 0.88f);
-        sun.shadows = LightShadows.Soft;
-        sun.shadowStrength = 0.78f;
-        sun.transform.rotation = Quaternion.Euler(48, -35, 0);
-        RenderSettings.sun = sun;
+        Sun = new GameObject("Sun").AddComponent<Light>();
+        Sun.type = LightType.Directional;
+        Sun.intensity = 1.25f;
+        Sun.color = new Color(1f, 0.96f, 0.88f);
+        Sun.shadows = LightShadows.Soft;
+        Sun.shadowStrength = 0.78f;
+        Sun.transform.rotation = Quaternion.Euler(48, -35, 0);
+        RenderSettings.sun = Sun;
         QualitySettings.shadowDistance = 140f;
         QualitySettings.shadowCascades = 4;
         QualitySettings.shadowResolution = ShadowResolution.High;
 
-        track = new GameObject("Track").AddComponent<Track>();
-        track.BuildPath();
-        track.BuildVisuals(this);
-        minimap = track.MakeMinimap(256, out toMap);
-
-        foreach (var spot in track.ItemBoxSpots)
+        // コマンドライン引数 -course の解析
+        int cIdx = 0;
+        for (int i = 0; i < args.Length - 1; i++)
         {
-            var box = new GameObject("ItemBox").AddComponent<ItemBox>();
-            box.Init(track.PointAt(spot.index, spot.lateral), itemBoxMaterial, font);
-            boxes.Add(box);
+            if (args[i] == "-course" && int.TryParse(args[i + 1], out int parsed))
+                cIdx = parsed;
         }
 
+        track = new GameObject("Track").AddComponent<Track>();
+        track.BuildPath(cIdx);
+
+        // カート初期生成
         for (int i = 0; i < 8; i++)
         {
             var go = new GameObject(i == playerGridSlot ? "Player" : "CPU");
@@ -124,8 +126,49 @@ public class RaceManager : MonoBehaviour
             if (isPlayer) Player = k;
         }
 
+        LoadCourse(cIdx);
+    }
+
+    public void LoadCourse(int index)
+    {
+        SelectedCourse = Mathf.Clamp(index, 0, Track.Courses.Length - 1);
+        foreach (var b in boxes) if (b) Destroy(b.gameObject);
+        boxes.Clear();
+        foreach (var b in bananas) if (b) Destroy(b.gameObject);
+        bananas.Clear();
+        foreach (var m in missiles) if (m) Destroy(m.gameObject);
+        missiles.Clear();
+
+        track.BuildPath(SelectedCourse);
+        track.BuildVisuals(this, SelectedCourse);
+        track.ApplyEnvironment(this, SelectedCourse);
+        minimap = track.MakeMinimap(256, out toMap);
+
+        foreach (var spot in track.ItemBoxSpots)
+        {
+            var box = new GameObject("ItemBox").AddComponent<ItemBox>();
+            box.Init(track.PointAt(spot.index, spot.lateral), itemBoxMaterial, font);
+            boxes.Add(box);
+        }
+
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            GridSlot(i, out int idx, out float lat);
+            Karts[i].ResetTo(idx, lat);
+        }
+
         titleDist = 0;
-        cam.transform.position = track.PointAt(0, 0) + Vector3.up * 20f;
+        if (cam != null) cam.transform.position = track.PointAt(0, 0) + Vector3.up * 20f;
+    }
+
+    void SwitchCourse(int delta)
+    {
+        int next = (SelectedCourse + delta + Track.Courses.Length) % Track.Courses.Length;
+        if (next != SelectedCourse)
+        {
+            if (Audio != null) Audio.Beep();
+            LoadCourse(next);
+        }
     }
 
     void GridSlot(int slot, out int index, out float lateral)
@@ -176,12 +219,13 @@ public class RaceManager : MonoBehaviour
         {
             ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
         }
-        if (screenshotRequested && state == State.Racing && stateTime > 3.0f && !screenshotTaken)
+        if (screenshotRequested && state == State.Racing && stateTime > 1.8f && !screenshotTaken)
         {
             screenshotTaken = true;
-            ScreenCapture.CaptureScreenshot("screenshot_gameplay.png");
-            Invoke(nameof(QuitAfterScreenshot), 0.5f);
+            ScreenCapture.CaptureScreenshot($"screenshot_course{SelectedCourse}.png");
+            Invoke(nameof(QuitAfterScreenshot), 0.3f);
         }
+        if (screenshotRequested && (stateTime + raceTime) > 12f) Application.Quit();
 
         if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
@@ -204,7 +248,12 @@ public class RaceManager : MonoBehaviour
         switch (state)
         {
             case State.Title:
-                if (enter || Input.GetKeyDown(KeyCode.Space) || (Demo && stateTime > 2f)) StartCountdown();
+                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                    SwitchCourse(-1);
+                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                    SwitchCourse(1);
+
+                if (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f)) StartCountdown();
                 break;
             case State.Countdown:
                 int beep = Mathf.FloorToInt(stateTime - 1f);
@@ -530,28 +579,36 @@ public class RaceManager : MonoBehaviour
     void DrawTitle(float w, float h)
     {
         float t = Time.time;
-        var title = new GUIStyle(sBig) { fontSize = 104 };
-        Outlined(new Rect(0, h * 0.14f, w, 130), "TURBO CIRCUIT", title, Color.HSVToRGB(Mathf.Repeat(t * 0.1f, 1f), 0.6f, 1f), 5);
-        Outlined(new Rect(0, h * 0.32f, w, 40), "8-kart Grand Prix  -  " + totalLaps + " laps", sSmall, Color.white);
+        var title = new GUIStyle(sBig) { fontSize = 92 };
+        Outlined(new Rect(0, h * 0.08f, w, 110), "TURBO CIRCUIT", title, Color.HSVToRGB(Mathf.Repeat(t * 0.1f, 1f), 0.6f, 1f), 5);
 
-        GUI.color = new Color(0, 0, 0, 0.45f);
-        GUI.DrawTexture(new Rect(w / 2 - 300, h * 0.44f, 600, 200), Texture2D.whiteTexture);
+        // コースセレクター
+        var curDef = Track.Courses[SelectedCourse];
+        var courseTitleStyle = new GUIStyle(sMid) { fontSize = 28, alignment = TextAnchor.MiddleCenter };
+        Outlined(new Rect(0, h * 0.23f, w, 36), $"<  TRACK {SelectedCourse + 1}/{Track.Courses.Length} : {curDef.Name}  >", courseTitleStyle, new Color(1f, 0.9f, 0.25f), 3);
+        Outlined(new Rect(0, h * 0.23f + 36, w, 24), curDef.Description, sSmall, Color.white, 2);
+        Outlined(new Rect(0, h * 0.23f + 62, w, 20), "Press [A] [D] or [<-] [->] to Select Track", sSmall, new Color(0.75f, 0.9f, 1f), 2);
+
+        Outlined(new Rect(0, h * 0.38f, w, 30), "8-kart Grand Prix  -  " + totalLaps + " laps", sSmall, Color.white);
+
+        GUI.color = new Color(0, 0, 0, 0.5f);
+        GUI.DrawTexture(new Rect(w / 2 - 300, h * 0.46f, 600, 190), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var left = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Normal };
         string[] lines =
         {
             "W / Up            Accelerate",
             "S / Down          Brake / Reverse",
-            "A D / Left Right  Steer",
-            "SPACE / SHIFT     Hop & Drift  (hold for mini-turbo)",
+            "A D / Left Right  Steer (In Title: Change Track)",
+            "SPACE / SHIFT     Hop & Drift (hold for mini-turbo)",
             "E / CTRL          Use item",
             "ESC               Pause",
         };
         for (int i = 0; i < lines.Length; i++)
-            GUI.Label(new Rect(w / 2 - 270, h * 0.44f + 12 + i * 30, 560, 30), lines[i], left);
+            GUI.Label(new Rect(w / 2 - 270, h * 0.46f + 10 + i * 28, 560, 28), lines[i], left);
 
         if (Mathf.Repeat(t, 1.1f) < 0.75f)
-            Outlined(new Rect(0, h * 0.78f, w, 60), "PRESS ENTER TO START", sMid, new Color(1f, 0.85f, 0.2f));
+            Outlined(new Rect(0, h * 0.79f, w, 60), "PRESS ENTER TO START", sMid, new Color(1f, 0.85f, 0.2f));
     }
 
     void DrawCountdown(float w, float h)

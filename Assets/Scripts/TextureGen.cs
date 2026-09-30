@@ -11,7 +11,9 @@ public static class TextureGen
         return t;
     }
 
-    public static Texture2D Asphalt()
+    public static Texture2D Asphalt() => Asphalt(new Color(0.28f, 0.28f, 0.29f));
+
+    public static Texture2D Asphalt(Color baseTint)
     {
         const int n = 512;
         var px = new Color[n * n];
@@ -23,9 +25,10 @@ public static class TextureGen
             // 砂利・アスファルトの微細テクスチャ
             float fineNoise = (float)(rng.NextDouble() - 0.5) * 0.08f;
             float coarseNoise = (Mathf.PerlinNoise(u * 16f, v * 16f) - 0.5f) * 0.06f;
-            float tireWear = Mathf.Pow(Mathf.Abs(u - 0.5f) * 2f, 2f) * 0.04f; // 走行ラインの黒ずみ（ラバー乗り）
-            float g = 0.28f + fineNoise + coarseNoise - tireWear;
-            var c = new Color(g, g, g * 1.03f, 1f);
+            float tireWear = Mathf.Pow(Mathf.Abs(u - 0.5f) * 2f, 2f) * 0.04f;
+            float g = fineNoise + coarseNoise - tireWear;
+            var c = baseTint * (1f + g);
+            c.a = 1f;
 
             // 白線（コース両端とセンター破線）
             bool edgeL = u > 0.035f && u < 0.055f;
@@ -36,6 +39,42 @@ public static class TextureGen
                 float lineNoise = (float)(rng.NextDouble() - 0.5) * 0.05f;
                 c = new Color(0.92f + lineNoise, 0.92f + lineNoise, 0.88f, 1f);
             }
+            px[y * n + x] = c;
+        }
+        return New(n, n, px);
+    }
+
+    public static Texture2D Sand()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        var rng = new System.Random(17);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float p = Mathf.PerlinNoise(x * 0.04f, y * 0.08f);
+            float r = (float)rng.NextDouble();
+            var c = Color.Lerp(new Color(0.88f, 0.72f, 0.42f), new Color(0.96f, 0.82f, 0.52f), p);
+            c *= 0.94f + r * 0.12f;
+            c.a = 1;
+            px[y * n + x] = c;
+        }
+        return New(n, n, px);
+    }
+
+    public static Texture2D Snow()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        var rng = new System.Random(23);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float p = Mathf.PerlinNoise(x * 0.06f, y * 0.06f);
+            float r = (float)rng.NextDouble();
+            var c = Color.Lerp(new Color(0.88f, 0.92f, 0.98f), new Color(0.98f, 0.99f, 1f), p);
+            c *= 0.96f + r * 0.08f;
+            c.a = 1;
             px[y * n + x] = c;
         }
         return New(n, n, px);
