@@ -67,6 +67,10 @@ public class RaceManager : MonoBehaviour
     Texture2D titleLogoTex;
     Texture2D[] trackBadgeTex = new Texture2D[3];
     Texture2D cardPanelTex;
+    Texture2D cardPopTex;
+    Texture2D btnRaceTex;
+    Texture2D ribbonTrackTex;
+    Texture2D ribbonDriverTex;
     System.Func<Vector3, Vector2> toMap;
 
     public struct KartCharacterDef
@@ -676,10 +680,10 @@ public class RaceManager : MonoBehaviour
     {
         float t = Time.time;
 
-        // 1. トップ：TURBO CIRCUIT アーケードロゴ
+        // 1. トップ：TURBO CIRCUIT ポップロゴ
         if (titleLogoTex != null)
         {
-            float logoW = 360f;
+            float logoW = 380f;
             float logoH = logoW * (titleLogoTex.height / (float)titleLogoTex.width);
             float logoY = 8f + Mathf.Sin(t * 2.2f) * 2f;
             GUI.DrawTexture(new Rect((w - logoW) * 0.5f, logoY, logoW, logoH), titleLogoTex, ScaleMode.ScaleToFit);
@@ -691,13 +695,13 @@ public class RaceManager : MonoBehaviour
         }
 
         float cardY = 175f;
-        float cardH = 410f;
+        float cardH = 412f;
         float cardW = 330f;
 
         // 2. 左カード：コースセレクター（TRACK SELECTION）
         float leftX = 35f;
-        DrawCard(new Rect(leftX, cardY, cardW, cardH));
-        DrawHeaderRibbon(new Rect(leftX + 10, cardY + 10, cardW - 20, 30), "◄ TRACK SELECT [A][D] ►", new Color(0.15f, 0.75f, 1f));
+        DrawPopCard(new Rect(leftX, cardY, cardW, cardH));
+        DrawPopRibbon(new Rect(leftX + 15, cardY + 12, cardW - 30, 32), ribbonTrackTex, "◄ TRACK SELECT [A][D] ►");
 
         var curDef = Track.Courses[SelectedCourse];
         if (trackBadgeTex[SelectedCourse] != null)
@@ -707,142 +711,158 @@ public class RaceManager : MonoBehaviour
         }
 
         var courseTitleStyle = new GUIStyle(sSmall) { fontSize = 21, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
-        Outlined(new Rect(leftX + 8, cardY + 194, cardW - 16, 28), $"< {curDef.Name.ToUpper()} >", courseTitleStyle, new Color(1f, 0.9f, 0.2f), 2);
+        courseTitleStyle.normal.textColor = new Color(0.12f, 0.18f, 0.35f);
+        GUI.Label(new Rect(leftX + 8, cardY + 192, cardW - 16, 28), $"< {curDef.Name.ToUpper()} >", courseTitleStyle);
 
         string diffStr = SelectedCourse == 0 ? "★☆☆  NOVICE" : SelectedCourse == 1 ? "★★☆  ADVANCED" : "★★★  EXPERT";
-        Color diffCol = SelectedCourse == 0 ? new Color(0.35f, 1f, 0.45f) : SelectedCourse == 1 ? new Color(1f, 0.85f, 0.2f) : new Color(1f, 0.35f, 0.35f);
-        var subStyle = new GUIStyle(sSmall) { fontSize = 14, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-        Outlined(new Rect(leftX + 10, cardY + 225, cardW - 20, 20), diffStr, subStyle, diffCol, 1);
+        Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : new Color(1f, 0.28f, 0.38f);
+        DrawPopPill(new Rect(leftX + (cardW - 140) * 0.5f, cardY + 224, 140, 22), diffStr, diffBg);
 
         var descStyle = new GUIStyle(sSmall) { fontSize = 13, alignment = TextAnchor.UpperCenter, fontStyle = FontStyle.Normal, wordWrap = true };
-        GUI.color = new Color(0.9f, 0.95f, 1f, 0.92f);
-        GUI.Label(new Rect(leftX + 16, cardY + 252, cardW - 32, 85), curDef.Description, descStyle);
-        GUI.color = Color.white;
+        descStyle.normal.textColor = new Color(0.26f, 0.30f, 0.42f);
+        GUI.Label(new Rect(leftX + 18, cardY + 254, cardW - 36, 85), curDef.Description, descStyle);
 
-        DrawBadgeTag(new Rect(leftX + (cardW - 200) * 0.5f, cardY + 360, 200, 26), $"{totalLaps} LAPS   |   8 KARTS GP", new Color(0.12f, 0.35f, 0.65f, 0.85f));
+        DrawPopPill(new Rect(leftX + (cardW - 200) * 0.5f, cardY + 360, 200, 26), $"{totalLaps} LAPS   |   8 KARTS GP", new Color(0.18f, 0.52f, 0.88f));
 
 
         // 3. 右カード：ドライバー＆マシンセレクター（DRIVER & MACHINE）
         float rightX = w - cardW - 35f;
-        DrawCard(new Rect(rightX, cardY, cardW, cardH));
-        DrawHeaderRibbon(new Rect(rightX + 10, cardY + 10, cardW - 20, 30), "◄ DRIVER & KART [W][S] ►", new Color(1f, 0.65f, 0.15f));
+        DrawPopCard(new Rect(rightX, cardY, cardW, cardH));
+        DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, "◄ DRIVER & KART [W][S] ►");
 
         var curChar = KartCharacters[SelectedKart];
         var charTitleStyle = new GUIStyle(sSmall) { fontSize = 23, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
         Outlined(new Rect(rightX + 8, cardY + 48, cardW - 16, 30), $"< {curChar.name} >", charTitleStyle, curChar.color, 2);
 
         var driverNickStyle = new GUIStyle(sSmall) { fontSize = 14, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-        Outlined(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle, Color.white, 1);
+        driverNickStyle.normal.textColor = new Color(0.22f, 0.26f, 0.38f);
+        GUI.Label(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle);
 
-        DrawBadgeTag(new Rect(rightX + 20, cardY + 108, cardW - 40, 24), curChar.trait, new Color(curChar.color.r * 0.32f, curChar.color.g * 0.32f, curChar.color.b * 0.32f, 0.9f));
+        DrawPopPill(new Rect(rightX + 22, cardY + 106, cardW - 44, 24), curChar.trait, curChar.color * 0.9f);
 
-        // 4項目ステータスゲージ
-        float statStartY = cardY + 148f;
-        DrawStatGauge(rightX + 22, statStartY + 0, cardW - 44, "SPEED", curChar.speed, 8, new Color(0.2f, 0.85f, 1f));
-        DrawStatGauge(rightX + 22, statStartY + 42, cardW - 44, "ACCEL", curChar.accel, 8, new Color(1f, 0.85f, 0.2f));
-        DrawStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.35f, 1f, 0.5f));
-        DrawStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.45f, 0.35f));
+        // 4項目ポップキャンディステータスゲージ
+        float statStartY = cardY + 146f;
+        DrawToonStatGauge(rightX + 22, statStartY + 0, cardW - 44, "SPEED", curChar.speed, 8, new Color(0.08f, 0.72f, 0.98f));
+        DrawToonStatGauge(rightX + 22, statStartY + 42, cardW - 44, "ACCEL", curChar.accel, 8, new Color(1f, 0.72f, 0.05f));
+        DrawToonStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.25f, 0.85f, 0.35f));
+        DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
 
         var switchGuide = new GUIStyle(sSmall) { fontSize = 12, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Normal };
-        GUI.color = new Color(0.85f, 0.9f, 1f, 0.7f);
+        switchGuide.normal.textColor = new Color(0.45f, 0.5f, 0.65f);
         GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "Press [W][S] to switch machine", switchGuide);
-        GUI.color = Color.white;
 
 
-        // 4. 画面中央下部：PRESS ENTER TO RACE（ネオンパルス）
+        // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
         float pulse = (Mathf.Sin(t * 6f) + 1f) * 0.5f;
-        float btnW = 430f + pulse * 10f;
-        float btnH = 46f + pulse * 4f;
+        float btnW = 440f + pulse * 10f;
+        float btnH = 50f + pulse * 4f;
         float btnX = (w - btnW) * 0.5f;
         float btnY = 598f - pulse * 2f;
 
-        GUI.color = new Color(0.04f, 0.10f, 0.24f, 0.9f);
-        GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), Texture2D.whiteTexture);
-        DrawFrame(new Rect(btnX, btnY, btnW, btnH), 3, Color.Lerp(new Color(1f, 0.82f, 0.15f), new Color(0.2f, 0.9f, 1f), pulse));
-        GUI.color = Color.white;
-
-        var startStyle = new GUIStyle(sMid) { fontSize = (int)(24 + pulse * 2), fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
-        Color startCol = Color.Lerp(new Color(1f, 0.88f, 0.25f), Color.white, pulse * 0.65f);
-        Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER TO RACE!  ◄◄", startStyle, startCol, 3);
-
-
-        // 5. 画面最下部：コントロールガイドバー
-        GUI.color = new Color(0.02f, 0.04f, 0.08f, 0.92f);
-        GUI.DrawTexture(new Rect(0, h - 34, w, 34), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        DrawFrame(new Rect(0, h - 34, w, 34), 1, new Color(0.25f, 0.4f, 0.6f, 0.5f));
-
-        var barStyle = new GUIStyle(sSmall) { fontSize = 13, fontStyle = FontStyle.Normal, alignment = TextAnchor.MiddleCenter };
-        string guideText = "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [ESC] Pause";
-        Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.85f, 0.92f, 1f), 1);
-    }
-
-    void DrawCard(Rect r)
-    {
-        if (cardPanelTex != null)
+        if (btnRaceTex != null)
         {
-            GUI.DrawTexture(r, cardPanelTex, ScaleMode.StretchToFill);
+            GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), btnRaceTex, ScaleMode.StretchToFill);
         }
         else
         {
-            GUI.color = new Color(0.04f, 0.08f, 0.18f, 0.88f);
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 0.7f, 0.1f);
+            GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            DrawFrame(r, 2, new Color(0.2f, 0.7f, 1f, 0.85f));
+            DrawFrame(new Rect(btnX, btnY, btnW, btnH), 3, new Color(0.1f, 0.15f, 0.3f));
+        }
+
+        var startStyle = new GUIStyle(sMid) { fontSize = (int)(24 + pulse * 2), fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
+        Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
+
+
+        // 5. 画面最下部：コントロールガイドバー
+        GUI.color = new Color(0.08f, 0.12f, 0.22f, 0.94f);
+        GUI.DrawTexture(new Rect(0, h - 34, w, 34), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        DrawFrame(new Rect(0, h - 34, w, 34), 1, new Color(0.2f, 0.3f, 0.45f, 0.6f));
+
+        var barStyle = new GUIStyle(sSmall) { fontSize = 13, fontStyle = FontStyle.Normal, alignment = TextAnchor.MiddleCenter };
+        string guideText = "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [ESC] Pause";
+        Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
+    }
+
+    void DrawPopCard(Rect r)
+    {
+        if (cardPopTex != null)
+        {
+            GUI.DrawTexture(r, cardPopTex, ScaleMode.StretchToFill);
+        }
+        else
+        {
+            GUI.color = Color.white;
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            DrawFrame(r, 3, new Color(0.1f, 0.15f, 0.25f));
         }
     }
 
-    void DrawHeaderRibbon(Rect r, string text, Color accent)
+    void DrawPopRibbon(Rect r, Texture2D tex, string text)
     {
-        GUI.color = new Color(0.08f, 0.14f, 0.28f, 0.92f);
-        GUI.DrawTexture(r, Texture2D.whiteTexture);
-        GUI.color = accent;
-        GUI.DrawTexture(new Rect(r.x, r.yMax - 3, r.width, 3), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-
+        if (tex != null)
+        {
+            GUI.DrawTexture(r, tex, ScaleMode.StretchToFill);
+        }
+        else
+        {
+            GUI.color = new Color(0.15f, 0.65f, 1f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawFrame(r, 2, new Color(0.1f, 0.15f, 0.25f));
+        }
         var st = new GUIStyle(sSmall) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        Outlined(r, text, st, Color.white, 1);
+        Outlined(r, text, st, Color.white, 1.5f);
     }
 
-    void DrawBadgeTag(Rect r, string text, Color bg)
+    void DrawPopPill(Rect r, string text, Color bg)
     {
         GUI.color = bg;
         GUI.DrawTexture(r, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        DrawFrame(r, 1, new Color(1f, 1f, 1f, 0.35f));
+        DrawFrame(r, 1.5f, new Color(0.1f, 0.15f, 0.25f, 0.8f));
 
-        var st = new GUIStyle(sSmall) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        Outlined(r, text, st, Color.white, 1);
+        var st = new GUIStyle(sSmall) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        Outlined(r, text, st, Color.white, 1.2f);
     }
 
-    void DrawStatGauge(float x, float y, float w, string label, int value, int maxVal, Color barColor)
+    void DrawToonStatGauge(float x, float y, float w, string label, int value, int maxVal, Color barColor)
     {
         var lblStyle = new GUIStyle(sSmall) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-        Outlined(new Rect(x, y, 70, 16), label, lblStyle, Color.white, 1);
+        lblStyle.normal.textColor = new Color(0.15f, 0.2f, 0.35f);
+        GUI.Label(new Rect(x, y, 70, 16), label, lblStyle);
 
         float barX = x + 72;
         float barW = w - 72;
-        float barH = 13;
+        float barH = 14;
         float barY = y + 1;
 
-        GUI.color = new Color(0.08f, 0.12f, 0.2f, 0.85f);
+        // トラフ背景（ライトグレーブルー）
+        GUI.color = new Color(0.86f, 0.90f, 0.95f, 1f);
         GUI.DrawTexture(new Rect(barX, barY, barW, barH), Texture2D.whiteTexture);
+        DrawFrame(new Rect(barX, barY, barW, barH), 1, new Color(0.72f, 0.78f, 0.86f));
 
         int segments = maxVal;
-        float gap = 2.5f;
+        float gap = 2f;
         float segW = (barW - (segments - 1) * gap) / segments;
         for (int i = 0; i < segments; i++)
         {
             float sx = barX + i * (segW + gap);
             if (i < value)
             {
+                // ポップなキャンディブロック
                 GUI.color = barColor;
-                GUI.DrawTexture(new Rect(sx, barY, segW, barH), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(sx, barY + 1, segW, barH - 2), Texture2D.whiteTexture);
+                // 上部ツヤ
+                GUI.color = new Color(1f, 1f, 1f, 0.45f);
+                GUI.DrawTexture(new Rect(sx, barY + 1, segW, (barH - 2) * 0.45f), Texture2D.whiteTexture);
             }
             else
             {
-                GUI.color = new Color(0.2f, 0.25f, 0.35f, 0.4f);
-                GUI.DrawTexture(new Rect(sx, barY, segW, barH), Texture2D.whiteTexture);
+                GUI.color = new Color(0.92f, 0.94f, 0.98f, 1f);
+                GUI.DrawTexture(new Rect(sx, barY + 1, segW, barH - 2), Texture2D.whiteTexture);
             }
         }
         GUI.color = Color.white;
@@ -1107,10 +1127,14 @@ public class RaceManager : MonoBehaviour
         iconShield = LoadTexture("Icons/item_shield", iconDir + "item_shield.jpg");
 
         string uiDir = Application.dataPath + "/Resources/UI/";
-        titleLogoTex = LoadTexture("UI/title_logo", uiDir + "title_logo.png");
+        titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");
         for (int i = 0; i < 3; i++)
-            trackBadgeTex[i] = LoadTexture($"UI/badge_track_{i}", uiDir + $"badge_track_{i}.png");
+            trackBadgeTex[i] = LoadTexture($"UI/badge_track_{i}_pop", uiDir + $"badge_track_{i}_pop.png") ?? LoadTexture($"UI/badge_track_{i}", uiDir + $"badge_track_{i}.png");
 
+        cardPopTex = LoadTexture("UI/ui_card_pop", uiDir + "ui_card_pop.png");
+        btnRaceTex = LoadTexture("UI/ui_btn_race", uiDir + "ui_btn_race.png");
+        ribbonTrackTex = LoadTexture("UI/ui_ribbon_track", uiDir + "ui_ribbon_track.png");
+        ribbonDriverTex = LoadTexture("UI/ui_ribbon_driver", uiDir + "ui_ribbon_driver.png");
         cardPanelTex = TextureGen.CardPanel(340, 400, new Color(0.04f, 0.08f, 0.18f, 0.88f), new Color(0.02f, 0.04f, 0.10f, 0.94f), new Color(0.2f, 0.7f, 1f, 0.85f), 2);
     }
 
