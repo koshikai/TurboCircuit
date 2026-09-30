@@ -59,6 +59,10 @@ public static class BuildTool
         rm.bananaMaterial = Lit("Banana", new Color(1f, 0.88f, 0.15f), 0.5f, 0f, new Color(0.25f, 0.2f, 0f));
         rm.missileMaterial = Lit("Missile", new Color(0.9f, 0.1f, 0.1f), 0.8f, 0.3f, new Color(0.4f, 0.02f, 0.02f));
         rm.glowMaterial = Glow("Glow");
+        rm.skidmarkMaterial = Glow("Skidmark");
+        rm.headlightMaterial = Lit("Headlight", new Color(1f, 1f, 0.95f), 0.9f, 0.1f, new Color(1.4f, 1.4f, 1.1f));
+        rm.taillightMaterial = Lit("Taillight", new Color(0.9f, 0.1f, 0.1f), 0.9f, 0.1f, new Color(0.8f, 0.05f, 0.05f));
+        rm.bannerMaterial = Lit("Banner", Color.white, 0.4f);
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };

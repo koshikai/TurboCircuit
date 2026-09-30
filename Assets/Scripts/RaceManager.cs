@@ -25,6 +25,10 @@ public class RaceManager : MonoBehaviour
     public Material bananaMaterial;
     public Material missileMaterial;
     public Material glowMaterial;
+    public Material skidmarkMaterial;
+    public Material headlightMaterial;
+    public Material taillightMaterial;
+    public Material bannerMaterial;
 
     [Header("Race")]
     public int totalLaps = 3;
@@ -53,6 +57,7 @@ public class RaceManager : MonoBehaviour
 
     Camera cam;
     Texture2D minimap;
+    Texture2D vignetteTex;
     System.Func<Vector3, Vector2> toMap;
 
     static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
@@ -67,8 +72,10 @@ public class RaceManager : MonoBehaviour
         Application.targetFrameRate = 120;
         Demo = System.Environment.GetCommandLineArgs().Contains("-demo");
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        EnsureMaterials();
         Audio = gameObject.AddComponent<RaceAudio>();
         Fx.Init(glowMaterial);
+        vignetteTex = TextureGen.Vignette();
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         cam = camGo.AddComponent<Camera>();
@@ -82,10 +89,12 @@ public class RaceManager : MonoBehaviour
         sun.intensity = 1.25f;
         sun.color = new Color(1f, 0.96f, 0.88f);
         sun.shadows = LightShadows.Soft;
-        sun.shadowStrength = 0.75f;
+        sun.shadowStrength = 0.78f;
         sun.transform.rotation = Quaternion.Euler(48, -35, 0);
         RenderSettings.sun = sun;
-        QualitySettings.shadowDistance = 90f;
+        QualitySettings.shadowDistance = 140f;
+        QualitySettings.shadowCascades = 4;
+        QualitySettings.shadowResolution = ShadowResolution.High;
 
         track = new GameObject("Track").AddComponent<Track>();
         track.BuildPath();
@@ -470,6 +479,12 @@ public class RaceManager : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
         float w = Screen.width / scale, h = 720f;
 
+        if (state != State.Title)
+        {
+            DrawVignette(w, h);
+            if (RaceRunning) DrawSpeedLines(w, h);
+        }
+
         switch (state)
         {
             case State.Title: DrawTitle(w, h); break;
@@ -670,6 +685,94 @@ public class RaceManager : MonoBehaviour
         }
         GUI.color = color;
         GUI.Label(r, text, style);
+        GUI.color = prev;
+    }
+
+    void EnsureMaterials()
+    {
+        if (skidmarkMaterial == null)
+        {
+            var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Legacy Shaders/Particles/Alpha Blended");
+            skidmarkMaterial = new Material(shader) { mainTexture = TextureGen.TireMark() };
+        }
+        if (headlightMaterial == null)
+        {
+            var shader = Shader.Find("Standard");
+            headlightMaterial = new Material(shader);
+            headlightMaterial.SetColor("_Color", new Color(1f, 1f, 0.95f));
+            headlightMaterial.EnableKeyword("_EMISSION");
+            headlightMaterial.SetColor("_EmissionColor", new Color(1.4f, 1.4f, 1.1f));
+        }
+        if (taillightMaterial == null)
+        {
+            var shader = Shader.Find("Standard");
+            taillightMaterial = new Material(shader);
+            taillightMaterial.SetColor("_Color", new Color(0.9f, 0.1f, 0.1f));
+            taillightMaterial.EnableKeyword("_EMISSION");
+            taillightMaterial.SetColor("_EmissionColor", new Color(0.8f, 0.05f, 0.05f));
+        }
+        if (bannerMaterial == null)
+        {
+            var shader = Shader.Find("Standard");
+            bannerMaterial = new Material(shader);
+            bannerMaterial.SetColor("_Color", Color.white);
+            bannerMaterial.SetFloat("_Glossiness", 0.4f);
+        }
+    }
+
+    void DrawVignette(float w, float h)
+    {
+        if (vignetteTex == null) return;
+        float speed01 = Player != null ? Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) : 0f;
+        float boostBonus = (Player != null && Player.Boosting) ? 0.35f : 0f;
+        float alpha = Mathf.Clamp01(0.18f + speed01 * 0.25f + boostBonus);
+        GUI.color = new Color(1, 1, 1, alpha);
+        GUI.DrawTexture(new Rect(0, 0, w, h), vignetteTex, ScaleMode.StretchToFill);
+        GUI.color = Color.white;
+    }
+
+    void DrawSpeedLines(float w, float h)
+    {
+        if (Player == null) return;
+        float speedRatio = Mathf.Clamp01(Player.Speed / Kart.MaxSpeed);
+        bool boost = Player.Boosting;
+        if (speedRatio < 0.65f && !boost) return;
+
+        float intensity = boost ? 1f : (speedRatio - 0.65f) / 0.35f;
+        int lineCount = (int)(intensity * 18);
+        var cx = w * 0.5f;
+        var cy = h * 0.5f;
+
+        var rng = new System.Random((int)(Time.time * 60f));
+        for (int i = 0; i < lineCount; i++)
+        {
+            float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+            float rOuter = Mathf.Max(w, h) * 0.65f;
+            float rInner = rOuter - (60f + (float)rng.NextDouble() * 140f * intensity);
+            float cos = Mathf.Cos(angle), sin = Mathf.Sin(angle);
+
+            Vector2 p1 = new Vector2(cx + cos * rOuter, cy + sin * rOuter);
+            Vector2 p2 = new Vector2(cx + cos * rInner, cy + sin * rInner);
+
+            Color lineColor = boost
+                ? (rng.Next(2) == 0 ? new Color(1f, 0.7f, 0.2f, 0.75f) : new Color(0.4f, 0.85f, 1f, 0.75f))
+                : new Color(1f, 1f, 1f, 0.45f * intensity);
+
+            DrawSpeedStroke(p1, p2, 2.5f + (float)rng.NextDouble() * 2f, lineColor);
+        }
+    }
+
+    void DrawSpeedStroke(Vector2 a, Vector2 b, float thickness, Color col)
+    {
+        var prev = GUI.color;
+        GUI.color = col;
+        var d = b - a;
+        float len = d.magnitude;
+        float ang = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        var m = GUI.matrix;
+        GUIUtility.RotateAroundPivot(ang, a);
+        GUI.DrawTexture(new Rect(a.x, a.y - thickness * 0.5f, len, thickness), Texture2D.whiteTexture);
+        GUI.matrix = m;
         GUI.color = prev;
     }
 }

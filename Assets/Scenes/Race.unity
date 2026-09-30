@@ -119,7 +119,22 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1864020499
+--- !u!115 &24775163
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: RaceManager
+  m_Namespace: 
+  m_AssemblyName: Assembly-CSharp
+--- !u!1 &1018775111
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +142,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1864020501}
-  - component: {fileID: 1864020500}
+  - component: {fileID: 1018775113}
+  - component: {fileID: 1018775112}
   m_Layer: 0
   m_Name: Race
   m_TagString: Untagged
@@ -136,16 +151,16 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1864020500
+--- !u!114 &1018775112
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1864020499}
+  m_GameObject: {fileID: 1018775111}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a463fa498fa25be43ad02734929ebc04, type: 3}
+  m_Script: {fileID: 24775163}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RaceManager
   roadMaterial: {fileID: 2100000, guid: 1927033198c1337408897216d71c9458, type: 2}
@@ -167,15 +182,19 @@ MonoBehaviour:
   bananaMaterial: {fileID: 2100000, guid: c84d8c28ca52c434082ae0d7ac496d2a, type: 2}
   missileMaterial: {fileID: 2100000, guid: dfd63598b7e566447bb5c5de86c121a9, type: 2}
   glowMaterial: {fileID: 2100000, guid: 2c7f04ace85bdca4bb9a9a47aaeddc75, type: 2}
+  skidmarkMaterial: {fileID: 2100000, guid: 4a9c11603881a5e46bea06d9e6c376f7, type: 2}
+  headlightMaterial: {fileID: 2100000, guid: 37bfcaf14d492204fb82e6b00c8f4f1a, type: 2}
+  taillightMaterial: {fileID: 2100000, guid: 76e376c7f5b1c0d4887667563ba7d9a2, type: 2}
+  bannerMaterial: {fileID: 2100000, guid: 8a63cae8f92dba84ea0db69f821d2039, type: 2}
   totalLaps: 3
   playerGridSlot: 5
---- !u!4 &1864020501
+--- !u!4 &1018775113
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1864020499}
+  m_GameObject: {fileID: 1018775111}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -188,4 +207,4 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1864020501}
+  - {fileID: 1018775113}

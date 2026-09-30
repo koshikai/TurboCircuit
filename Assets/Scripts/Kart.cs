@@ -51,10 +51,16 @@ public class Kart : MonoBehaviour
     Track track;
     RaceManager rm;
     Transform model;
+    Transform driverBody;
+    Transform driverHead;
     Transform[] wheelSpin = new Transform[4];
     Transform[] frontPivot = new Transform[2];
     Renderer shieldRenderer;
     MaterialPropertyBlock shieldMpb;
+    Renderer[] tailLightRend = new Renderer[2];
+    MaterialPropertyBlock tailMpb;
+    TrailRenderer[] skidTrails = new TrailRenderer[2];
+    bool isBraking;
 
     public void Init(RaceManager rm, Track track, string name, Color color, bool isPlayer, int index, float lateral, float aiSkill)
     {
@@ -87,8 +93,10 @@ public class Kart : MonoBehaviour
         RouletteTimer = 0;
         boostTimer = shieldTimer = spinTimer = invulnTimer = driftCharge = 0;
         drifting = false;
+        isBraking = false;
         spinAngle = 0;
         aiItemTimer = Random.Range(1f, 3f);
+        if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
         UpdateVisual(0, 0);
     }
 
@@ -104,6 +112,7 @@ public class Kart : MonoBehaviour
         var dark = new MaterialPropertyBlock();
         dark.SetColor("_Color", Color * 0.55f);
 
+        // カートボディ
         Part(PrimitiveType.Cube, new Vector3(0, 0.38f, 0), new Vector3(1.4f, 0.28f, 2.3f), rm.kartPaintMaterial, paint);
         Part(PrimitiveType.Cube, new Vector3(0, 0.42f, 1.3f), new Vector3(1.0f, 0.24f, 0.6f), rm.kartPaintMaterial, paint, Quaternion.Euler(12, 0, 0));
         Part(PrimitiveType.Cube, new Vector3(0, 0.3f, 1.62f), new Vector3(1.7f, 0.16f, 0.22f), rm.chromeMaterial);
@@ -116,10 +125,43 @@ public class Kart : MonoBehaviour
         Part(PrimitiveType.Cylinder, new Vector3(-0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
         Part(PrimitiveType.Cylinder, new Vector3(0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
         Part(PrimitiveType.Cube, new Vector3(0, 0.72f, -0.5f), new Vector3(0.7f, 0.55f, 0.18f), rm.tireMaterial);
-        // ドライバー
-        Part(PrimitiveType.Capsule, new Vector3(0, 0.95f, -0.22f), new Vector3(0.55f, 0.38f, 0.45f), rm.kartPaintMaterial, dark);
-        Part(PrimitiveType.Sphere, new Vector3(0, 1.45f, -0.15f), new Vector3(0.58f, 0.58f, 0.6f), rm.kartPaintMaterial, paint);
-        Part(PrimitiveType.Cube, new Vector3(0, 1.47f, 0.1f), new Vector3(0.42f, 0.16f, 0.12f), rm.visorMaterial);
+
+        // ヘッドライト（左右フロント）
+        var hlMat = rm.headlightMaterial;
+        Part(PrimitiveType.Cube, new Vector3(-0.46f, 0.44f, 1.46f), new Vector3(0.24f, 0.16f, 0.1f), hlMat);
+        Part(PrimitiveType.Cube, new Vector3(0.46f, 0.44f, 1.46f), new Vector3(0.24f, 0.16f, 0.1f), hlMat);
+        if (IsPlayer)
+        {
+            var spotGo = new GameObject("HeadlightBeam");
+            spotGo.transform.SetParent(transform, false);
+            spotGo.transform.localPosition = new Vector3(0, 0.55f, 1.5f);
+            spotGo.transform.localRotation = Quaternion.Euler(12, 0, 0);
+            var spot = spotGo.AddComponent<Light>();
+            spot.type = LightType.Spot;
+            spot.range = 38f;
+            spot.spotAngle = 55f;
+            spot.intensity = 2.4f;
+            spot.color = new Color(1f, 0.98f, 0.92f);
+        }
+
+        // テールランプ（左右リア・ブレーキ連動）
+        tailMpb = new MaterialPropertyBlock();
+        var tlMat = rm.taillightMaterial;
+        var tl1 = Part(PrimitiveType.Cube, new Vector3(-0.46f, 0.52f, -1.24f), new Vector3(0.22f, 0.14f, 0.08f), tlMat);
+        var tl2 = Part(PrimitiveType.Cube, new Vector3(0.46f, 0.52f, -1.24f), new Vector3(0.22f, 0.14f, 0.08f), tlMat);
+        tailLightRend[0] = tl1.GetComponent<Renderer>();
+        tailLightRend[1] = tl2.GetComponent<Renderer>();
+
+        // 排気管（マフラー左右）
+        Part(PrimitiveType.Cylinder, new Vector3(-0.35f, 0.28f, -1.22f), new Vector3(0.18f, 0.26f, 0.18f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+        Part(PrimitiveType.Cylinder, new Vector3(0.35f, 0.28f, -1.22f), new Vector3(0.18f, 0.26f, 0.18f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+
+        // ドライバー（アニメーション用ピボット保持）
+        var bodyGo = Part(PrimitiveType.Capsule, new Vector3(0, 0.95f, -0.22f), new Vector3(0.55f, 0.38f, 0.45f), rm.kartPaintMaterial, dark);
+        driverBody = bodyGo.transform;
+        var headGo = Part(PrimitiveType.Sphere, new Vector3(0, 1.45f, -0.15f), new Vector3(0.58f, 0.58f, 0.6f), rm.kartPaintMaterial, paint);
+        driverHead = headGo.transform;
+        Part(PrimitiveType.Cube, new Vector3(0, 1.47f, 0.1f), new Vector3(0.42f, 0.16f, 0.12f), rm.visorMaterial).transform.SetParent(driverHead, true);
         Part(PrimitiveType.Cylinder, new Vector3(0, 0.98f, 0.35f), new Vector3(0.36f, 0.025f, 0.36f), rm.tireMaterial, null, Quaternion.Euler(-60, 0, 0));
         Part(PrimitiveType.Sphere, new Vector3(-0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
         Part(PrimitiveType.Sphere, new Vector3(0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
@@ -140,6 +182,26 @@ public class Kart : MonoBehaviour
             tire.transform.SetParent(spin, false);
             var hub = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d * 0.5f, w * 1.1f, d * 0.5f), rm.chromeMaterial, null, Quaternion.Euler(0, 0, 90));
             hub.transform.SetParent(spin, false);
+        }
+
+        // スキッドマーク（タイヤ痕）
+        for (int i = 0; i < 2; i++)
+        {
+            var trGo = new GameObject("Skidmark_" + i);
+            trGo.transform.SetParent(transform, false);
+            trGo.transform.localPosition = new Vector3(i == 0 ? -0.88f : 0.88f, 0.04f, -0.85f);
+            trGo.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            var tr = trGo.AddComponent<TrailRenderer>();
+            tr.time = 4.5f;
+            tr.startWidth = 0.28f;
+            tr.endWidth = 0.26f;
+            tr.material = rm.skidmarkMaterial;
+            tr.alignment = LineAlignment.TransformZ;
+            tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            tr.receiveShadows = false;
+            tr.minVertexDistance = 0.35f;
+            tr.emitting = false;
+            skidTrails[i] = tr;
         }
 
         // シールド時のバリア
@@ -191,6 +253,24 @@ public class Kart : MonoBehaviour
         wheelAngle += Speed * dt / 0.37f * Mathf.Rad2Deg;
         for (int i = 0; i < 4; i++) wheelSpin[i].localRotation = Quaternion.Euler(wheelAngle, 0, 0);
         for (int i = 0; i < 2; i++) frontPivot[i].localRotation = Quaternion.Euler(0, steerVis * 28f, 0);
+
+        // ドライバーのアニメーション（ドリフト時のハングオン傾きと視線）
+        if (driverBody != null && driverHead != null)
+        {
+            float targetLean = drifting ? driftDir * 18f : -steerVis * 6f;
+            float targetLook = drifting ? driftDir * 22f : steerVis * 20f;
+            driverBody.localRotation = Quaternion.Euler(0, 0, -targetLean);
+            driverHead.localRotation = Quaternion.Euler(0, targetLook, -targetLean * 0.5f);
+        }
+
+        // テールランプ（ブレーキ時の強烈な赤発光）
+        if (tailLightRend[0] != null && tailMpb != null)
+        {
+            Color emitCol = isBraking ? new Color(2.4f, 0.15f, 0.15f) : new Color(0.6f, 0.04f, 0.04f);
+            tailMpb.SetColor("_EmissionColor", emitCol);
+            tailLightRend[0].SetPropertyBlock(tailMpb);
+            tailLightRend[1].SetPropertyBlock(tailMpb);
+        }
 
         bool sh = shieldTimer > 0;
         if (shieldRenderer.gameObject.activeSelf != sh) shieldRenderer.gameObject.SetActive(sh);
@@ -404,6 +484,14 @@ public class Kart : MonoBehaviour
             }
         }
 
+        isBraking = inp.throttle < 0 && Speed > 2f;
+        bool skidding = canDrive && (drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f));
+        if (skidTrails[0] != null)
+        {
+            skidTrails[0].emitting = skidding;
+            skidTrails[1].emitting = skidding;
+        }
+
         Effects(dt);
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
     }
@@ -422,15 +510,34 @@ public class Kart : MonoBehaviour
             var vel = back * 3f + Vector3.up * (lv > 0 ? 3f : 1f);
             Fx.Emit(rearL, vel, c, size, lv == 0 ? 0.4f : 0.25f, 1, lv > 0 ? 2.5f : 0.8f);
             Fx.Emit(rearR, vel, c, size, lv == 0 ? 0.4f : 0.25f, 1, lv > 0 ? 2.5f : 0.8f);
+
+            // タイヤスモーク（モクモク広がる白煙）
+            var smokeCol = new Color(0.88f, 0.88f, 0.92f, lv > 0 ? 0.4f : 0.22f);
+            Fx.Smoke(rearL, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
+            Fx.Smoke(rearR, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
         }
+
+        // 急ブレーキ白煙
+        if (isBraking && Speed > 6f && Random.value < 0.7f)
+        {
+            var brakeSmoke = new Color(0.9f, 0.9f, 0.92f, 0.3f);
+            Fx.Smoke(rearL, back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
+            Fx.Smoke(rearR, back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
+        }
+
         if (boostTimer > 0)
         {
-            var ex = transform.TransformPoint(new Vector3(0, 0.62f, -1.35f));
-            Fx.Emit(ex, back * 8f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.7f, 0.18f, 2, 1f);
-            Fx.Emit(ex, back * 6f + VelDir * Speed * 0.8f, new Color(0.4f, 0.7f, 1f), 0.4f, 0.12f, 1, 0.5f);
+            var exL = transform.TransformPoint(new Vector3(-0.35f, 0.28f, -1.35f));
+            var exR = transform.TransformPoint(new Vector3(0.35f, 0.28f, -1.35f));
+            // オレンジのアフターバーナー炎
+            Fx.Emit(exL, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
+            Fx.Emit(exR, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
+            // コアの青白熱炎
+            Fx.Emit(exL, back * 7f + VelDir * Speed * 0.8f, new Color(0.35f, 0.75f, 1f), 0.45f, 0.12f, 1, 0.4f);
+            Fx.Emit(exR, back * 7f + VelDir * Speed * 0.8f, new Color(0.35f, 0.75f, 1f), 0.45f, 0.12f, 1, 0.4f);
         }
         if (Offroad && Speed > 6f && Random.value < 0.6f)
-            Fx.Emit((rearL + rearR) * 0.5f, back * 2f + Vector3.up * 2f, new Color(0.7f, 0.6f, 0.4f, 0.6f), 0.9f, 0.5f, 1, 1.5f);
+            Fx.Smoke((rearL + rearR) * 0.5f, back * 2.5f + Vector3.up * 1.5f, new Color(0.65f, 0.55f, 0.35f, 0.45f), 0.8f, 0.6f, 1, 1.2f);
         if (shieldTimer > 0 && Random.value < 0.5f)
             Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
     }

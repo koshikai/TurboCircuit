@@ -160,6 +160,7 @@ public class Track : MonoBehaviour
         BuildBoostPads(rm);
         PlanItemBoxes();
         BuildScenery(rm);
+        BuildSponsorBoards(rm);
     }
 
     // a/b は (横オフセット, 高さ)。a→b が進行方向に対して右向きになる面が表。
@@ -227,6 +228,17 @@ public class Track : MonoBehaviour
         beamMat.mainTexture.filterMode = FilterMode.Point;
         beamMat.mainTextureScale = new Vector2(16, 2);
         Box("GateBeam", Pts[0] + Vector3.up * 8.5f, new Vector3((HalfWidth + 3.5f) * 2f + 1.2f, 1.6f, 0.6f), rot, beamMat);
+
+        // スタートシグナルランプ（赤・黄・青の3連ライト）
+        var signalColors = new[] { new Color(1f, 0.2f, 0.2f), new Color(1f, 0.85f, 0.15f), new Color(0.2f, 0.95f, 0.35f) };
+        for (int i = 0; i < 3; i++)
+        {
+            float xOffset = (i - 1) * 2.4f;
+            var lampPos = Pts[0] + rot * new Vector3(xOffset, 9.6f, 0.35f);
+            var lampMat = new Material(rm.glowMaterial) { color = signalColors[i] };
+            Box("SignalCase_" + i, lampPos, new Vector3(1.5f, 1.5f, 0.3f), rot, rm.tireMaterial);
+            Box("SignalBulb_" + i, lampPos + rot * Vector3.forward * 0.16f, new Vector3(1.1f, 1.1f, 0.1f), rot, lampMat, PrimitiveType.Cylinder).transform.localRotation = rot * Quaternion.Euler(90, 0, 0);
+        }
 
         // 観客席
         for (int row = 0; row < 5; row++)
@@ -330,6 +342,52 @@ public class Track : MonoBehaviour
                 mpb.SetColor("_Color", Color.HSVToRGB((i / 25 % 6) / 6f, 0.8f, 1f));
                 flag.GetComponent<Renderer>().SetPropertyBlock(mpb);
             }
+        }
+    }
+
+    void BuildSponsorBoards(RaceManager rm)
+    {
+        var bannerMats = new Material[4];
+        for (int v = 0; v < 4; v++)
+        {
+            bannerMats[v] = new Material(rm.bannerMaterial ?? rm.wallMaterial)
+            {
+                mainTexture = TextureGen.SponsorBanner(v)
+            };
+        }
+
+        // コース壁沿いのスポンサー看板
+        for (int i = 18; i < Count - 15; i += 22)
+        {
+            float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 12)], Vector3.up);
+            float side = bend > 2f ? -1f : 1f; // カーブ外側を優先
+            var pos = PointAt(i, side * (WallOffset + 0.1f)) + Vector3.up * 1.6f;
+            var rot = Quaternion.LookRotation(Dirs[i]);
+            var mat = bannerMats[(i / 22) % 4];
+
+            // 看板の支柱とボード
+            Box("BoardPole1", pos - Dirs[i] * 1.8f - Vector3.up * 0.8f, new Vector3(0.18f, 1.8f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("BoardPole2", pos + Dirs[i] * 1.8f - Vector3.up * 0.8f, new Vector3(0.18f, 1.8f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("SponsorBoard", pos, new Vector3(0.15f, 1.3f, 4.6f), rot, mat);
+        }
+
+        // オーバーヘッド・ブリッジ看板（コースをまたぐ大型ゲート 2箇所）
+        int[] bridgeSpots = { Count * 33 / 100, Count * 72 / 100 };
+        for (int b = 0; b < bridgeSpots.Length; b++)
+        {
+            int idx = bridgeSpots[b];
+            var center = Pts[idx] + Vector3.up * 7.5f;
+            var rot = Quaternion.LookRotation(Dirs[idx]);
+            var mat = bannerMats[(b + 1) % 4];
+
+            // 左右の巨大支柱
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var pillarPos = PointAt(idx, side * (HalfWidth + 3.0f)) + Vector3.up * 4.0f;
+                Box("BridgePillar", pillarPos, new Vector3(1.2f, 8.0f, 1.2f), rot, rm.chromeMaterial);
+            }
+            // 横梁
+            Box("BridgeBeam", center, new Vector3((HalfWidth + 3.0f) * 2f + 1.2f, 2.0f, 0.8f), rot, mat);
         }
     }
 
