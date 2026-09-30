@@ -58,6 +58,7 @@ public class RaceManager : MonoBehaviour
     Camera cam;
     Texture2D minimap;
     Texture2D vignetteTex;
+    Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
     System.Func<Vector3, Vector2> toMap;
 
     static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
@@ -73,6 +74,7 @@ public class RaceManager : MonoBehaviour
         Demo = System.Environment.GetCommandLineArgs().Contains("-demo");
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         EnsureMaterials();
+        LoadIcons();
         Audio = gameObject.AddComponent<RaceAudio>();
         Fx.Init(glowMaterial);
         vignetteTex = TextureGen.Vignette();
@@ -555,30 +557,43 @@ public class RaceManager : MonoBehaviour
     void DrawHud(float w, float h)
     {
         // アイテム枠
-        var slot = new Rect(24, 20, 130, 110);
-        GUI.color = new Color(0, 0, 0, 0.5f);
+        var slot = new Rect(24, 20, 114, 114);
+        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.8f);
         GUI.DrawTexture(slot, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        DrawFrame(slot, 3, Color.white);
+        DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
+
         ItemType shown = Player.Item;
-        if (Player.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 14f) % 4);
+        if (Player.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
         if (shown != ItemType.None)
         {
+            Texture2D icon = null;
             Color ic; string label;
             switch (shown)
             {
-                case ItemType.Turbo: ic = new Color(1f, 0.55f, 0.1f); label = "TURBO"; break;
-                case ItemType.Banana: ic = new Color(1f, 0.9f, 0.2f); label = "BANANA"; break;
-                case ItemType.Missile: ic = new Color(1f, 0.2f, 0.2f); label = "MISSILE"; break;
-                default: ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = "SHIELD"; break;
+                case ItemType.Turbo: icon = iconTurbo; ic = new Color(1f, 0.55f, 0.1f); label = "TURBO"; break;
+                case ItemType.Banana: icon = iconBanana; ic = new Color(1f, 0.9f, 0.2f); label = "BANANA"; break;
+                case ItemType.Missile: icon = iconMissile; ic = new Color(1f, 0.2f, 0.2f); label = "MISSILE"; break;
+                default: icon = iconShield; ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = "SHIELD"; break;
             }
-            GUI.color = ic;
-            GUI.DrawTexture(new Rect(slot.x + 12, slot.y + 12, slot.width - 24, 58), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            var ls = new GUIStyle(sSmall) { fontSize = 20 };
-            Outlined(new Rect(slot.x, slot.y + 12, slot.width, 58), label, ls, Color.white, 2);
+
+            if (icon != null)
+            {
+                // 生成した3Dアイコン画像の描画
+                GUI.DrawTexture(new Rect(slot.x + 8, slot.y + 8, slot.width - 16, slot.height - 16), icon, ScaleMode.ScaleToFit);
+            }
+            else
+            {
+                // フォールバック
+                GUI.color = ic;
+                GUI.DrawTexture(new Rect(slot.x + 12, slot.y + 12, slot.width - 24, 58), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                var ls = new GUIStyle(sSmall) { fontSize = 20 };
+                Outlined(new Rect(slot.x, slot.y + 12, slot.width, 58), label, ls, Color.white, 2);
+            }
+
             if (Player.RouletteTimer <= 0)
-                Outlined(new Rect(slot.x, slot.y + 74, slot.width, 30), "[E]", new GUIStyle(sSmall) { fontSize = 16 }, Color.white, 1);
+                Outlined(new Rect(slot.x, slot.yMax - 22, slot.width, 20), "[E]", new GUIStyle(sSmall) { fontSize = 15 }, new Color(1f, 1f, 0.3f), 1);
         }
 
         // 周回とタイム
@@ -774,5 +789,27 @@ public class RaceManager : MonoBehaviour
         GUI.DrawTexture(new Rect(a.x, a.y - thickness * 0.5f, len, thickness), Texture2D.whiteTexture);
         GUI.matrix = m;
         GUI.color = prev;
+    }
+
+    void LoadIcons()
+    {
+        string dir = Application.dataPath + "/Resources/Icons/";
+        iconTurbo = LoadTexture("Icons/item_turbo", dir + "item_turbo.jpg");
+        iconBanana = LoadTexture("Icons/item_banana", dir + "item_banana.jpg");
+        iconMissile = LoadTexture("Icons/item_missile", dir + "item_missile.jpg");
+        iconShield = LoadTexture("Icons/item_shield", dir + "item_shield.jpg");
+    }
+
+    public static Texture2D LoadTexture(string resPath, string diskPath)
+    {
+        var tex = Resources.Load<Texture2D>(resPath);
+        if (tex != null) return tex;
+        if (System.IO.File.Exists(diskPath))
+        {
+            var bytes = System.IO.File.ReadAllBytes(diskPath);
+            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (t.LoadImage(bytes)) return t;
+        }
+        return null;
     }
 }

@@ -347,12 +347,15 @@ public class Track : MonoBehaviour
 
     void BuildSponsorBoards(RaceManager rm)
     {
+        var hiResBanner = RaceManager.LoadTexture("Banners/banner_turbo", Application.dataPath + "/Resources/Banners/banner_turbo.jpg");
+
         var bannerMats = new Material[4];
         for (int v = 0; v < 4; v++)
         {
+            var tex = (v == 0 && hiResBanner != null) ? hiResBanner : TextureGen.SponsorBanner(v);
             bannerMats[v] = new Material(rm.bannerMaterial ?? rm.wallMaterial)
             {
-                mainTexture = TextureGen.SponsorBanner(v)
+                mainTexture = tex
             };
         }
 
@@ -378,7 +381,9 @@ public class Track : MonoBehaviour
             int idx = bridgeSpots[b];
             var center = Pts[idx] + Vector3.up * 7.5f;
             var rot = Quaternion.LookRotation(Dirs[idx]);
-            var mat = bannerMats[(b + 1) % 4];
+            var mat = (hiResBanner != null)
+                ? new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = hiResBanner }
+                : bannerMats[(b + 1) % 4];
 
             // 左右の巨大支柱
             foreach (float side in new[] { -1f, 1f })
