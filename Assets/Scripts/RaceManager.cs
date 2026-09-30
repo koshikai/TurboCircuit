@@ -46,7 +46,8 @@ public class RaceManager : MonoBehaviour
     public bool RaceRunning => state == State.Racing || state == State.Results;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
-    bool screenshotRequested, screenshotTaken;
+    bool screenshotRequested, screenshotTaken, titleShotRequested;
+    string customShotName;
     float shotDelay = 4.2f;
 
     Track track;
@@ -65,6 +66,24 @@ public class RaceManager : MonoBehaviour
     Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
     System.Func<Vector3, Vector2> toMap;
 
+    public struct KartCharacterDef
+    {
+        public string name;
+        public string driver;
+        public string trait;
+        public Color color;
+    }
+    public static readonly KartCharacterDef[] KartCharacters =
+    {
+        new KartCharacterDef { name = "OOBI", driver = "Alien Oobi", trait = "Balanced / All-Rounder", color = new Color(0.95f, 0.15f, 0.15f) },
+        new KartCharacterDef { name = "OODI", driver = "Pink Oodi", trait = "High Drift & Turbo Boost", color = new Color(0.95f, 0.35f, 0.75f) },
+        new KartCharacterDef { name = "OOLI", driver = "Aero Ooli", trait = "Maximum Top Speed", color = new Color(0.15f, 0.55f, 0.95f) },
+        new KartCharacterDef { name = "OOPI", driver = "Racer Oopi", trait = "Sharp Handling & Turn", color = new Color(1.0f, 0.6f, 0.1f) },
+        new KartCharacterDef { name = "OOZI", driver = "Cool Oozi", trait = "Heavy Weight & High Grip", color = new Color(0.2f, 0.85f, 0.3f) },
+    };
+
+    public int SelectedKart { get; private set; } = 0;
+
     static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
     static readonly Color[] AiColors =
     {
@@ -77,10 +96,13 @@ public class RaceManager : MonoBehaviour
         var args = System.Environment.GetCommandLineArgs();
         Demo = args.Contains("-demo") || args.Contains("-screenshot");
         screenshotRequested = args.Contains("-screenshot");
+        titleShotRequested = args.Contains("-titleshot");
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "-shotdelay" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d))
                 shotDelay = d;
+            if (args[i] == "-shotname")
+                customShotName = args[i + 1];
         }
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         EnsureMaterials();
@@ -104,7 +126,7 @@ public class RaceManager : MonoBehaviour
         Sun.shadowStrength = 0.78f;
         Sun.transform.rotation = Quaternion.Euler(48, -35, 0);
         RenderSettings.sun = Sun;
-        QualitySettings.shadowDistance = 140f;
+        QualitySettings.shadowDistance = 350f;
         QualitySettings.shadowCascades = 4;
         QualitySettings.shadowResolution = ShadowResolution.High;
 
@@ -114,6 +136,8 @@ public class RaceManager : MonoBehaviour
         {
             if (args[i] == "-course" && int.TryParse(args[i + 1], out int parsed))
                 cIdx = parsed;
+            if (args[i] == "-kart" && int.TryParse(args[i + 1], out int parsedKart))
+                SelectedKart = Mathf.Clamp(parsedKart, 0, KartCharacters.Length - 1);
         }
 
         track = new GameObject("Track").AddComponent<Track>();
@@ -127,7 +151,9 @@ public class RaceManager : MonoBehaviour
             bool isPlayer = i == playerGridSlot;
             int ai = i < playerGridSlot ? i : i - 1;
             GridSlot(i, out int idx, out float lat);
-            k.Init(this, track, isPlayer ? "YOU" : AiNames[ai], isPlayer ? new Color(0.95f, 0.12f, 0.12f) : AiColors[ai], isPlayer, idx, lat, 0.95f);
+            string kName = isPlayer ? ("YOU (" + KartCharacters[SelectedKart].name + ")") : AiNames[ai];
+            Color kCol = isPlayer ? KartCharacters[SelectedKart].color : AiColors[ai];
+            k.Init(this, track, kName, kCol, isPlayer, idx, lat, 0.95f);
             Karts.Add(k);
             if (isPlayer) Player = k;
         }
@@ -174,6 +200,23 @@ public class RaceManager : MonoBehaviour
         {
             if (Audio != null) Audio.Beep();
             LoadCourse(next);
+        }
+    }
+
+    void SwitchKart(int delta)
+    {
+        int next = (SelectedKart + delta + KartCharacters.Length) % KartCharacters.Length;
+        if (next != SelectedKart)
+        {
+            SelectedKart = next;
+            if (Audio != null) Audio.Beep();
+            if (Player != null)
+            {
+                var def = KartCharacters[SelectedKart];
+                Player.Name = "YOU (" + def.name + ")";
+                Player.Color = def.color;
+                Player.RebuildModel();
+            }
         }
     }
 
@@ -225,13 +268,21 @@ public class RaceManager : MonoBehaviour
         {
             ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
         }
+        if (titleShotRequested && state == State.Title && stateTime > shotDelay && !screenshotTaken)
+        {
+            screenshotTaken = true;
+            string fname = string.IsNullOrEmpty(customShotName) ? "screenshot_title.png" : customShotName;
+            ScreenCapture.CaptureScreenshot(fname);
+            Invoke(nameof(QuitAfterScreenshot), 0.4f);
+        }
         if (screenshotRequested && state == State.Racing && stateTime > shotDelay && !screenshotTaken)
         {
             screenshotTaken = true;
-            ScreenCapture.CaptureScreenshot($"screenshot_course{SelectedCourse}.png");
-            Invoke(nameof(QuitAfterScreenshot), 0.3f);
+            string fname = string.IsNullOrEmpty(customShotName) ? $"screenshot_course{SelectedCourse}.png" : customShotName;
+            ScreenCapture.CaptureScreenshot(fname);
+            Invoke(nameof(QuitAfterScreenshot), 0.4f);
         }
-        if (screenshotRequested && (stateTime + raceTime) > 30f) Application.Quit();
+        if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 30f) Application.Quit();
 
         if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
@@ -258,8 +309,12 @@ public class RaceManager : MonoBehaviour
                     SwitchCourse(-1);
                 else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
                     SwitchCourse(1);
+                else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+                    SwitchKart(-1);
+                else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
+                    SwitchKart(1);
 
-                if (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f)) StartCountdown();
+                if (!titleShotRequested && (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))) StartCountdown();
                 break;
             case State.Countdown:
                 int beep = Mathf.FloorToInt(stateTime - 1f);
@@ -531,6 +586,7 @@ public class RaceManager : MonoBehaviour
         if (shake > 0) cam.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
 
         float fov = 62f + Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) * 4f + (Player.Boosting ? 10f : 0f);
+        if (Player != null && Player.IsAirborne) fov += 12f;
         cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-6f * dt));
     }
 
@@ -587,36 +643,43 @@ public class RaceManager : MonoBehaviour
     void DrawTitle(float w, float h)
     {
         float t = Time.time;
-        var title = new GUIStyle(sBig) { fontSize = 92 };
-        Outlined(new Rect(0, h * 0.08f, w, 110), "TURBO CIRCUIT", title, Color.HSVToRGB(Mathf.Repeat(t * 0.1f, 1f), 0.6f, 1f), 5);
+        var title = new GUIStyle(sBig) { fontSize = 84 };
+        Outlined(new Rect(0, h * 0.05f, w, 100), "TURBO CIRCUIT", title, Color.HSVToRGB(Mathf.Repeat(t * 0.1f, 1f), 0.6f, 1f), 5);
 
         // コースセレクター
         var curDef = Track.Courses[SelectedCourse];
-        var courseTitleStyle = new GUIStyle(sMid) { fontSize = 28, alignment = TextAnchor.MiddleCenter };
-        Outlined(new Rect(0, h * 0.23f, w, 36), $"<  TRACK {SelectedCourse + 1}/{Track.Courses.Length} : {curDef.Name}  >", courseTitleStyle, new Color(1f, 0.9f, 0.25f), 3);
-        Outlined(new Rect(0, h * 0.23f + 36, w, 24), curDef.Description, sSmall, Color.white, 2);
-        Outlined(new Rect(0, h * 0.23f + 62, w, 20), "Press [A] [D] or [<-] [->] to Select Track", sSmall, new Color(0.75f, 0.9f, 1f), 2);
+        var courseTitleStyle = new GUIStyle(sMid) { fontSize = 26, alignment = TextAnchor.MiddleCenter };
+        Outlined(new Rect(0, h * 0.18f, w, 32), $"<  TRACK {SelectedCourse + 1}/{Track.Courses.Length} : {curDef.Name}  >", courseTitleStyle, new Color(1f, 0.9f, 0.25f), 3);
+        Outlined(new Rect(0, h * 0.18f + 32, w, 22), curDef.Description, sSmall, Color.white, 2);
+        Outlined(new Rect(0, h * 0.18f + 54, w, 20), "Press [A] [D] or [<-] [->] to Select Track", sSmall, new Color(0.75f, 0.9f, 1f), 2);
 
-        Outlined(new Rect(0, h * 0.38f, w, 30), "8-kart Grand Prix  -  " + totalLaps + " laps", sSmall, Color.white);
+        // カート＆キャラクターセレクター
+        var curChar = KartCharacters[SelectedKart];
+        var kartTitleStyle = new GUIStyle(sMid) { fontSize = 24, alignment = TextAnchor.MiddleCenter };
+        Outlined(new Rect(0, h * 0.30f, w, 30), $"<  DRIVER {SelectedKart + 1}/{KartCharacters.Length} : {curChar.name} ({curChar.driver})  >", kartTitleStyle, curChar.color, 3);
+        Outlined(new Rect(0, h * 0.30f + 28, w, 20), $"Trait: {curChar.trait}", sSmall, Color.white, 2);
+        Outlined(new Rect(0, h * 0.30f + 48, w, 18), "Press [W] [S] or [Up] [Down] to Select Driver", sSmall, new Color(1f, 0.85f, 0.6f), 2);
 
-        GUI.color = new Color(0, 0, 0, 0.5f);
-        GUI.DrawTexture(new Rect(w / 2 - 300, h * 0.46f, 600, 190), Texture2D.whiteTexture);
+        Outlined(new Rect(0, h * 0.42f, w, 24), "8-kart Grand Prix  -  " + totalLaps + " laps", sSmall, Color.white);
+
+        GUI.color = new Color(0, 0, 0, 0.55f);
+        GUI.DrawTexture(new Rect(w / 2 - 310, h * 0.48f, 620, 180), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        var left = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Normal };
+        var left = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Normal, fontSize = 20 };
         string[] lines =
         {
-            "W / Up            Accelerate",
-            "S / Down          Brake / Reverse",
+            "W / Up            Accelerate (In Title: Change Driver)",
+            "S / Down          Brake / Reverse (In Title: Change Driver)",
             "A D / Left Right  Steer (In Title: Change Track)",
-            "SPACE / SHIFT     Hop & Drift (hold for mini-turbo)",
+            "SPACE / SHIFT     Hop & Drift (hold for spark mini-turbo)",
             "E / CTRL          Use item",
             "ESC               Pause",
         };
         for (int i = 0; i < lines.Length; i++)
-            GUI.Label(new Rect(w / 2 - 270, h * 0.46f + 10 + i * 28, 560, 28), lines[i], left);
+            GUI.Label(new Rect(w / 2 - 280, h * 0.48f + 8 + i * 27, 560, 27), lines[i], left);
 
         if (Mathf.Repeat(t, 1.1f) < 0.75f)
-            Outlined(new Rect(0, h * 0.79f, w, 60), "PRESS ENTER TO START", sMid, new Color(1f, 0.85f, 0.2f));
+            Outlined(new Rect(0, h * 0.80f, w, 60), "PRESS ENTER TO START", sMid, new Color(1f, 0.85f, 0.2f));
     }
 
     void DrawCountdown(float w, float h)

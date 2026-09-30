@@ -330,6 +330,9 @@ public class Track : MonoBehaviour
         Strip("WallTopL", new Vector2(-WallOffset - 0.4f, 1.2f), new Vector2(-WallOffset, 1.2f), rm.chromeMaterial, 6f);
         Strip("WallTopR", new Vector2(WallOffset, 1.2f), new Vector2(WallOffset + 0.4f, 1.2f), rm.chromeMaterial, 6f);
 
+        // 高架橋の底面（下から見上げたときに道路の裏が見えるように）
+        Strip("RoadUnder", new Vector2(WallOffset, -0.35f), new Vector2(-WallOffset, -0.35f), rm.standMaterial, 8f);
+
         // 地面
         var ground = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Destroy(ground.GetComponent<Collider>());
@@ -338,7 +341,9 @@ public class Track : MonoBehaviour
         ground.transform.position = new Vector3(bounds.center.x, -0.3f, bounds.center.z);
         ground.transform.rotation = Quaternion.Euler(90, 0, 0);
         ground.transform.localScale = new Vector3(1800, 1800, 1);
-        ground.GetComponent<Renderer>().sharedMaterial = groundMat;
+        var groundRend = ground.GetComponent<Renderer>();
+        groundRend.sharedMaterial = groundMat;
+        groundRend.receiveShadows = true;
 
         BuildStartLine(rm, def);
         BuildBoostPads(rm);

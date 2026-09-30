@@ -38,6 +38,7 @@ public class Kart : MonoBehaviour
     public bool Boosting => boostTimer > 0;
     public bool Shielded => shieldTimer > 0;
     public bool Offroad { get; private set; }
+    public bool IsAirborne => isAirborne;
     public Vector3 Forward => Quaternion.Euler(0, Heading, 0) * Vector3.forward;
 
     float boostTimer, shieldTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
@@ -79,6 +80,20 @@ public class Kart : MonoBehaviour
         aiLane = lateral * 0.5f;
         BuildModel();
         ResetTo(index, lateral);
+    }
+
+    public void RebuildModel()
+    {
+        if (model != null) Destroy(model.gameObject);
+        var spot = transform.Find("HeadlightBeam");
+        if (spot != null) Destroy(spot.gameObject);
+        var sk0 = transform.Find("Skidmark_0");
+        if (sk0 != null) Destroy(sk0.gameObject);
+        var sk1 = transform.Find("Skidmark_1");
+        if (sk1 != null) Destroy(sk1.gameObject);
+        if (shieldRenderer != null) Destroy(shieldRenderer.gameObject);
+
+        BuildModel();
     }
 
     public void SetSkill(float skill) => aiSkill = skill;
@@ -246,7 +261,7 @@ public class Kart : MonoBehaviour
 
     bool TryBuildKenneyModel()
     {
-        int variant = Mathf.Abs(IsPlayer ? 0 : (Index + 1)) % KenneyKarts.Length;
+        int variant = IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 1) % KenneyKarts.Length);
         var kartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[variant]);
         var wheelPrefab = Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default");
         if (kartPrefab == null) return false;
@@ -663,6 +678,26 @@ public class Kart : MonoBehaviour
             var smokeCol = new Color(0.88f, 0.88f, 0.92f, lv > 0 ? 0.4f : 0.22f);
             Fx.Smoke(rearL, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
             Fx.Smoke(rearR, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
+
+            // ドリフト火花スパーク（マリオカート風にタイヤから弾け飛ぶ粒子）
+            if (lv > 0)
+            {
+                var sparkCol = lv == 3 ? new Color(1f, 0.4f, 1f) : lv == 2 ? new Color(1f, 0.7f, 0.1f) : new Color(0.4f, 0.8f, 1f);
+                Vector3 sparkVelL = -transform.right * Random.Range(2.5f, 5.5f) + Vector3.up * Random.Range(1.5f, 4.5f) + back * Random.Range(0.5f, 2f);
+                Vector3 sparkVelR = transform.right * Random.Range(2.5f, 5.5f) + Vector3.up * Random.Range(1.5f, 4.5f) + back * Random.Range(0.5f, 2f);
+                Fx.Emit(rearL, sparkVelL, sparkCol, 0.22f, 0.18f, 2, 2.5f);
+                Fx.Emit(rearR, sparkVelR, sparkCol, 0.22f, 0.18f, 2, 2.5f);
+            }
+        }
+
+        // スピン中のピヨピヨ星（頭上を回転するスター）
+        if (spinTimer > 0)
+        {
+            float ang = Time.time * 12f;
+            Vector3 starPos1 = transform.position + Vector3.up * 1.6f + new Vector3(Mathf.Cos(ang), 0.1f * Mathf.Sin(ang * 2f), Mathf.Sin(ang)) * 0.75f;
+            Vector3 starPos2 = transform.position + Vector3.up * 1.6f + new Vector3(Mathf.Cos(ang + Mathf.PI), -0.1f * Mathf.Sin(ang * 2f), Mathf.Sin(ang + Mathf.PI)) * 0.75f;
+            Fx.Emit(starPos1, Vector3.up * 0.3f, new Color(1f, 0.95f, 0.2f), 0.26f, 0.18f, 1, 1.5f);
+            Fx.Emit(starPos2, Vector3.up * 0.3f, new Color(1f, 0.85f, 0.2f), 0.26f, 0.18f, 1, 1.5f);
         }
 
         // 急ブレーキ白煙
