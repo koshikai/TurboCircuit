@@ -1,11 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public struct JumpRampDef
+{
+    public float Ratio; // 0.0 ~ 1.0 (コースの進行度)
+    public float Power; // 射出上向き速度 (例: 14f)
+}
+
 public struct TrackDef
 {
     public string Name;
     public string Description;
-    public Vector2[] Control;
+    public Vector3[] Control;
+    public JumpRampDef[] Ramps;
     public Color SkyTint;
     public Color GroundColor;
     public Color SunColor;
@@ -33,19 +40,32 @@ public class Track : MonoBehaviour
 
     public static readonly TrackDef[] Courses =
     {
-        // 1. Turbo Circuit
+        // 1. Turbo Circuit - 緩やかな丘陵と高架橋立体交差、終盤のビッグジャンプ
         new TrackDef
         {
             Name = "TURBO CIRCUIT",
-            Description = "Standard Grand Prix track with fast chicanes and packed grandstands.",
+            Description = "Grand Prix circuit with dynamic flyover bridge, high-speed sweeping hills, and a stadium ramp.",
             Control = new[]
             {
-                new Vector2(0, -120), new Vector2(120, -128), new Vector2(200, -100), new Vector2(232, -30),
-                new Vector2(192, 28), new Vector2(122, 40), new Vector2(92, 92), new Vector2(132, 150),
-                new Vector2(82, 204), new Vector2(-20, 192), new Vector2(-82, 140), new Vector2(-60, 72),
-                new Vector2(-128, 38), new Vector2(-200, 62), new Vector2(-244, 0), new Vector2(-214, -82),
-                new Vector2(-120, -122)
+                new Vector3(0, 0, -120),        // スタート/フィニッシュ
+                new Vector3(120, 3, -128),      // 緩やかな上り坂
+                new Vector3(200, 7, -100),      // 第1コーナー
+                new Vector3(232, 14, -30),      // 高架橋へのアプローチ
+                new Vector3(192, 18, 28),       // 高架橋ピーク（絶景パノラマ！）
+                new Vector3(122, 12, 40),       // ダウンヒル下り坂
+                new Vector3(92, 6, 92),         // 低速ヘアピン
+                new Vector3(132, 8, 150),       // 北側ストレート（ジャンプ台設置）
+                new Vector3(82, 11, 204),       // 高台シケイン
+                new Vector3(-20, 6, 192),       // ダウンヒル
+                new Vector3(-82, 2, 140),       // 中速S字
+                new Vector3(-60, 0, 72),        // 平坦セクション
+                new Vector3(-128, 4, 38),       // 丘越え
+                new Vector3(-200, 7, 62),       // 高速コーナー
+                new Vector3(-244, 4, 0),        // 西側ストレート
+                new Vector3(-214, 1, -82),      // 最終コーナー手前
+                new Vector3(-120, 0, -122)      // ホームストレートへ
             },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.44f, Power = 15f } },
             SkyTint = new Color(0.45f, 0.6f, 1f),
             GroundColor = new Color(0.45f, 0.55f, 0.4f),
             SunColor = new Color(1f, 0.96f, 0.88f),
@@ -61,18 +81,31 @@ public class Track : MonoBehaviour
             ShoulderColor = new Color(0.85f, 0.75f, 0.55f),
             SceneryTheme = 0
         },
-        // 2. Sunset Dunes
+        // 2. Sunset Dunes - 砂漠の超巨大デューン急上昇とオアシスへの急降下ジェットコースター
         new TrackDef
         {
             Name = "SUNSET DUNES",
-            Description = "High-speed desert raceway with sweeping curves and ancient ruins.",
+            Description = "Rollercoaster desert raceway climbing massive sand dunes and plunging into ancient ruins.",
             Control = new[]
             {
-                new Vector2(0, -150), new Vector2(130, -145), new Vector2(210, -90), new Vector2(240, 20),
-                new Vector2(170, 90), new Vector2(80, 50), new Vector2(20, 110), new Vector2(70, 190),
-                new Vector2(-20, 220), new Vector2(-110, 180), new Vector2(-80, 100), new Vector2(-150, 40),
-                new Vector2(-230, 20), new Vector2(-250, -60), new Vector2(-180, -130), new Vector2(-90, -140)
+                new Vector3(0, 0, -150),        // スタート
+                new Vector3(130, 4, -145),      // 砂漠平原
+                new Vector3(210, 15, -90),      // 巨大砂丘の登り口
+                new Vector3(240, 26, 20),       // 砂丘頂上！（巨大夕日クライマックス）
+                new Vector3(170, 22, 90),       // 砂丘の尾根滑走
+                new Vector3(80, 16, 50),        // 下り坂
+                new Vector3(20, 18, 110),       // 砂丘陵
+                new Vector3(70, 14, 190),       // 高台コーナー（ジャンプ台設置）
+                new Vector3(-20, 5, 220),       // 急降下ジェットコースター！
+                new Vector3(-110, 0, 180),      // オアシス低地
+                new Vector3(-80, 6, 100),       // 古代ピラミッド谷
+                new Vector3(-150, 12, 40),      // 遺跡の丘
+                new Vector3(-230, 16, 20),      // 峡谷の登り
+                new Vector3(-250, 10, -60),     // 峡谷出口
+                new Vector3(-180, 4, -130),     // ホームストレートへ下る
+                new Vector3(-90, 0, -140)       // 平坦ストレート
             },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.48f, Power = 16f } },
             SkyTint = new Color(1.0f, 0.45f, 0.25f),
             GroundColor = new Color(0.85f, 0.65f, 0.35f),
             SunColor = new Color(1.0f, 0.65f, 0.35f),
@@ -88,19 +121,33 @@ public class Track : MonoBehaviour
             ShoulderColor = new Color(0.92f, 0.75f, 0.48f),
             SceneryTheme = 1
         },
-        // 3. Frost Peak
+        // 3. Frost Peak - 標高差35mの本格アルペン雪山クライム＆クレバス滑降
         new TrackDef
         {
             Name = "FROST PEAK",
-            Description = "Twisting alpine circuit carved through snow-capped mountains and ice.",
+            Description = "Alpine mountain track carving up to snowy summits with 35m drop and a daring crevasse leap.",
             Control = new[]
             {
-                new Vector2(0, -130), new Vector2(110, -120), new Vector2(180, -70), new Vector2(140, -10),
-                new Vector2(200, 30), new Vector2(160, 90), new Vector2(110, 140), new Vector2(40, 130),
-                new Vector2(10, 180), new Vector2(-60, 190), new Vector2(-90, 130), new Vector2(-40, 70),
-                new Vector2(-110, 20), new Vector2(-190, 50), new Vector2(-220, -30), new Vector2(-160, -90),
-                new Vector2(-90, -80), new Vector2(-60, -130)
+                new Vector3(0, 0, -130),        // スタート（山麓の谷）
+                new Vector3(110, 6, -120),      // 雪山登山口
+                new Vector3(180, 18, -70),      // つづら折りクライム
+                new Vector3(140, 28, -10),      // 雪の尾根道
+                new Vector3(200, 36, 30),       // 最高峰ピーク（標高36m！）
+                new Vector3(160, 33, 90),       // 氷河の台地（ジャンプ台設置）
+                new Vector3(110, 28, 140),      // 氷の急斜面
+                new Vector3(40, 22, 130),       // つづら折りダウンヒル開始
+                new Vector3(10, 18, 180),       // 急勾配ダウンヒル
+                new Vector3(-60, 14, 190),      // 雪煙ヘアピン
+                new Vector3(-90, 9, 130),       // 氷柱の谷
+                new Vector3(-40, 5, 70),        // 緩やかな下り
+                new Vector3(-110, 2, 20),       // 山麓への出口
+                new Vector3(-190, 6, 50),       // 針葉樹林帯クライム
+                new Vector3(-220, 7, -30),      // 氷雪コーナー
+                new Vector3(-160, 4, -90),      // 下り坂
+                new Vector3(-90, 1, -80),       // ベースキャンプ手前
+                new Vector3(-60, 0, -130)       // ホームストレートへ
             },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.36f, Power = 16f } },
             SkyTint = new Color(0.55f, 0.72f, 1.0f),
             GroundColor = new Color(0.9f, 0.94f, 1.0f),
             SunColor = new Color(0.95f, 0.98f, 1.0f),
@@ -122,12 +169,14 @@ public class Track : MonoBehaviour
     public Vector3[] Pts { get; private set; }
     public Vector3[] Dirs { get; private set; }
     public Vector3[] Rights { get; private set; }
+    public Vector3[] Normals { get; private set; }
     public float[] Dist { get; private set; }
     public float Length { get; private set; }
     public int Count => Pts != null ? Pts.Length : 0;
 
     public readonly List<(int index, float lateral)> BoostPads = new List<(int, float)>();
     public readonly List<(int index, float lateral)> ItemBoxSpots = new List<(int, float)>();
+    public readonly List<(int index, float lateral, float power)> JumpRamps = new List<(int, float, float)>();
 
     Bounds bounds;
 
@@ -141,7 +190,7 @@ public class Track : MonoBehaviour
         var dense = new List<Vector3>();
         for (int i = 0; i < n; i++)
         {
-            Vector3 p0 = V(control[(i - 1 + n) % n]), p1 = V(control[i]), p2 = V(control[(i + 1) % n]), p3 = V(control[(i + 2) % n]);
+            Vector3 p0 = control[(i - 1 + n) % n], p1 = control[i], p2 = control[(i + 1) % n], p3 = control[(i + 2) % n];
             for (int s = 0; s < 60; s++) dense.Add(CatmullRom(p0, p1, p2, p3, s / 60f));
         }
 
@@ -170,20 +219,31 @@ public class Track : MonoBehaviour
         Pts = res.ToArray();
         Dirs = new Vector3[c];
         Rights = new Vector3[c];
+        Normals = new Vector3[c];
         Dist = new float[c];
         for (int i = 0; i < c; i++)
         {
             Dirs[i] = (Pts[(i + 1) % c] - Pts[(i - 1 + c) % c]).normalized;
-            Rights[i] = Vector3.Cross(Vector3.up, Dirs[i]);
+            Vector3 r = Vector3.Cross(Vector3.up, Dirs[i]).normalized;
+            Rights[i] = r;
+            Normals[i] = Vector3.Cross(Dirs[i], r).normalized;
             if (i > 0) Dist[i] = Dist[i - 1] + (Pts[i] - Pts[i - 1]).magnitude;
         }
         Length = Dist[c - 1] + (Pts[0] - Pts[c - 1]).magnitude;
 
+        JumpRamps.Clear();
+        if (Courses[ActiveCourseIndex].Ramps != null)
+        {
+            foreach (var ramp in Courses[ActiveCourseIndex].Ramps)
+            {
+                int ri = Mathf.Clamp(Mathf.RoundToInt(ramp.Ratio * c), 0, c - 1);
+                JumpRamps.Add((ri, 0f, ramp.Power));
+            }
+        }
+
         bounds = new Bounds(Pts[0], Vector3.zero);
         foreach (var p in Pts) bounds.Encapsulate(p);
     }
-
-    static Vector3 V(Vector2 p) => new Vector3(p.x, 0, p.y);
 
     static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
     {
@@ -275,7 +335,7 @@ public class Track : MonoBehaviour
         Destroy(ground.GetComponent<Collider>());
         ground.name = "Ground";
         ground.transform.SetParent(transform, false);
-        ground.transform.position = new Vector3(bounds.center.x, 0, bounds.center.z);
+        ground.transform.position = new Vector3(bounds.center.x, -0.3f, bounds.center.z);
         ground.transform.rotation = Quaternion.Euler(90, 0, 0);
         ground.transform.localScale = new Vector3(1800, 1800, 1);
         ground.GetComponent<Renderer>().sharedMaterial = groundMat;
@@ -283,6 +343,8 @@ public class Track : MonoBehaviour
         BuildStartLine(rm, def);
         BuildBoostPads(rm);
         PlanItemBoxes();
+        BuildBridgePillars(rm);
+        BuildJumpRamps(rm);
         BuildScenery(rm, def);
         BuildSponsorBoards(rm);
         BuildCircuitProps(rm, def);
@@ -316,7 +378,7 @@ public class Track : MonoBehaviour
         }
     }
 
-    // a/b は (横オフセット, 高さ)。a→b が進行方向に対して右向きになる面が表。
+    // a/b は (横オフセット, 高さ)。路面法線 Normals に沿って生成するため立体コースでも歪まない。
     void Strip(string name, Vector2 a, Vector2 b, Material mat, float vScale)
     {
         int c = Count;
@@ -327,8 +389,8 @@ public class Track : MonoBehaviour
         {
             int k = i % c;
             float v = (i == c ? Length : Dist[k]) / vScale;
-            verts[i * 2] = Pts[k] + Rights[k] * a.x + Vector3.up * a.y;
-            verts[i * 2 + 1] = Pts[k] + Rights[k] * b.x + Vector3.up * b.y;
+            verts[i * 2] = Pts[k] + Rights[k] * a.x + Normals[k] * a.y;
+            verts[i * 2 + 1] = Pts[k] + Rights[k] * b.x + Normals[k] * b.y;
             uvs[i * 2] = new Vector2(0, v);
             uvs[i * 2 + 1] = new Vector2(1, v);
         }
@@ -342,6 +404,109 @@ public class Track : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         MeshObject(name, mesh, mat);
+    }
+
+    // 高架橋・立体交差セクションの橋脚（ピラー）
+    void BuildBridgePillars(RaceManager rm)
+    {
+        var pillarMat = rm.standMaterial;
+        int step = 12;
+        for (int i = 0; i < Count; i += step)
+        {
+            float y = Pts[i].y;
+            if (y > 4.5f)
+            {
+                var p = Pts[i];
+                float colH = y + 0.6f;
+                // コンクリート橋脚
+                var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Destroy(col.GetComponent<Collider>());
+                col.name = "BridgePillar_" + i;
+                col.transform.SetParent(transform, false);
+                col.transform.position = new Vector3(p.x, colH * 0.5f, p.z);
+                col.transform.localScale = new Vector3(3.2f, colH * 0.5f, 3.2f);
+                col.GetComponent<Renderer>().sharedMaterial = pillarMat;
+
+                // 道路底面を支える横ビーム（クロスビーム）
+                var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Destroy(beam.GetComponent<Collider>());
+                beam.name = "BridgeBeam_" + i;
+                beam.transform.SetParent(transform, false);
+                beam.transform.position = p - Normals[i] * 0.5f;
+                beam.transform.rotation = Quaternion.LookRotation(Dirs[i], Normals[i]);
+                beam.transform.localScale = new Vector3(WallOffset * 1.8f, 1.2f, 3.8f);
+                beam.GetComponent<Renderer>().sharedMaterial = pillarMat;
+            }
+        }
+    }
+
+    // 立体ジャンプ台（カタパルトランプ）
+    void BuildJumpRamps(RaceManager rm)
+    {
+        for (int r = 0; r < JumpRamps.Count; r++)
+        {
+            var ramp = JumpRamps[r];
+            int i = ramp.index;
+            var pos = Pts[i];
+            var fwd = Dirs[i];
+            var up = Normals[i];
+
+            var rampGo = new GameObject("JumpRamp_" + r);
+            rampGo.transform.SetParent(transform, false);
+            rampGo.transform.position = pos;
+            rampGo.transform.rotation = Quaternion.LookRotation(fwd, up);
+
+            float w = HalfWidth * 1.7f;
+            float len = 8.5f;
+            float h = 1.6f;
+
+            var rampMesh = new Mesh();
+            rampMesh.name = "RampMesh_" + r;
+            rampMesh.vertices = new[]
+            {
+                new Vector3(-w * 0.5f, 0.05f, -len * 0.5f), // 0: 手前左
+                new Vector3(w * 0.5f, 0.05f, -len * 0.5f),  // 1: 手前右
+                new Vector3(-w * 0.5f, h, len * 0.5f),      // 2: 奥左上
+                new Vector3(w * 0.5f, h, len * 0.5f),       // 3: 奥右上
+                new Vector3(-w * 0.5f, 0f, len * 0.5f),     // 4: 奥左下
+                new Vector3(w * 0.5f, 0f, len * 0.5f)       // 5: 奥右下
+            };
+            rampMesh.uv = new[]
+            {
+                new Vector2(0, 0), new Vector2(1, 0),
+                new Vector2(0, 4), new Vector2(1, 4),
+                new Vector2(0, 0), new Vector2(1, 0)
+            };
+            rampMesh.triangles = new[]
+            {
+                0, 2, 1, 1, 2, 3,  // スロープ面
+                2, 4, 3, 3, 4, 5,  // 背面
+                0, 4, 2,           // 左側面
+                1, 3, 5            // 右側面
+            };
+            rampMesh.RecalculateNormals();
+            rampMesh.RecalculateBounds();
+
+            rampGo.AddComponent<MeshFilter>().sharedMesh = rampMesh;
+            var mr = rampGo.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = rm.boostPadMaterial; // ネオンオレンジ発光
+
+            // ランプ先端の両脇に警告サインポール
+            var poleMat = rm.chromeMaterial;
+            var poleL = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(poleL.GetComponent<Collider>());
+            poleL.transform.SetParent(rampGo.transform, false);
+            poleL.transform.localPosition = new Vector3(-w * 0.5f, h + 0.9f, len * 0.5f);
+            poleL.transform.localScale = new Vector3(0.24f, 0.9f, 0.24f);
+            poleL.GetComponent<Renderer>().sharedMaterial = poleMat;
+
+            var poleR = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(poleR.GetComponent<Collider>());
+            poleR.transform.SetParent(rampGo.transform, false);
+            poleR.transform.localPosition = new Vector3(w * 0.5f, h + 0.9f, len * 0.5f);
+            poleR.transform.localScale = new Vector3(0.24f, 0.9f, 0.24f);
+            poleR.GetComponent<Renderer>().sharedMaterial = poleMat;
+        }
     }
 
     GameObject MeshObject(string name, Mesh mesh, Material mat)

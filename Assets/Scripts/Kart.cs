@@ -62,6 +62,10 @@ public class Kart : MonoBehaviour
     TrailRenderer[] skidTrails = new TrailRenderer[2];
     bool isBraking;
     bool kenneyReady;
+    float verticalVel;
+    bool isAirborne;
+    float airTrickSpin;
+    float jumpCooldown;
 
     public void Init(RaceManager rm, Track track, string name, Color color, bool isPlayer, int index, float lateral, float aiSkill)
     {
@@ -96,6 +100,10 @@ public class Kart : MonoBehaviour
         drifting = false;
         isBraking = false;
         spinAngle = 0;
+        verticalVel = 0;
+        isAirborne = false;
+        airTrickSpin = 0;
+        jumpCooldown = 0;
         aiItemTimer = Random.Range(1f, 3f);
         if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
         UpdateVisual(0, 0);
@@ -308,7 +316,17 @@ public class Kart : MonoBehaviour
 
     void UpdateVisual(float dt, float steer)
     {
-        transform.rotation = Quaternion.Euler(0, Heading, 0);
+        // 路面の勾配（ピッチ角）とバンク角（ロール）
+        float roadPitch = 0f;
+        float roadRoll = 0f;
+        if (track != null && track.Count > 0 && Index >= 0 && Index < track.Count)
+        {
+            var rDir = track.Dirs[Index];
+            var rNorm = track.Normals[Index];
+            roadPitch = -Mathf.Asin(Mathf.Clamp(rDir.y, -0.9f, 0.9f)) * Mathf.Rad2Deg;
+            roadRoll = Vector3.Dot(rNorm, track.Rights[Index]) * 20f;
+        }
+        transform.rotation = Quaternion.Euler(roadPitch, Heading, roadRoll);
 
         float targetYaw = drifting ? driftDir * 24f : 0f;
         visYaw = Mathf.Lerp(visYaw, targetYaw, 1f - Mathf.Exp(-10f * dt));
@@ -323,7 +341,9 @@ public class Kart : MonoBehaviour
         float roll = -steerVis * 4f * Mathf.Clamp01(Speed / MaxSpeed) - (drifting ? driftDir * 5f : 0f);
         float bob = Offroad && Speed > 5f ? Mathf.Sin(Time.time * 40f) * 0.04f : 0f;
         model.localPosition = new Vector3(0, hop + bob, 0);
-        model.localRotation = Quaternion.Euler(0, visYaw + spinAngle, roll);
+
+        float trickAngle = isAirborne ? airTrickSpin : 0f;
+        model.localRotation = Quaternion.Euler(0, visYaw + spinAngle + trickAngle, roll);
 
         wheelAngle += Speed * dt / 0.37f * Mathf.Rad2Deg;
         for (int i = 0; i < 4; i++) wheelSpin[i].localRotation = Quaternion.Euler(wheelAngle, 0, 0);
@@ -514,7 +534,8 @@ public class Kart : MonoBehaviour
 
         var fwd = Forward;
         VelDir = Speed < 0 ? fwd : Vector3.Slerp(VelDir, fwd, (drifting ? 2.6f : 10f) * dt).normalized;
-        transform.position += VelDir * Speed * dt;
+        Vector3 moveDelta = new Vector3(VelDir.x, 0, VelDir.z).normalized * Speed * dt;
+        transform.position += moveDelta;
 
         // コース上の位置と周回
         float prevProgress = Progress;
@@ -557,6 +578,56 @@ public class Kart : MonoBehaviour
                 Boost(1.1f);
                 if (IsPlayer) rm.Audio.Boost();
             }
+        }
+
+        // ジャンプ台判定
+        if (jumpCooldown > 0) jumpCooldown -= dt;
+        else if (track.JumpRamps != null)
+        {
+            foreach (var ramp in track.JumpRamps)
+            {
+                int di = track.Wrap(Index - ramp.index);
+                if ((di <= 1 || di >= track.Count - 2) && Speed > 8f)
+                {
+                    LaunchJump(ramp.power);
+                    break;
+                }
+            }
+        }
+
+        // 垂直方向の接地・重力・着地
+        Vector3 roadGround = track.PointAt(Index, Lateral);
+        float roadY = roadGround.y;
+        var curPos = transform.position;
+
+        if (isAirborne)
+        {
+            verticalVel -= 28f * dt; // 重力加速度
+            curPos.y += verticalVel * dt;
+            airTrickSpin += 720f * dt; // 空中トリックスピン
+
+            if (curPos.y <= roadY)
+            {
+                // 着地！
+                curPos.y = roadY;
+                verticalVel = 0;
+                isAirborne = false;
+                airTrickSpin = 0;
+                Boost(0.65f); // 着地ミニターボ！
+                Fx.Smoke(curPos, -Forward * 3f + Vector3.up * 1.5f, new Color(0.9f, 0.9f, 0.95f, 0.6f), 1.2f, 0.5f, 3);
+                if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.45f); }
+            }
+            transform.position = curPos;
+        }
+        else
+        {
+            curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
+            if (curPos.y > roadY + 0.9f && Speed > 20f && verticalVel <= 0)
+            {
+                isAirborne = true;
+                verticalVel = 4f;
+            }
+            transform.position = curPos;
         }
 
         isBraking = inp.throttle < 0 && Speed > 2f;
@@ -637,6 +708,22 @@ public class Kart : MonoBehaviour
     public void Boost(float t)
     {
         boostTimer = Mathf.Max(boostTimer, t);
+    }
+
+    public void LaunchJump(float power)
+    {
+        verticalVel = power;
+        isAirborne = true;
+        airTrickSpin = 0f;
+        jumpCooldown = 2.2f;
+        Speed = Mathf.Max(Speed, MaxSpeed * 1.15f);
+        if (IsPlayer)
+        {
+            rm.Audio.Boost();
+            rm.Shake(0.35f);
+            rm.Banner("BIG JUMP!", new Color(1f, 0.7f, 0.2f));
+        }
+        Fx.Burst(transform.position + Vector3.up * 0.5f, new Color(1f, 0.75f, 0.2f), 16, 7f, 0.4f);
     }
 
     public void OnGo()

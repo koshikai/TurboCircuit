@@ -47,6 +47,7 @@ public class RaceManager : MonoBehaviour
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
     bool screenshotRequested, screenshotTaken;
+    float shotDelay = 4.2f;
 
     Track track;
     readonly List<ItemBox> boxes = new List<ItemBox>();
@@ -76,6 +77,11 @@ public class RaceManager : MonoBehaviour
         var args = System.Environment.GetCommandLineArgs();
         Demo = args.Contains("-demo") || args.Contains("-screenshot");
         screenshotRequested = args.Contains("-screenshot");
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-shotdelay" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d))
+                shotDelay = d;
+        }
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         EnsureMaterials();
         LoadIcons();
@@ -219,13 +225,13 @@ public class RaceManager : MonoBehaviour
         {
             ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
         }
-        if (screenshotRequested && state == State.Racing && stateTime > 1.8f && !screenshotTaken)
+        if (screenshotRequested && state == State.Racing && stateTime > shotDelay && !screenshotTaken)
         {
             screenshotTaken = true;
             ScreenCapture.CaptureScreenshot($"screenshot_course{SelectedCourse}.png");
             Invoke(nameof(QuitAfterScreenshot), 0.3f);
         }
-        if (screenshotRequested && (stateTime + raceTime) > 12f) Application.Quit();
+        if (screenshotRequested && (stateTime + raceTime) > 30f) Application.Quit();
 
         if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
@@ -518,8 +524,10 @@ public class RaceManager : MonoBehaviour
         var r = Quaternion.Euler(0, yaw, 0);
         var target = kp + r * new Vector3(0, height, -dist);
         bool snap = state == State.Countdown && stateTime < 0.05f;
-        cam.transform.position = snap ? target : Vector3.Lerp(cam.transform.position, target, 1f - Mathf.Exp(-12f * dt));
-        cam.transform.LookAt(kp + r * new Vector3(0, 1.1f, 3f));
+        float pitchAng = Player.transform.eulerAngles.x;
+        if (pitchAng > 180f) pitchAng -= 360f;
+        float pitchOffset = Mathf.Clamp(pitchAng * -0.06f, -2.5f, 2.5f);
+        cam.transform.LookAt(kp + r * new Vector3(0, 1.1f + pitchOffset, 3.2f));
         if (shake > 0) cam.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
 
         float fov = 62f + Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) * 4f + (Player.Boosting ? 10f : 0f);
