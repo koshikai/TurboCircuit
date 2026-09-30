@@ -237,4 +237,32 @@ public static class TextureGen
         t.wrapMode = TextureWrapMode.Clamp;
         return t;
     }
+
+    // UIカード用の半透明グラデーション＆角丸パネル
+    public static Texture2D CardPanel(int w, int h, Color topBg, Color botBg, Color borderColor, int borderThick)
+    {
+        var px = new Color[w * h];
+        float radius = 10f;
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - radius) : 0);
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - radius) : 0);
+            float dist = Mathf.Sqrt(cx * cx + cy * cy);
+            if (dist > radius)
+            {
+                px[y * w + x] = Color.clear;
+                continue;
+            }
+
+            float t = y / (float)h;
+            Color bg = Color.Lerp(botBg, topBg, t);
+
+            bool isBorder = x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick || (dist >= radius - borderThick);
+            px[y * w + x] = isBorder ? borderColor : bg;
+        }
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        return tex;
+    }
 }

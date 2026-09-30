@@ -96,6 +96,8 @@ public class Kart : MonoBehaviour
         BuildModel();
     }
 
+    public void Hop() => hopT = 0f;
+
     public void SetSkill(float skill) => aiSkill = skill;
 
     public void ResetTo(int index, float lateral)
