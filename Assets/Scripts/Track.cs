@@ -347,12 +347,15 @@ public class Track : MonoBehaviour
 
     void BuildSponsorBoards(RaceManager rm)
     {
-        var hiResBanner = RaceManager.LoadTexture("Banners/banner_turbo", Application.dataPath + "/Resources/Banners/banner_turbo.jpg");
+        string dir = Application.dataPath + "/Resources/Banners/";
+        var bannerTurbo = RaceManager.LoadTexture("Banners/banner_turbo", dir + "banner_turbo.jpg");
+        var bannerNitro = RaceManager.LoadTexture("Banners/banner_nitro", dir + "banner_nitro.jpg");
 
+        var customBanners = new[] { bannerTurbo, bannerNitro };
         var bannerMats = new Material[4];
         for (int v = 0; v < 4; v++)
         {
-            var tex = (v == 0 && hiResBanner != null) ? hiResBanner : TextureGen.SponsorBanner(v);
+            var tex = (v < 2 && customBanners[v] != null) ? customBanners[v] : TextureGen.SponsorBanner(v);
             bannerMats[v] = new Material(rm.bannerMaterial ?? rm.wallMaterial)
             {
                 mainTexture = tex
@@ -381,8 +384,9 @@ public class Track : MonoBehaviour
             int idx = bridgeSpots[b];
             var center = Pts[idx] + Vector3.up * 7.5f;
             var rot = Quaternion.LookRotation(Dirs[idx]);
-            var mat = (hiResBanner != null)
-                ? new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = hiResBanner }
+            var bridgeTex = b == 0 ? (bannerTurbo ?? customBanners[0]) : (bannerNitro ?? customBanners[1]);
+            var mat = (bridgeTex != null)
+                ? new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = bridgeTex }
                 : bannerMats[(b + 1) % 4];
 
             // 左右の巨大支柱
