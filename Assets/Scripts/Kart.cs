@@ -102,6 +102,8 @@ public class Kart : MonoBehaviour
 
     // ───────────────────────── 見た目 ─────────────────────────
 
+    static readonly string[] KenneyKarts = { "kart-oobi", "kart-oodi", "kart-ooli", "kart-oopi", "kart-oozi" };
+
     void BuildModel()
     {
         model = new GameObject("Model").transform;
@@ -112,19 +114,41 @@ public class Kart : MonoBehaviour
         var dark = new MaterialPropertyBlock();
         dark.SetColor("_Color", Color * 0.55f);
 
-        // カートボディ
-        Part(PrimitiveType.Cube, new Vector3(0, 0.38f, 0), new Vector3(1.4f, 0.28f, 2.3f), rm.kartPaintMaterial, paint);
-        Part(PrimitiveType.Cube, new Vector3(0, 0.42f, 1.3f), new Vector3(1.0f, 0.24f, 0.6f), rm.kartPaintMaterial, paint, Quaternion.Euler(12, 0, 0));
-        Part(PrimitiveType.Cube, new Vector3(0, 0.3f, 1.62f), new Vector3(1.7f, 0.16f, 0.22f), rm.chromeMaterial);
-        Part(PrimitiveType.Cube, new Vector3(-0.78f, 0.38f, 0.05f), new Vector3(0.3f, 0.32f, 1.3f), rm.kartPaintMaterial, dark);
-        Part(PrimitiveType.Cube, new Vector3(0.78f, 0.38f, 0.05f), new Vector3(0.3f, 0.32f, 1.3f), rm.kartPaintMaterial, dark);
-        Part(PrimitiveType.Cube, new Vector3(0, 1.0f, -1.2f), new Vector3(1.7f, 0.08f, 0.45f), rm.kartPaintMaterial, paint);
-        Part(PrimitiveType.Cube, new Vector3(-0.55f, 0.72f, -1.15f), new Vector3(0.08f, 0.5f, 0.1f), rm.chromeMaterial);
-        Part(PrimitiveType.Cube, new Vector3(0.55f, 0.72f, -1.15f), new Vector3(0.08f, 0.5f, 0.1f), rm.chromeMaterial);
-        Part(PrimitiveType.Cube, new Vector3(0, 0.62f, -0.85f), new Vector3(0.8f, 0.36f, 0.5f), rm.chromeMaterial);
-        Part(PrimitiveType.Cylinder, new Vector3(-0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
-        Part(PrimitiveType.Cylinder, new Vector3(0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
-        Part(PrimitiveType.Cube, new Vector3(0, 0.72f, -0.5f), new Vector3(0.7f, 0.55f, 0.18f), rm.tireMaterial);
+        bool kenneyReady = TryBuildKenneyModel();
+        if (!kenneyReady)
+        {
+            // 従来のプロシージャルボディ
+            Part(PrimitiveType.Cube, new Vector3(0, 0.38f, 0), new Vector3(1.4f, 0.28f, 2.3f), rm.kartPaintMaterial, paint);
+            Part(PrimitiveType.Cube, new Vector3(0, 0.42f, 1.3f), new Vector3(1.0f, 0.24f, 0.6f), rm.kartPaintMaterial, paint, Quaternion.Euler(12, 0, 0));
+            Part(PrimitiveType.Cube, new Vector3(0, 0.3f, 1.62f), new Vector3(1.7f, 0.16f, 0.22f), rm.chromeMaterial);
+            Part(PrimitiveType.Cube, new Vector3(-0.78f, 0.38f, 0.05f), new Vector3(0.3f, 0.32f, 1.3f), rm.kartPaintMaterial, dark);
+            Part(PrimitiveType.Cube, new Vector3(0.78f, 0.38f, 0.05f), new Vector3(0.3f, 0.32f, 1.3f), rm.kartPaintMaterial, dark);
+            Part(PrimitiveType.Cube, new Vector3(0, 1.0f, -1.2f), new Vector3(1.7f, 0.08f, 0.45f), rm.kartPaintMaterial, paint);
+            Part(PrimitiveType.Cube, new Vector3(-0.55f, 0.72f, -1.15f), new Vector3(0.08f, 0.5f, 0.1f), rm.chromeMaterial);
+            Part(PrimitiveType.Cube, new Vector3(0.55f, 0.72f, -1.15f), new Vector3(0.08f, 0.5f, 0.1f), rm.chromeMaterial);
+            Part(PrimitiveType.Cube, new Vector3(0, 0.62f, -0.85f), new Vector3(0.8f, 0.36f, 0.5f), rm.chromeMaterial);
+            Part(PrimitiveType.Cylinder, new Vector3(-0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+            Part(PrimitiveType.Cylinder, new Vector3(0.25f, 0.62f, -1.2f), new Vector3(0.16f, 0.18f, 0.16f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+            Part(PrimitiveType.Cube, new Vector3(0, 0.72f, -0.5f), new Vector3(0.7f, 0.55f, 0.18f), rm.tireMaterial);
+
+            // タイヤ
+            var wheelPos = new[] { new Vector3(-0.88f, 0.35f, 0.9f), new Vector3(0.88f, 0.35f, 0.9f), new Vector3(-0.9f, 0.4f, -0.85f), new Vector3(0.9f, 0.4f, -0.85f) };
+            for (int i = 0; i < 4; i++)
+            {
+                var pivot = new GameObject("WheelPivot").transform;
+                pivot.SetParent(model, false);
+                pivot.localPosition = wheelPos[i];
+                if (i < 2) frontPivot[i] = pivot;
+                var spin = new GameObject("WheelSpin").transform;
+                spin.SetParent(pivot, false);
+                wheelSpin[i] = spin;
+                float d = i < 2 ? 0.7f : 0.8f, w = i < 2 ? 0.18f : 0.26f;
+                var tire = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d, w, d), rm.tireMaterial, null, Quaternion.Euler(0, 0, 90));
+                tire.transform.SetParent(spin, false);
+                var hub = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d * 0.5f, w * 1.1f, d * 0.5f), rm.chromeMaterial, null, Quaternion.Euler(0, 0, 90));
+                hub.transform.SetParent(spin, false);
+            }
+        }
 
         // ヘッドライト（左右フロント）
         var hlMat = rm.headlightMaterial;
@@ -166,24 +190,6 @@ public class Kart : MonoBehaviour
         Part(PrimitiveType.Sphere, new Vector3(-0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
         Part(PrimitiveType.Sphere, new Vector3(0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
 
-        // タイヤ（前輪はステアリングで向きが変わる）
-        var wheelPos = new[] { new Vector3(-0.88f, 0.35f, 0.9f), new Vector3(0.88f, 0.35f, 0.9f), new Vector3(-0.9f, 0.4f, -0.85f), new Vector3(0.9f, 0.4f, -0.85f) };
-        for (int i = 0; i < 4; i++)
-        {
-            var pivot = new GameObject("WheelPivot").transform;
-            pivot.SetParent(model, false);
-            pivot.localPosition = wheelPos[i];
-            if (i < 2) frontPivot[i] = pivot;
-            var spin = new GameObject("WheelSpin").transform;
-            spin.SetParent(pivot, false);
-            wheelSpin[i] = spin;
-            float d = i < 2 ? 0.7f : 0.8f, w = i < 2 ? 0.18f : 0.26f;
-            var tire = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d, w, d), rm.tireMaterial, null, Quaternion.Euler(0, 0, 90));
-            tire.transform.SetParent(spin, false);
-            var hub = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d * 0.5f, w * 1.1f, d * 0.5f), rm.chromeMaterial, null, Quaternion.Euler(0, 0, 90));
-            hub.transform.SetParent(spin, false);
-        }
-
         // スキッドマーク（タイヤ痕）
         for (int i = 0; i < 2; i++)
         {
@@ -215,6 +221,62 @@ public class Kart : MonoBehaviour
         shieldRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         shieldMpb = new MaterialPropertyBlock();
         bubble.SetActive(false);
+    }
+
+    bool TryBuildKenneyModel()
+    {
+        int variant = Mathf.Abs(IsPlayer ? 0 : (Index + 1)) % KenneyKarts.Length;
+        var kartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[variant]);
+        var wheelPrefab = Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default");
+        if (kartPrefab == null) return false;
+
+        var body = Instantiate(kartPrefab, model);
+        body.transform.localPosition = new Vector3(0, 0.15f, 0);
+        body.transform.localRotation = Quaternion.Euler(0, 180, 0);
+        body.transform.localScale = Vector3.one * 1.5f;
+        foreach (var c in body.GetComponentsInChildren<Collider>()) Destroy(c);
+
+        var paint = new MaterialPropertyBlock();
+        paint.SetColor("_Color", Color);
+        foreach (var r in body.GetComponentsInChildren<Renderer>())
+        {
+            r.SetPropertyBlock(paint);
+        }
+
+        var wheelPos = new[]
+        {
+            new Vector3(-0.84f, 0.35f, 0.85f),
+            new Vector3(0.84f, 0.35f, 0.85f),
+            new Vector3(-0.86f, 0.38f, -0.85f),
+            new Vector3(0.86f, 0.38f, -0.85f)
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            var pivot = new GameObject("WheelPivot").transform;
+            pivot.SetParent(model, false);
+            pivot.localPosition = wheelPos[i];
+            if (i < 2) frontPivot[i] = pivot;
+            var spin = new GameObject("WheelSpin").transform;
+            spin.SetParent(pivot, false);
+            wheelSpin[i] = spin;
+
+            if (wheelPrefab != null)
+            {
+                var w = Instantiate(wheelPrefab, spin);
+                w.transform.localPosition = Vector3.zero;
+                w.transform.localRotation = i % 2 == 0 ? Quaternion.identity : Quaternion.Euler(0, 180, 0);
+                w.transform.localScale = Vector3.one * 1.4f;
+                foreach (var c in w.GetComponentsInChildren<Collider>()) Destroy(c);
+            }
+            else
+            {
+                float d = i < 2 ? 0.7f : 0.8f, width = i < 2 ? 0.18f : 0.26f;
+                var tire = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d, width, d), rm.tireMaterial, null, Quaternion.Euler(0, 0, 90));
+                tire.transform.SetParent(spin, false);
+            }
+        }
+        return true;
     }
 
     GameObject Part(PrimitiveType type, Vector3 pos, Vector3 scale, Material mat, MaterialPropertyBlock mpb = null, Quaternion? rot = null)

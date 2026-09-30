@@ -161,6 +161,7 @@ public class Track : MonoBehaviour
         PlanItemBoxes();
         BuildScenery(rm);
         BuildSponsorBoards(rm);
+        BuildCircuitProps(rm);
     }
 
     // a/b は (横オフセット, 高さ)。a→b が進行方向に対して右向きになる面が表。
@@ -398,6 +399,112 @@ public class Track : MonoBehaviour
             // 横梁
             Box("BridgeBeam", center, new Vector3((HalfWidth + 3.0f) * 2f + 1.2f, 2.0f, 0.8f), rot, mat);
         }
+    }
+
+    void BuildCircuitProps(RaceManager rm)
+    {
+        var conePrefab = Resources.Load<GameObject>("Props/cone");
+        var barrierRed = Resources.Load<GameObject>("Props/barrierRed");
+        var barrierWhite = Resources.Load<GameObject>("Props/barrierWhite");
+        var lightPost = Resources.Load<GameObject>("Props/lightPostLarge");
+        var grandStand = Resources.Load<GameObject>("Props/grandStandCovered");
+        var checkersFlag = Resources.Load<GameObject>("Props/flagCheckers");
+        var tent = Resources.Load<GameObject>("Props/tent");
+
+        // 1. 大型グランドスタンド（スタートライン横の観客席）
+        if (grandStand != null)
+        {
+            for (int s = -2; s <= 2; s++)
+            {
+                int idx = Wrap(s * 8);
+                var pos = PointAt(idx, -(WallOffset + 5.5f));
+                var rot = Quaternion.LookRotation(Rights[idx], Vector3.up);
+                var go = Instantiate(grandStand, pos, rot, transform);
+                go.transform.localScale = Vector3.one * 1.8f;
+                StripColliders(go);
+            }
+        }
+
+        // 2. 照明塔（サーキット全体を照らす大型ナイターポール 8箇所）
+        if (lightPost != null)
+        {
+            for (int i = 0; i < Count; i += Count / 8)
+            {
+                var pos = PointAt(i, WallOffset + 3.2f);
+                var rot = Quaternion.LookRotation(-Rights[i], Vector3.up);
+                var go = Instantiate(lightPost, pos, rot, transform);
+                go.transform.localScale = Vector3.one * 1.6f;
+                StripColliders(go);
+            }
+        }
+
+        // 3. タイヤバリア（急カーブ外側に赤白交互配置）
+        if (barrierRed != null && barrierWhite != null)
+        {
+            for (int i = 10; i < Count - 10; i += 3)
+            {
+                float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 10)], Vector3.up);
+                if (Mathf.Abs(bend) > 12f)
+                {
+                    float side = bend > 0 ? -1f : 1f;
+                    var pos = PointAt(i, side * (WallOffset - 0.45f));
+                    var rot = Quaternion.LookRotation(Dirs[i]);
+                    var prefab = (i / 3 % 2 == 0) ? barrierRed : barrierWhite;
+                    var go = Instantiate(prefab, pos, rot, transform);
+                    go.transform.localScale = Vector3.one * 1.5f;
+                    StripColliders(go);
+                }
+            }
+        }
+
+        // 4. コーナーのコーン（パイロン：イン側クリッピングポイント）
+        if (conePrefab != null)
+        {
+            for (int i = 15; i < Count - 15; i += 14)
+            {
+                float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 8)], Vector3.up);
+                if (Mathf.Abs(bend) > 10f)
+                {
+                    float side = bend > 0 ? 1f : -1f;
+                    for (int c = 0; c < 2; c++)
+                    {
+                        var pos = PointAt(Wrap(i + c * 2), side * (HalfWidth - 0.8f));
+                        var go = Instantiate(conePrefab, pos, Quaternion.identity, transform);
+                        go.transform.localScale = Vector3.one * 1.4f;
+                        StripColliders(go);
+                    }
+                }
+            }
+        }
+
+        // 5. ピットテントとチェッカーフラッグ（スタート付近）
+        if (tent != null)
+        {
+            for (int t = 1; t <= 3; t++)
+            {
+                int idx = Wrap(-t * 8);
+                var pos = PointAt(idx, WallOffset + 4.5f);
+                var rot = Quaternion.LookRotation(-Rights[idx], Vector3.up);
+                var go = Instantiate(tent, pos, rot, transform);
+                go.transform.localScale = Vector3.one * 2.0f;
+                StripColliders(go);
+            }
+        }
+        if (checkersFlag != null)
+        {
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var pos = PointAt(0, side * (HalfWidth + 1.2f));
+                var go = Instantiate(checkersFlag, pos, Quaternion.LookRotation(Dirs[0]), transform);
+                go.transform.localScale = Vector3.one * 2.0f;
+                StripColliders(go);
+            }
+        }
+    }
+
+    void StripColliders(GameObject go)
+    {
+        foreach (var c in go.GetComponentsInChildren<Collider>()) Destroy(c);
     }
 
     float DistanceToTrack(Vector3 p)

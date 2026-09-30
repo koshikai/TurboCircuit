@@ -30,3 +30,6 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Downloads
+/Downloads/
