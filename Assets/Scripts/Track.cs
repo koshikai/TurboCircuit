@@ -411,55 +411,55 @@ public class Track : MonoBehaviour
         var checkersFlag = Resources.Load<GameObject>("Props/flagCheckers");
         var tent = Resources.Load<GameObject>("Props/tent");
 
-        // 1. 大型グランドスタンド（スタートライン横の観客席）
-        if (grandStand != null)
-        {
-            for (int s = -2; s <= 2; s++)
-            {
-                int idx = Wrap(s * 8);
-                var pos = PointAt(idx, -(WallOffset + 5.5f));
-                var rot = Quaternion.LookRotation(Rights[idx], Vector3.up);
-                var go = Instantiate(grandStand, pos, rot, transform);
-                go.transform.localScale = Vector3.one * 1.8f;
-                StripColliders(go);
-            }
-        }
-
-        // 2. 照明塔（サーキット全体を照らす大型ナイターポール 8箇所）
+        // 1. 照明塔（サーキット全体を照らす大型ナイターポール 8箇所）
         if (lightPost != null)
         {
+            var poleMat = rm.chromeMaterial;
             for (int i = 0; i < Count; i += Count / 8)
             {
-                var pos = PointAt(i, WallOffset + 3.2f);
+                var pos = PointAt(i, WallOffset + 4.2f);
                 var rot = Quaternion.LookRotation(-Rights[i], Vector3.up);
                 var go = Instantiate(lightPost, pos, rot, transform);
-                go.transform.localScale = Vector3.one * 1.6f;
+                go.transform.localScale = Vector3.one * 1.5f;
                 StripColliders(go);
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                    r.sharedMaterial = poleMat;
             }
         }
 
-        // 3. タイヤバリア（急カーブ外側に赤白交互配置）
+        // 2. タイヤバリア（急カーブ外側に赤白交互配置）
         if (barrierRed != null && barrierWhite != null)
         {
+            var redMat = new Material(rm.wallMaterial) { color = new Color(0.92f, 0.15f, 0.15f) };
+            var whiteMat = new Material(rm.wallMaterial) { color = new Color(0.95f, 0.95f, 0.95f) };
             for (int i = 10; i < Count - 10; i += 3)
             {
                 float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 10)], Vector3.up);
                 if (Mathf.Abs(bend) > 12f)
                 {
                     float side = bend > 0 ? -1f : 1f;
-                    var pos = PointAt(i, side * (WallOffset - 0.45f));
+                    var pos = PointAt(i, side * (WallOffset - 0.25f));
                     var rot = Quaternion.LookRotation(Dirs[i]);
                     var prefab = (i / 3 % 2 == 0) ? barrierRed : barrierWhite;
-                    var go = Instantiate(prefab, pos, rot, transform);
-                    go.transform.localScale = Vector3.one * 1.5f;
-                    StripColliders(go);
+                    var anchor = new GameObject("BarrierAnchor").transform;
+                    anchor.SetParent(transform, false);
+                    anchor.position = pos;
+                    anchor.rotation = rot;
+                    var go = Instantiate(prefab, anchor);
+                    go.transform.localPosition = new Vector3(-1.25f, 0, -0.62f);
+                    go.transform.localRotation = Quaternion.identity;
+                    go.transform.localScale = Vector3.one * 1.3f;
+                    StripColliders(anchor.gameObject);
+                    foreach (var r in go.GetComponentsInChildren<Renderer>())
+                        r.sharedMaterial = (i / 3 % 2 == 0) ? redMat : whiteMat;
                 }
             }
         }
 
-        // 4. コーナーのコーン（パイロン：イン側クリッピングポイント）
+        // 3. コーナーのコーン（パイロン：イン側クリッピングポイント）
         if (conePrefab != null)
         {
+            var coneMat = new Material(rm.boostPadMaterial) { color = new Color(1f, 0.45f, 0.05f) };
             for (int i = 15; i < Count - 15; i += 14)
             {
                 float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 8)], Vector3.up);
@@ -472,22 +472,33 @@ public class Track : MonoBehaviour
                         var go = Instantiate(conePrefab, pos, Quaternion.identity, transform);
                         go.transform.localScale = Vector3.one * 1.4f;
                         StripColliders(go);
+                        foreach (var r in go.GetComponentsInChildren<Renderer>())
+                            r.sharedMaterial = coneMat;
                     }
                 }
             }
         }
 
-        // 5. ピットテントとチェッカーフラッグ（スタート付近）
+        // 4. ピットテントとチェッカーフラッグ（スタート付近・十分なオフセット配置）
         if (tent != null)
         {
+            var tentMat = new Material(rm.wallMaterial) { color = new Color(0.15f, 0.45f, 0.95f) };
             for (int t = 1; t <= 3; t++)
             {
-                int idx = Wrap(-t * 8);
-                var pos = PointAt(idx, WallOffset + 4.5f);
+                int idx = Wrap(-t * 9);
+                var pos = PointAt(idx, WallOffset + 8.5f);
                 var rot = Quaternion.LookRotation(-Rights[idx], Vector3.up);
-                var go = Instantiate(tent, pos, rot, transform);
-                go.transform.localScale = Vector3.one * 2.0f;
-                StripColliders(go);
+                var anchor = new GameObject("TentAnchor").transform;
+                anchor.SetParent(transform, false);
+                anchor.position = pos;
+                anchor.rotation = rot;
+                var go = Instantiate(tent, anchor);
+                go.transform.localPosition = new Vector3(-5f, 0, -5f);
+                go.transform.localRotation = Quaternion.identity;
+                go.transform.localScale = Vector3.one * 1.4f;
+                StripColliders(anchor.gameObject);
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                    r.sharedMaterial = tentMat;
             }
         }
         if (checkersFlag != null)
@@ -496,7 +507,7 @@ public class Track : MonoBehaviour
             {
                 var pos = PointAt(0, side * (HalfWidth + 1.2f));
                 var go = Instantiate(checkersFlag, pos, Quaternion.LookRotation(Dirs[0]), transform);
-                go.transform.localScale = Vector3.one * 2.0f;
+                go.transform.localScale = Vector3.one * 1.6f;
                 StripColliders(go);
             }
         }

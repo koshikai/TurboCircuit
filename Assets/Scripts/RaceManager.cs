@@ -44,6 +44,7 @@ public class RaceManager : MonoBehaviour
     public bool RaceRunning => state == State.Racing || state == State.Results;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
+    bool screenshotRequested, screenshotTaken;
 
     Track track;
     readonly List<ItemBox> boxes = new List<ItemBox>();
@@ -70,8 +71,9 @@ public class RaceManager : MonoBehaviour
 
     void Awake()
     {
-        Application.targetFrameRate = 120;
-        Demo = System.Environment.GetCommandLineArgs().Contains("-demo");
+        var args = System.Environment.GetCommandLineArgs();
+        Demo = args.Contains("-demo") || args.Contains("-screenshot");
+        screenshotRequested = args.Contains("-screenshot");
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         EnsureMaterials();
         LoadIcons();
@@ -170,6 +172,17 @@ public class RaceManager : MonoBehaviour
 
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.F12))
+        {
+            ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
+        }
+        if (screenshotRequested && state == State.Racing && stateTime > 3.0f && !screenshotTaken)
+        {
+            screenshotTaken = true;
+            ScreenCapture.CaptureScreenshot("screenshot_gameplay.png");
+            Invoke(nameof(QuitAfterScreenshot), 0.5f);
+        }
+
         if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
             paused = !paused;
@@ -812,4 +825,6 @@ public class RaceManager : MonoBehaviour
         }
         return null;
     }
+
+    void QuitAfterScreenshot() => Application.Quit();
 }

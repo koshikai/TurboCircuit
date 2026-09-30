@@ -171,31 +171,57 @@ public class Kart : MonoBehaviour
         // テールランプ（左右リア・ブレーキ連動）
         tailMpb = new MaterialPropertyBlock();
         var tlMat = rm.taillightMaterial;
-        var tl1 = Part(PrimitiveType.Cube, new Vector3(-0.46f, 0.52f, -1.24f), new Vector3(0.22f, 0.14f, 0.08f), tlMat);
-        var tl2 = Part(PrimitiveType.Cube, new Vector3(0.46f, 0.52f, -1.24f), new Vector3(0.22f, 0.14f, 0.08f), tlMat);
+        float tlZ = kenneyReady ? -1.02f : -1.24f;
+        float tlY = kenneyReady ? 0.38f : 0.52f;
+        float tlX = kenneyReady ? 0.36f : 0.46f;
+        var tl1 = Part(PrimitiveType.Cube, new Vector3(-tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
+        var tl2 = Part(PrimitiveType.Cube, new Vector3(tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
         tailLightRend[0] = tl1.GetComponent<Renderer>();
         tailLightRend[1] = tl2.GetComponent<Renderer>();
 
         // 排気管（マフラー左右）
-        Part(PrimitiveType.Cylinder, new Vector3(-0.35f, 0.28f, -1.22f), new Vector3(0.18f, 0.26f, 0.18f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
-        Part(PrimitiveType.Cylinder, new Vector3(0.35f, 0.28f, -1.22f), new Vector3(0.18f, 0.26f, 0.18f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+        float exhZ = kenneyReady ? -1.05f : -1.22f;
+        float exhY = kenneyReady ? 0.22f : 0.28f;
+        Part(PrimitiveType.Cylinder, new Vector3(-0.28f, exhY, exhZ), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+        Part(PrimitiveType.Cylinder, new Vector3(0.28f, exhY, exhZ), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
 
         // ドライバー（アニメーション用ピボット保持）
-        var bodyGo = Part(PrimitiveType.Capsule, new Vector3(0, 0.95f, -0.22f), new Vector3(0.55f, 0.38f, 0.45f), rm.kartPaintMaterial, dark);
+        Vector3 bodyPos = kenneyReady ? new Vector3(0, 0.62f, 0.16f) : new Vector3(0, 0.95f, -0.22f);
+        Vector3 bodyScale = kenneyReady ? new Vector3(0.44f, 0.32f, 0.38f) : new Vector3(0.55f, 0.38f, 0.45f);
+        var bodyGo = Part(PrimitiveType.Capsule, bodyPos, bodyScale, rm.kartPaintMaterial, dark);
         driverBody = bodyGo.transform;
-        var headGo = Part(PrimitiveType.Sphere, new Vector3(0, 1.45f, -0.15f), new Vector3(0.58f, 0.58f, 0.6f), rm.kartPaintMaterial, paint);
+
+        Vector3 headPos = kenneyReady ? new Vector3(0, 1.02f, 0.18f) : new Vector3(0, 1.45f, -0.15f);
+        float headScale = kenneyReady ? 0.54f : 0.58f;
+        var headGo = Part(PrimitiveType.Sphere, headPos, new Vector3(headScale, headScale, headScale * 1.04f), rm.kartPaintMaterial, paint);
         driverHead = headGo.transform;
-        Part(PrimitiveType.Cube, new Vector3(0, 1.47f, 0.1f), new Vector3(0.42f, 0.16f, 0.12f), rm.visorMaterial).transform.SetParent(driverHead, true);
-        Part(PrimitiveType.Cylinder, new Vector3(0, 0.98f, 0.35f), new Vector3(0.36f, 0.025f, 0.36f), rm.tireMaterial, null, Quaternion.Euler(-60, 0, 0));
-        Part(PrimitiveType.Sphere, new Vector3(-0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
-        Part(PrimitiveType.Sphere, new Vector3(0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
+
+        Vector3 visorPos = kenneyReady ? new Vector3(0, 1.04f, 0.42f) : new Vector3(0, 1.47f, 0.1f);
+        Vector3 visorScale = kenneyReady ? new Vector3(0.38f, 0.15f, 0.10f) : new Vector3(0.42f, 0.16f, 0.12f);
+        Part(PrimitiveType.Cube, visorPos, visorScale, rm.visorMaterial).transform.SetParent(driverHead, true);
+
+        if (!kenneyReady)
+        {
+            Part(PrimitiveType.Cylinder, new Vector3(0, 0.98f, 0.35f), new Vector3(0.36f, 0.025f, 0.36f), rm.tireMaterial, null, Quaternion.Euler(-60, 0, 0));
+            Part(PrimitiveType.Sphere, new Vector3(-0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
+            Part(PrimitiveType.Sphere, new Vector3(0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
+        }
+        else
+        {
+            // Kenneyモデル用のステアリングと手
+            Part(PrimitiveType.Cylinder, new Vector3(0, 0.72f, 0.45f), new Vector3(0.28f, 0.02f, 0.28f), rm.tireMaterial, null, Quaternion.Euler(-55, 0, 0));
+            Part(PrimitiveType.Sphere, new Vector3(-0.18f, 0.72f, 0.42f), Vector3.one * 0.12f, rm.skinMaterial);
+            Part(PrimitiveType.Sphere, new Vector3(0.18f, 0.72f, 0.42f), Vector3.one * 0.12f, rm.skinMaterial);
+        }
 
         // スキッドマーク（タイヤ痕）
+        float skidX = kenneyReady ? 0.78f : 0.88f;
+        float skidZ = kenneyReady ? -0.68f : -0.85f;
         for (int i = 0; i < 2; i++)
         {
             var trGo = new GameObject("Skidmark_" + i);
             trGo.transform.SetParent(transform, false);
-            trGo.transform.localPosition = new Vector3(i == 0 ? -0.88f : 0.88f, 0.04f, -0.85f);
+            trGo.transform.localPosition = new Vector3(i == 0 ? -skidX : skidX, 0.04f, skidZ);
             trGo.transform.localRotation = Quaternion.Euler(90, 0, 0);
             var tr = trGo.AddComponent<TrailRenderer>();
             tr.time = 4.5f;
@@ -237,7 +263,7 @@ public class Kart : MonoBehaviour
         foreach (var c in body.GetComponentsInChildren<Collider>()) Destroy(c);
 
         var paint = new MaterialPropertyBlock();
-        paint.SetColor("_Color", Color);
+        paint.SetColor("_Color", Color.Lerp(Color.white, Color, 0.65f));
         foreach (var r in body.GetComponentsInChildren<Renderer>())
         {
             r.SetPropertyBlock(paint);
@@ -245,10 +271,10 @@ public class Kart : MonoBehaviour
 
         var wheelPos = new[]
         {
-            new Vector3(-0.84f, 0.35f, 0.85f),
-            new Vector3(0.84f, 0.35f, 0.85f),
-            new Vector3(-0.86f, 0.38f, -0.85f),
-            new Vector3(0.86f, 0.38f, -0.85f)
+            new Vector3(-0.76f, 0.32f, 0.72f),
+            new Vector3(0.76f, 0.32f, 0.72f),
+            new Vector3(-0.78f, 0.32f, -0.68f),
+            new Vector3(0.78f, 0.32f, -0.68f)
         };
 
         for (int i = 0; i < 4; i++)
@@ -266,7 +292,7 @@ public class Kart : MonoBehaviour
                 var w = Instantiate(wheelPrefab, spin);
                 w.transform.localPosition = Vector3.zero;
                 w.transform.localRotation = i % 2 == 0 ? Quaternion.identity : Quaternion.Euler(0, 180, 0);
-                w.transform.localScale = Vector3.one * 1.4f;
+                w.transform.localScale = Vector3.one * 1.25f;
                 foreach (var c in w.GetComponentsInChildren<Collider>()) Destroy(c);
             }
             else
