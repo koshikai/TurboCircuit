@@ -61,6 +61,7 @@ public class Kart : MonoBehaviour
     MaterialPropertyBlock tailMpb;
     TrailRenderer[] skidTrails = new TrailRenderer[2];
     bool isBraking;
+    bool kenneyReady;
 
     public void Init(RaceManager rm, Track track, string name, Color color, bool isPlayer, int index, float lateral, float aiSkill)
     {
@@ -114,7 +115,7 @@ public class Kart : MonoBehaviour
         var dark = new MaterialPropertyBlock();
         dark.SetColor("_Color", Color * 0.55f);
 
-        bool kenneyReady = TryBuildKenneyModel();
+        kenneyReady = TryBuildKenneyModel();
         if (!kenneyReady)
         {
             // 従来のプロシージャルボディ
@@ -152,13 +153,16 @@ public class Kart : MonoBehaviour
 
         // ヘッドライト（左右フロント）
         var hlMat = rm.headlightMaterial;
-        Part(PrimitiveType.Cube, new Vector3(-0.46f, 0.44f, 1.46f), new Vector3(0.24f, 0.16f, 0.1f), hlMat);
-        Part(PrimitiveType.Cube, new Vector3(0.46f, 0.44f, 1.46f), new Vector3(0.24f, 0.16f, 0.1f), hlMat);
+        float hlZ = kenneyReady ? 1.05f : 1.46f;
+        float hlY = kenneyReady ? 0.30f : 0.44f;
+        float hlX = kenneyReady ? 0.38f : 0.46f;
+        Part(PrimitiveType.Cube, new Vector3(-hlX, hlY, hlZ), new Vector3(0.18f, 0.12f, 0.08f), hlMat);
+        Part(PrimitiveType.Cube, new Vector3(hlX, hlY, hlZ), new Vector3(0.18f, 0.12f, 0.08f), hlMat);
         if (IsPlayer)
         {
             var spotGo = new GameObject("HeadlightBeam");
             spotGo.transform.SetParent(transform, false);
-            spotGo.transform.localPosition = new Vector3(0, 0.55f, 1.5f);
+            spotGo.transform.localPosition = new Vector3(0, kenneyReady ? 0.40f : 0.55f, kenneyReady ? 1.15f : 1.5f);
             spotGo.transform.localRotation = Quaternion.Euler(12, 0, 0);
             var spot = spotGo.AddComponent<Light>();
             spot.type = LightType.Spot;
@@ -171,52 +175,35 @@ public class Kart : MonoBehaviour
         // テールランプ（左右リア・ブレーキ連動）
         tailMpb = new MaterialPropertyBlock();
         var tlMat = rm.taillightMaterial;
-        float tlZ = kenneyReady ? -1.02f : -1.24f;
-        float tlY = kenneyReady ? 0.38f : 0.52f;
-        float tlX = kenneyReady ? 0.36f : 0.46f;
+        float tlZ = kenneyReady ? -0.74f : -1.24f;
+        float tlY = kenneyReady ? 0.36f : 0.52f;
+        float tlX = kenneyReady ? 0.34f : 0.46f;
         var tl1 = Part(PrimitiveType.Cube, new Vector3(-tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
         var tl2 = Part(PrimitiveType.Cube, new Vector3(tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
         tailLightRend[0] = tl1.GetComponent<Renderer>();
         tailLightRend[1] = tl2.GetComponent<Renderer>();
 
-        // 排気管（マフラー左右）
-        float exhZ = kenneyReady ? -1.05f : -1.22f;
-        float exhY = kenneyReady ? 0.22f : 0.28f;
-        Part(PrimitiveType.Cylinder, new Vector3(-0.28f, exhY, exhZ), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
-        Part(PrimitiveType.Cylinder, new Vector3(0.28f, exhY, exhZ), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
-
-        // ドライバー（アニメーション用ピボット保持）
-        Vector3 bodyPos = kenneyReady ? new Vector3(0, 0.62f, 0.16f) : new Vector3(0, 0.95f, -0.22f);
-        Vector3 bodyScale = kenneyReady ? new Vector3(0.44f, 0.32f, 0.38f) : new Vector3(0.55f, 0.38f, 0.45f);
-        var bodyGo = Part(PrimitiveType.Capsule, bodyPos, bodyScale, rm.kartPaintMaterial, dark);
-        driverBody = bodyGo.transform;
-
-        Vector3 headPos = kenneyReady ? new Vector3(0, 1.02f, 0.18f) : new Vector3(0, 1.45f, -0.15f);
-        float headScale = kenneyReady ? 0.54f : 0.58f;
-        var headGo = Part(PrimitiveType.Sphere, headPos, new Vector3(headScale, headScale, headScale * 1.04f), rm.kartPaintMaterial, paint);
-        driverHead = headGo.transform;
-
-        Vector3 visorPos = kenneyReady ? new Vector3(0, 1.04f, 0.42f) : new Vector3(0, 1.47f, 0.1f);
-        Vector3 visorScale = kenneyReady ? new Vector3(0.38f, 0.15f, 0.10f) : new Vector3(0.42f, 0.16f, 0.12f);
-        Part(PrimitiveType.Cube, visorPos, visorScale, rm.visorMaterial).transform.SetParent(driverHead, true);
-
         if (!kenneyReady)
         {
+            // プロシージャルボディ時のみ排気管・ドライバー・ステアリングを生成（Kenneyモデルには元からドライバーとマフラーが造形済み）
+            Part(PrimitiveType.Cylinder, new Vector3(-0.28f, 0.28f, -1.22f), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+            Part(PrimitiveType.Cylinder, new Vector3(0.28f, 0.28f, -1.22f), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
+
+            var bodyGo = Part(PrimitiveType.Capsule, new Vector3(0, 0.95f, -0.22f), new Vector3(0.55f, 0.38f, 0.45f), rm.kartPaintMaterial, dark);
+            driverBody = bodyGo.transform;
+
+            var headGo = Part(PrimitiveType.Sphere, new Vector3(0, 1.45f, -0.15f), new Vector3(0.58f, 0.58f, 0.60f), rm.kartPaintMaterial, paint);
+            driverHead = headGo.transform;
+
+            Part(PrimitiveType.Cube, new Vector3(0, 1.47f, 0.1f), new Vector3(0.42f, 0.16f, 0.12f), rm.visorMaterial).transform.SetParent(driverHead, true);
             Part(PrimitiveType.Cylinder, new Vector3(0, 0.98f, 0.35f), new Vector3(0.36f, 0.025f, 0.36f), rm.tireMaterial, null, Quaternion.Euler(-60, 0, 0));
             Part(PrimitiveType.Sphere, new Vector3(-0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
             Part(PrimitiveType.Sphere, new Vector3(0.25f, 0.98f, 0.3f), Vector3.one * 0.14f, rm.skinMaterial);
         }
-        else
-        {
-            // Kenneyモデル用のステアリングと手
-            Part(PrimitiveType.Cylinder, new Vector3(0, 0.72f, 0.45f), new Vector3(0.28f, 0.02f, 0.28f), rm.tireMaterial, null, Quaternion.Euler(-55, 0, 0));
-            Part(PrimitiveType.Sphere, new Vector3(-0.18f, 0.72f, 0.42f), Vector3.one * 0.12f, rm.skinMaterial);
-            Part(PrimitiveType.Sphere, new Vector3(0.18f, 0.72f, 0.42f), Vector3.one * 0.12f, rm.skinMaterial);
-        }
 
         // スキッドマーク（タイヤ痕）
         float skidX = kenneyReady ? 0.78f : 0.88f;
-        float skidZ = kenneyReady ? -0.68f : -0.85f;
+        float skidZ = kenneyReady ? -0.52f : -0.85f;
         for (int i = 0; i < 2; i++)
         {
             var trGo = new GameObject("Skidmark_" + i);
@@ -258,7 +245,7 @@ public class Kart : MonoBehaviour
 
         var body = Instantiate(kartPrefab, model);
         body.transform.localPosition = new Vector3(0, 0.15f, 0);
-        body.transform.localRotation = Quaternion.Euler(0, 180, 0);
+        body.transform.localRotation = Quaternion.identity;
         body.transform.localScale = Vector3.one * 1.5f;
         foreach (var c in body.GetComponentsInChildren<Collider>()) Destroy(c);
 
@@ -271,10 +258,10 @@ public class Kart : MonoBehaviour
 
         var wheelPos = new[]
         {
-            new Vector3(-0.76f, 0.32f, 0.72f),
-            new Vector3(0.76f, 0.32f, 0.72f),
-            new Vector3(-0.78f, 0.32f, -0.68f),
-            new Vector3(0.78f, 0.32f, -0.68f)
+            new Vector3(-0.76f, 0.32f, 0.60f),  // 前左
+            new Vector3(0.76f, 0.32f, 0.60f),   // 前右
+            new Vector3(-0.78f, 0.34f, -0.52f), // 後左
+            new Vector3(0.78f, 0.34f, -0.52f)  // 後右
         };
 
         for (int i = 0; i < 4; i++)
@@ -292,7 +279,7 @@ public class Kart : MonoBehaviour
                 var w = Instantiate(wheelPrefab, spin);
                 w.transform.localPosition = Vector3.zero;
                 w.transform.localRotation = i % 2 == 0 ? Quaternion.identity : Quaternion.Euler(0, 180, 0);
-                w.transform.localScale = Vector3.one * 1.25f;
+                w.transform.localScale = Vector3.one * 1.35f;
                 foreach (var c in w.GetComponentsInChildren<Collider>()) Destroy(c);
             }
             else
@@ -586,8 +573,10 @@ public class Kart : MonoBehaviour
 
     void Effects(float dt)
     {
-        var rearL = transform.TransformPoint(new Vector3(-0.9f, 0.15f, -1.0f));
-        var rearR = transform.TransformPoint(new Vector3(0.9f, 0.15f, -1.0f));
+        float rz = kenneyReady ? -0.52f : -1.0f;
+        float rx = kenneyReady ? 0.78f : 0.9f;
+        var rearL = transform.TransformPoint(new Vector3(-rx, 0.15f, rz));
+        var rearR = transform.TransformPoint(new Vector3(rx, 0.15f, rz));
         var back = -Forward;
 
         if (drifting)
@@ -615,8 +604,11 @@ public class Kart : MonoBehaviour
 
         if (boostTimer > 0)
         {
-            var exL = transform.TransformPoint(new Vector3(-0.35f, 0.28f, -1.35f));
-            var exR = transform.TransformPoint(new Vector3(0.35f, 0.28f, -1.35f));
+            float exZ = kenneyReady ? -0.72f : -1.35f;
+            float exY = kenneyReady ? 0.46f : 0.28f;
+            float exX = kenneyReady ? 0.28f : 0.35f;
+            var exL = transform.TransformPoint(new Vector3(-exX, exY, exZ));
+            var exR = transform.TransformPoint(new Vector3(exX, exY, exZ));
             // オレンジのアフターバーナー炎
             Fx.Emit(exL, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
             Fx.Emit(exR, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
