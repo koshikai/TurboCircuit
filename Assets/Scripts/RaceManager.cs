@@ -615,6 +615,7 @@ public class RaceManager : MonoBehaviour
         var r = Quaternion.Euler(0, yaw, 0);
         var target = kp + r * new Vector3(0, height, -dist);
         bool snap = state == State.Countdown && stateTime < 0.05f;
+        cam.transform.position = snap ? target : Vector3.Lerp(cam.transform.position, target, 1f - Mathf.Exp(-12f * dt));
         float pitchAng = Player.transform.eulerAngles.x;
         if (pitchAng > 180f) pitchAng -= 360f;
         float pitchOffset = Mathf.Clamp(pitchAng * -0.06f, -2.5f, 2.5f);
