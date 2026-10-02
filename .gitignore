@@ -33,3 +33,6 @@ Thumbs.db
 
 # Downloads
 /Downloads/
+
+# Build logs
+build.log

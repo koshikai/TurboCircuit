@@ -265,4 +265,33 @@ public static class TextureGen
         tex.wrapMode = TextureWrapMode.Clamp;
         return tex;
     }
+
+    // スピード線（集中線・ウィンドストリーム）用の先細り・フェードアウトテクスチャ
+    public static Texture2D SpeedLine()
+    {
+        const int w = 128, h = 16;
+        var px = new Color[w * h];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float u = x / (float)(w - 1); // 0 = 根元 (外側), 1 = 先端 (中心側)
+            float v = (y / (float)(h - 1)) * 2f - 1f; // -1 〜 +1 (中心が0)
+
+            // 先端に向かって幅が鋭く狭くなる (u=0で1.0, u=1で0.0)
+            float widthFactor = Mathf.Clamp01(1f - Mathf.Pow(u, 0.75f));
+            float normY = Mathf.Abs(v) / Mathf.Max(0.001f, widthFactor);
+
+            float alphaY = normY >= 1f ? 0f : (1f - normY * normY);
+
+            // 長手方向のフェード（根元側はスムーズにフェードイン、先端側は綺麗に0へ消え去る）
+            float alphaX = u < 0.12f ? (u / 0.12f) : Mathf.Pow(1f - u, 1.35f);
+
+            float a = Mathf.Clamp01(alphaY * alphaX);
+            px[y * w + x] = new Color(1f, 1f, 1f, a);
+        }
+        var t = New(w, h, px, false);
+        t.wrapMode = TextureWrapMode.Clamp;
+        t.filterMode = FilterMode.Bilinear;
+        return t;
+    }
 }

@@ -44,9 +44,10 @@ public class RaceManager : MonoBehaviour
     public Light Sun { get; private set; }
     public int SelectedCourse { get; private set; }
     public bool RaceRunning => state == State.Racing || state == State.Results;
+    public float RaceTime => raceTime;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
-    bool screenshotRequested, screenshotTaken, titleShotRequested;
+    bool screenshotRequested, screenshotTaken, titleShotRequested, testBoostRequested;
     string customShotName;
     float shotDelay = 4.2f;
 
@@ -63,6 +64,7 @@ public class RaceManager : MonoBehaviour
     Camera cam;
     Texture2D minimap;
     Texture2D vignetteTex;
+    Texture2D speedLineTex;
     Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
     Texture2D titleLogoTex;
     Texture2D[] trackBadgeTex = new Texture2D[3];
@@ -123,6 +125,7 @@ public class RaceManager : MonoBehaviour
         Demo = args.Contains("-demo") || args.Contains("-screenshot");
         screenshotRequested = args.Contains("-screenshot");
         titleShotRequested = args.Contains("-titleshot");
+        testBoostRequested = args.Contains("-testboost");
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "-shotdelay" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d))
@@ -136,6 +139,7 @@ public class RaceManager : MonoBehaviour
         Audio = gameObject.AddComponent<RaceAudio>();
         Fx.Init(glowMaterial);
         vignetteTex = TextureGen.Vignette();
+        speedLineTex = TextureGen.SpeedLine();
 
         var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
         cam = camGo.AddComponent<Camera>();
@@ -179,12 +183,20 @@ public class RaceManager : MonoBehaviour
             GridSlot(i, out int idx, out float lat);
             string kName = isPlayer ? ("YOU (" + KartCharacters[SelectedKart].name + ")") : AiNames[ai];
             Color kCol = isPlayer ? KartCharacters[SelectedKart].color : AiColors[ai];
-            k.Init(this, track, kName, kCol, isPlayer, idx, lat, 0.95f);
+            float skill = isPlayer ? 1f : Mathf.Lerp(1.02f, 0.94f, (float)i / 7f);
+            k.Init(this, track, kName, kCol, isPlayer, idx, lat, skill);
             Karts.Add(k);
-            if (isPlayer) Player = k;
+            placeOrder.Add(k);
+            if (isPlayer) { Player = k; ApplyKartStats(); }
         }
 
         LoadCourse(cIdx);
+    }
+
+    void ApplyKartStats()
+    {
+        var d = KartCharacters[SelectedKart];
+        Player.ApplyStats(d.speed, d.accel, d.handling, d.weight);
     }
 
     public void LoadCourse(int index)
@@ -241,6 +253,7 @@ public class RaceManager : MonoBehaviour
                 var def = KartCharacters[SelectedKart];
                 Player.Name = "YOU (" + def.name + ")";
                 Player.Color = def.color;
+                ApplyKartStats();
                 Player.RebuildModel();
                 Player.Hop();
             }
@@ -302,6 +315,9 @@ public class RaceManager : MonoBehaviour
             ScreenCapture.CaptureScreenshot(fname);
             Invoke(nameof(QuitAfterScreenshot), 0.4f);
         }
+        if (testBoostRequested && state == State.Racing && Player != null && !Player.Boosting)
+            Player.Boost(5f);
+
         if (screenshotRequested && state == State.Racing && stateTime > shotDelay && !screenshotTaken)
         {
             screenshotTaken = true;
@@ -309,7 +325,7 @@ public class RaceManager : MonoBehaviour
             ScreenCapture.CaptureScreenshot(fname);
             Invoke(nameof(QuitAfterScreenshot), 0.4f);
         }
-        if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 30f) Application.Quit();
+        if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
 
         if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
@@ -440,10 +456,8 @@ public class RaceManager : MonoBehaviour
 
     void UpdatePlaces()
     {
-        var order = Karts.OrderBy(k => k.Finished ? 0 : 1)
-                         .ThenBy(k => k.Finished ? k.FinishTime : -k.RaceDistance)
-                         .ToList();
-        for (int i = 0; i < order.Count; i++) order[i].Place = i + 1;
+        placeOrder.Sort(ComparePlaces);
+        for (int i = 0; i < placeOrder.Count; i++) placeOrder[i].Place = i + 1;
     }
 
     void KartCollisions()
@@ -457,15 +471,17 @@ public class RaceManager : MonoBehaviour
             float m = d.magnitude, min = Kart.Radius * 2f;
             if (m >= min || m < 0.001f) continue;
             var n = d / m;
-            a.transform.position += n * (min - m) * 0.5f;
-            b.transform.position -= n * (min - m) * 0.5f;
+            // 重いカートほど押し返されにくい
+            float wa = b.Mass / (a.Mass + b.Mass), wb = 1f - wa;
+            a.transform.position += n * (min - m) * wa;
+            b.transform.position -= n * (min - m) * wb;
 
             if (a.Shielded && !b.Shielded) { b.Spin(); continue; }
             if (b.Shielded && !a.Shielded) { a.Spin(); continue; }
 
             // 押し合い：横方向に少し弾く
-            a.VelDir = (a.VelDir + n * 0.25f).normalized;
-            b.VelDir = (b.VelDir - n * 0.25f).normalized;
+            a.VelDir = (a.VelDir + n * 0.5f * wa).normalized;
+            b.VelDir = (b.VelDir - n * 0.5f * wb).normalized;
             a.Speed *= 0.985f;
             b.Speed *= 0.985f;
             if ((a == Player || b == Player) && Random.value < 0.15f) Audio.Bump();
@@ -567,6 +583,17 @@ public class RaceManager : MonoBehaviour
         return false;
     }
 
+    public bool KartAheadWithin(Kart k, float dist)
+    {
+        foreach (var o in Karts)
+        {
+            if (o == k) continue;
+            float d = o.RaceDistance - k.RaceDistance;
+            if (d > 0 && d < dist) return true;
+        }
+        return false;
+    }
+
     // ───────────────────────── Camera ─────────────────────────
 
     void LateUpdate()
@@ -631,6 +658,39 @@ public class RaceManager : MonoBehaviour
 
     GUIStyle sBig, sMid, sSmall;
 
+    readonly List<Kart> placeOrder = new List<Kart>();
+
+    static int ComparePlaces(Kart a, Kart b)
+    {
+        if (a.Finished != b.Finished) return a.Finished ? -1 : 1;
+        float ka = a.Finished ? a.FinishTime : -a.RaceDistance;
+        float kb = b.Finished ? b.FinishTime : -b.RaceDistance;
+        int c = ka.CompareTo(kb);
+        return c != 0 ? c : string.CompareOrdinal(a.Name, b.Name);
+    }
+
+    // OnGUI 内での GUIStyle 生成を避けるため、(基準, サイズ, 配置, 書体, 折返し, 色) ごとにキャッシュする
+    readonly Dictionary<(int, int, int, int, bool, int), GUIStyle> styleCache = new Dictionary<(int, int, int, int, bool, int), GUIStyle>();
+
+    GUIStyle St(GUIStyle b, int size = 0, TextAnchor? anchor = null, FontStyle? fs = null, bool wrap = false, Color? text = null)
+    {
+        int bid = b == sBig ? 0 : b == sMid ? 1 : 2;
+        int col = -1;
+        if (text.HasValue) { Color32 c = text.Value; col = c.r << 16 | c.g << 8 | c.b; }
+        var key = (bid, size, anchor.HasValue ? (int)anchor.Value : -1, fs.HasValue ? (int)fs.Value : -1, wrap, col);
+        if (!styleCache.TryGetValue(key, out var st))
+        {
+            st = new GUIStyle(b);
+            if (size > 0) st.fontSize = size;
+            if (anchor.HasValue) st.alignment = anchor.Value;
+            if (fs.HasValue) st.fontStyle = fs.Value;
+            st.wordWrap = wrap;
+            if (text.HasValue) st.normal.textColor = text.Value;
+            styleCache[key] = st;
+        }
+        return st;
+    }
+
     void OnGUI()
     {
         if (sBig == null)
@@ -662,7 +722,7 @@ public class RaceManager : MonoBehaviour
         {
             float a = Mathf.Clamp01((1.6f - bannerTime) / 0.3f);
             float pop = 1f + Mathf.Max(0, 0.3f - bannerTime) * 1.5f;
-            var st = new GUIStyle(sBig) { fontSize = (int)(72 * pop) };
+            var st = St(sBig, (int)(72 * pop));
             var c = bannerColor; c.a = a;
             Outlined(new Rect(0, h * 0.28f, w, 120), bannerText, st, c);
         }
@@ -691,7 +751,7 @@ public class RaceManager : MonoBehaviour
         }
         else
         {
-            var title = new GUIStyle(sBig) { fontSize = 76 };
+            var title = St(sBig, 76);
             Outlined(new Rect(0, 16, w, 80), "TURBO CIRCUIT", title, Color.HSVToRGB(Mathf.Repeat(t * 0.1f, 1f), 0.6f, 1f), 5);
         }
 
@@ -711,16 +771,14 @@ public class RaceManager : MonoBehaviour
             GUI.DrawTexture(new Rect(leftX + (cardW - bSize) * 0.5f, cardY + 48, bSize, bSize), trackBadgeTex[SelectedCourse], ScaleMode.ScaleToFit);
         }
 
-        var courseTitleStyle = new GUIStyle(sSmall) { fontSize = 21, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
-        courseTitleStyle.normal.textColor = new Color(0.12f, 0.18f, 0.35f);
+        var courseTitleStyle = St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.12f, 0.18f, 0.35f));
         GUI.Label(new Rect(leftX + 8, cardY + 192, cardW - 16, 28), $"< {curDef.Name.ToUpper()} >", courseTitleStyle);
 
         string diffStr = SelectedCourse == 0 ? "★☆☆  NOVICE" : SelectedCourse == 1 ? "★★☆  ADVANCED" : "★★★  EXPERT";
         Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : new Color(1f, 0.28f, 0.38f);
         DrawPopPill(new Rect(leftX + (cardW - 140) * 0.5f, cardY + 224, 140, 22), diffStr, diffBg);
 
-        var descStyle = new GUIStyle(sSmall) { fontSize = 13, alignment = TextAnchor.UpperCenter, fontStyle = FontStyle.Normal, wordWrap = true };
-        descStyle.normal.textColor = new Color(0.26f, 0.30f, 0.42f);
+        var descStyle = St(sSmall, 13, TextAnchor.UpperCenter, FontStyle.Normal, true, new Color(0.26f, 0.30f, 0.42f));
         GUI.Label(new Rect(leftX + 18, cardY + 254, cardW - 36, 85), curDef.Description, descStyle);
 
         DrawPopPill(new Rect(leftX + (cardW - 200) * 0.5f, cardY + 360, 200, 26), $"{totalLaps} LAPS   |   8 KARTS GP", new Color(0.18f, 0.52f, 0.88f));
@@ -732,11 +790,10 @@ public class RaceManager : MonoBehaviour
         DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, "◄ DRIVER & KART [W][S] ►");
 
         var curChar = KartCharacters[SelectedKart];
-        var charTitleStyle = new GUIStyle(sSmall) { fontSize = 23, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
+        var charTitleStyle = St(sSmall, 23, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
         Outlined(new Rect(rightX + 8, cardY + 48, cardW - 16, 30), $"< {curChar.name} >", charTitleStyle, curChar.color, 2);
 
-        var driverNickStyle = new GUIStyle(sSmall) { fontSize = 14, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-        driverNickStyle.normal.textColor = new Color(0.22f, 0.26f, 0.38f);
+        var driverNickStyle = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.22f, 0.26f, 0.38f));
         GUI.Label(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle);
 
         DrawPopPill(new Rect(rightX + 22, cardY + 106, cardW - 44, 24), curChar.trait, curChar.color * 0.9f);
@@ -748,8 +805,7 @@ public class RaceManager : MonoBehaviour
         DrawToonStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.25f, 0.85f, 0.35f));
         DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
 
-        var switchGuide = new GUIStyle(sSmall) { fontSize = 12, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Normal };
-        switchGuide.normal.textColor = new Color(0.45f, 0.5f, 0.65f);
+        var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
         GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "Press [W][S] to switch machine", switchGuide);
 
 
@@ -772,7 +828,7 @@ public class RaceManager : MonoBehaviour
             DrawFrame(new Rect(btnX, btnY, btnW, btnH), 3, new Color(0.1f, 0.15f, 0.3f));
         }
 
-        var startStyle = new GUIStyle(sMid) { fontSize = (int)(24 + pulse * 2), fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
+        var startStyle = St(sMid, (int)(24 + pulse * 2), TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
         Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
 
 
@@ -782,7 +838,7 @@ public class RaceManager : MonoBehaviour
         GUI.color = Color.white;
         DrawFrame(new Rect(0, h - 34, w, 34), 1, new Color(0.2f, 0.3f, 0.45f, 0.6f));
 
-        var barStyle = new GUIStyle(sSmall) { fontSize = 13, fontStyle = FontStyle.Normal, alignment = TextAnchor.MiddleCenter };
+        var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [ESC] Pause";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
@@ -814,7 +870,7 @@ public class RaceManager : MonoBehaviour
             GUI.color = Color.white;
             DrawFrame(r, 2, new Color(0.1f, 0.15f, 0.25f));
         }
-        var st = new GUIStyle(sSmall) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        var st = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold);
         Outlined(r, text, st, Color.white, 1.5f);
     }
 
@@ -825,14 +881,13 @@ public class RaceManager : MonoBehaviour
         GUI.color = Color.white;
         DrawFrame(r, 1.5f, new Color(0.1f, 0.15f, 0.25f, 0.8f));
 
-        var st = new GUIStyle(sSmall) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        var st = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold);
         Outlined(r, text, st, Color.white, 1.2f);
     }
 
     void DrawToonStatGauge(float x, float y, float w, string label, int value, int maxVal, Color barColor)
     {
-        var lblStyle = new GUIStyle(sSmall) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-        lblStyle.normal.textColor = new Color(0.15f, 0.2f, 0.35f);
+        var lblStyle = St(sSmall, 12, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.15f, 0.2f, 0.35f));
         GUI.Label(new Rect(x, y, 70, 16), label, lblStyle);
 
         float barX = x + 72;
@@ -876,7 +931,7 @@ public class RaceManager : MonoBehaviour
         int n = 3 - Mathf.FloorToInt(t);
         float frac = t - Mathf.Floor(t);
         string text = n > 0 ? n.ToString() : "GO!";
-        var st = new GUIStyle(sBig) { fontSize = (int)(150 * (1.3f - frac * 0.3f)) };
+        var st = St(sBig, (int)(150 * (1.3f - frac * 0.3f)));
         var c = n > 0 ? new Color(1f, 0.85f, 0.2f) : new Color(0.3f, 1f, 0.4f);
         c.a = 1f - frac * 0.3f;
         Outlined(new Rect(0, h * 0.25f, w, 200), text, st, c, 5);
@@ -916,30 +971,30 @@ public class RaceManager : MonoBehaviour
                 GUI.color = ic;
                 GUI.DrawTexture(new Rect(slot.x + 12, slot.y + 12, slot.width - 24, 58), Texture2D.whiteTexture);
                 GUI.color = Color.white;
-                var ls = new GUIStyle(sSmall) { fontSize = 20 };
+                var ls = St(sSmall, 20);
                 Outlined(new Rect(slot.x, slot.y + 12, slot.width, 58), label, ls, Color.white, 2);
             }
 
             if (Player.RouletteTimer <= 0)
-                Outlined(new Rect(slot.x, slot.yMax - 22, slot.width, 20), "[E]", new GUIStyle(sSmall) { fontSize = 15 }, new Color(1f, 1f, 0.3f), 1);
+                Outlined(new Rect(slot.x, slot.yMax - 22, slot.width, 20), "[E]", St(sSmall, 15), new Color(1f, 1f, 0.3f), 1);
         }
 
         // 周回とタイム
-        var right = new GUIStyle(sMid) { alignment = TextAnchor.UpperRight };
+        var right = St(sMid, 0, TextAnchor.UpperRight);
         int lap = Mathf.Clamp(Player.MaxLap, 1, totalLaps);
         Outlined(new Rect(w - 324, 18, 300, 50), "LAP " + lap + "/" + totalLaps, right, Color.white);
-        var rs = new GUIStyle(sSmall) { alignment = TextAnchor.UpperRight };
+        var rs = St(sSmall, 0, TextAnchor.UpperRight);
         Outlined(new Rect(w - 324, 66, 300, 30), FormatTime(Player.Finished ? Player.FinishTime : raceTime), rs, Color.white);
-        if (bestLapTime > 0) Outlined(new Rect(w - 324, 94, 300, 30), "BEST LAP " + FormatTime(bestLapTime), new GUIStyle(rs) { fontSize = 16 }, new Color(1f, 0.9f, 0.5f));
+        if (bestLapTime > 0) Outlined(new Rect(w - 324, 94, 300, 30), "BEST LAP " + FormatTime(bestLapTime), St(sSmall, 16, TextAnchor.UpperRight), new Color(1f, 0.9f, 0.5f));
 
         // 順位
         string place = Ordinal(Player.Place);
-        var ps = new GUIStyle(sBig) { fontSize = 120, alignment = TextAnchor.LowerRight };
+        var ps = St(sBig, 120, TextAnchor.LowerRight);
         Color pc = Player.Place == 1 ? new Color(1f, 0.85f, 0.15f) : Player.Place <= 3 ? new Color(0.85f, 0.9f, 1f) : Color.white;
         Outlined(new Rect(w - 324, h - 170, 300, 150), place, ps, pc, 5);
 
         // スピード
-        var ss = new GUIStyle(sMid) { alignment = TextAnchor.LowerCenter };
+        var ss = St(sMid, 0, TextAnchor.LowerCenter);
         Outlined(new Rect(w / 2 - 150, h - 70, 300, 50), Mathf.RoundToInt(Mathf.Abs(Player.Speed) * 3.6f) + " km/h", ss, Color.white);
 
         // ミニマップ
@@ -948,8 +1003,10 @@ public class RaceManager : MonoBehaviour
         GUI.DrawTexture(mm, Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.DrawTexture(mm, minimap);
-        foreach (var k in Karts.OrderBy(k => k == Player ? 1 : 0))
+        int playerIdx = Karts.IndexOf(Player);
+        for (int n = 1; n <= Karts.Count; n++) // プレイヤーを最後（最前面）に描く
         {
+            var k = Karts[(playerIdx + n) % Karts.Count];
             var uv = toMap(k.transform.position);
             var p = new Vector2(mm.x + uv.x * mm.width, mm.y + (1f - uv.y) * mm.height);
             float s = k == Player ? 14f : 10f;
@@ -962,7 +1019,7 @@ public class RaceManager : MonoBehaviour
 
         // 逆走
         if (RaceRunning && !Player.Finished && Vector3.Dot(Player.Forward, track.Dirs[Player.Index]) < -0.3f && Player.Speed > 3f && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
-            Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", new GUIStyle(sBig) { fontSize = 60 }, new Color(1f, 0.3f, 0.3f));
+            Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", St(sBig, 60), new Color(1f, 0.3f, 0.3f));
     }
 
     void DrawResults(float w, float h)
@@ -974,9 +1031,9 @@ public class RaceManager : MonoBehaviour
         DrawFrame(panel, 3, new Color(1f, 0.85f, 0.2f));
         Outlined(new Rect(panel.x, panel.y + 10, panel.width, 60), "RESULTS", sMid, new Color(1f, 0.85f, 0.2f));
 
-        var order = Karts.OrderBy(k => k.Place).ToList();
-        var left = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleLeft };
-        var rightS = new GUIStyle(sSmall) { alignment = TextAnchor.MiddleRight };
+        var order = placeOrder;
+        var left = St(sSmall, 0, TextAnchor.MiddleLeft);
+        var rightS = St(sSmall, 0, TextAnchor.MiddleRight);
         for (int i = 0; i < order.Count; i++)
         {
             var k = order[i];
@@ -995,7 +1052,7 @@ public class RaceManager : MonoBehaviour
             Outlined(new Rect(row.x, row.y, row.width - 10, 40), k.Finished ? FormatTime(k.FinishTime) : "--:--.--", rightS, Color.white, 1);
         }
         if (Mathf.Repeat(Time.time, 1.1f) < 0.75f)
-            Outlined(new Rect(0, panel.yMax + 20, w, 50), "PRESS ENTER TO RACE AGAIN", new GUIStyle(sMid) { fontSize = 30 }, Color.white);
+            Outlined(new Rect(0, panel.yMax + 20, w, 50), "PRESS ENTER TO RACE AGAIN", St(sMid, 30), Color.white);
     }
 
     static string Ordinal(int n) => n + (n == 1 ? "st" : n == 2 ? "nd" : n == 3 ? "rd" : "th");
@@ -1067,8 +1124,17 @@ public class RaceManager : MonoBehaviour
     {
         if (vignetteTex == null) return;
         float speed01 = Player != null ? Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) : 0f;
-        float boostBonus = (Player != null && Player.Boosting) ? 0.35f : 0f;
+        bool boost = Player != null && Player.Boosting;
+        float boostBonus = boost ? 0.35f : 0f;
         float alpha = Mathf.Clamp01(0.18f + speed01 * 0.25f + boostBonus);
+
+        // ブースト時は周辺にサイバーブルーのエネルギーグローを薄く付加
+        if (boost)
+        {
+            GUI.color = new Color(0.2f, 0.75f, 1f, alpha * 0.55f);
+            GUI.DrawTexture(new Rect(0, 0, w, h), vignetteTex, ScaleMode.StretchToFill);
+        }
+
         GUI.color = new Color(1, 1, 1, alpha);
         GUI.DrawTexture(new Rect(0, 0, w, h), vignetteTex, ScaleMode.StretchToFill);
         GUI.color = Color.white;
@@ -1079,43 +1145,168 @@ public class RaceManager : MonoBehaviour
         if (Player == null) return;
         float speedRatio = Mathf.Clamp01(Player.Speed / Kart.MaxSpeed);
         bool boost = Player.Boosting;
-        if (speedRatio < 0.65f && !boost) return;
+        if (speedRatio < 0.38f && !boost) return;
 
-        float intensity = boost ? 1f : (speedRatio - 0.65f) / 0.35f;
-        int lineCount = (int)(intensity * 18);
-        var cx = w * 0.5f;
-        var cy = h * 0.5f;
+        // 速度比率 0.38〜1.0 を 0〜1 に正規化。ブースト時は 1.4
+        float speedIntensity = Mathf.Clamp01((speedRatio - 0.38f) / 0.62f);
+        float intensity = boost ? 1.4f : speedIntensity;
+        if (intensity <= 0.01f) return;
 
-        var rng = new System.Random((int)(Time.time * 60f));
-        for (int i = 0; i < lineCount; i++)
+        float scale = Screen.height / 720f;
+        Matrix4x4 baseMatrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+
+        // 消失点（Focus Point）: 画面中央・道路奥に安定配置
+        float steerTilt = Player != null ? Mathf.Clamp(Player.Lateral * 2f, -22f, 22f) : 0f;
+        Vector2 focus = new Vector2(w * 0.5f + steerTilt, h * 0.46f);
+
+        float time = Time.time;
+        var strokeTex = speedLineTex != null ? speedLineTex : Texture2D.whiteTexture;
+
+        // ─────────────────────────────────────────────
+        // レイヤー1: 流れる高速ウィンドストリーム（滑らかに外から内へ疾走する空気の筋）
+        // ─────────────────────────────────────────────
+        int streamCount = (int)Mathf.Lerp(18f, boost ? 42f : 32f, intensity);
+        float streamSpeed = 3.5f + speedRatio * 3.8f + (boost ? 5.2f : 0f);
+
+        for (int i = 0; i < streamCount; i++)
         {
-            float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
-            float rOuter = Mathf.Max(w, h) * 0.65f;
-            float rInner = rOuter - (60f + (float)rng.NextDouble() * 140f * intensity);
-            float cos = Mathf.Cos(angle), sin = Mathf.Sin(angle);
+            float baseAngle = (i / (float)streamCount) * Mathf.PI * 2f;
+            float seed = i * 137.5f;
+            float angle = baseAngle + Mathf.Sin(seed) * 0.12f;
 
-            Vector2 p1 = new Vector2(cx + cos * rOuter, cy + sin * rOuter);
-            Vector2 p2 = new Vector2(cx + cos * rInner, cy + sin * rInner);
+            float cos = Mathf.Cos(angle);
+            float sin = Mathf.Sin(angle);
 
-            Color lineColor = boost
-                ? (rng.Next(2) == 0 ? new Color(1f, 0.7f, 0.2f, 0.75f) : new Color(0.4f, 0.85f, 1f, 0.75f))
-                : new Color(1f, 1f, 1f, 0.45f * intensity);
+            // 画面境界までの距離
+            float tx = cos > 0.0001f ? (w - focus.x) / cos : (cos < -0.0001f ? -focus.x / cos : 99999f);
+            float ty = sin > 0.0001f ? (h - focus.y) / sin : (sin < -0.0001f ? -focus.y / sin : 99999f);
+            float rEdge = Mathf.Min(tx, ty);
+            if (rEdge < 30f) continue;
 
-            DrawSpeedStroke(p1, p2, 2.5f + (float)rng.NextDouble() * 2f, lineColor);
+            // 視界保護セーフゾーン（楕円：横170px, 縦110px）
+            float rSafe = Mathf.Sqrt(Mathf.Pow(cos * 170f, 2f) + Mathf.Pow(sin * 110f, 2f));
+
+            // 外側から中心へ流れるフェーズ
+            float phaseOffset = Mathf.Repeat(seed * 0.317f, 1f);
+            float flow = Mathf.Repeat(time * streamSpeed * (0.85f + (i % 4) * 0.1f) + phaseOffset, 1f);
+
+            // 画面外枠からセーフゾーン手前まで流れる
+            float maxLineLen = Mathf.Lerp(150f, 320f, intensity) * (0.75f + (i % 3) * 0.25f);
+            float currentR = Mathf.Lerp(rEdge + maxLineLen * 0.3f, rSafe + 30f, flow);
+            float headR = currentR - maxLineLen;
+
+            float alphaMod = 1f;
+            if (currentR > rEdge) alphaMod *= Mathf.Clamp01((rEdge + maxLineLen * 0.3f - currentR) / (maxLineLen * 0.3f));
+            if (headR < rSafe) alphaMod *= Mathf.Clamp01((headR - rSafe * 0.6f) / (rSafe * 0.4f));
+            if (alphaMod <= 0.01f) continue;
+
+            Vector2 p1 = new Vector2(focus.x + cos * currentR, focus.y + sin * currentR);
+            Vector2 p2 = new Vector2(focus.x + cos * Mathf.Max(headR, rSafe * 0.5f), focus.y + sin * Mathf.Max(headR, rSafe * 0.5f));
+
+            float thick = Mathf.Lerp(2.5f, boost ? 5.2f : 3.8f, intensity);
+
+            Color col;
+            if (boost)
+            {
+                col = (i % 3 == 0)
+                    ? new Color(1f, 0.80f, 0.2f, 0.90f * intensity * alphaMod)
+                    : (i % 3 == 1)
+                        ? new Color(0.2f, 0.92f, 1f, 0.90f * intensity * alphaMod)
+                        : new Color(1f, 1f, 1f, 0.95f * intensity * alphaMod);
+            }
+            else
+            {
+                // 明るい背景でもクッキリ見えるよう、鮮やかなシアンと白をブレンド
+                col = (i % 2 == 0)
+                    ? new Color(0.35f, 0.88f, 1f, 0.85f * intensity * alphaMod)
+                    : new Color(1f, 1f, 1f, 0.80f * intensity * alphaMod);
+            }
+
+            DrawSpeedStroke(p1, p2, thick, col, strokeTex, baseMatrix);
         }
+
+        // ─────────────────────────────────────────────
+        // レイヤー2: 迫力の集中線（ダイナミック・インパクトスパイク）
+        // ─────────────────────────────────────────────
+        int spikeCount = (int)Mathf.Lerp(28f, boost ? 80f : 56f, intensity);
+        int timeSlot = (int)(time * 22f); // 22Hzでリズミカルに切り替わる
+
+        for (int i = 0; i < spikeCount; i++)
+        {
+            int hash = (i * 265443576 + timeSlot * 8235729) & 0x7FFFFFFF;
+            float r0 = (hash % 1000) / 1000f;
+            float r1 = ((hash / 1000) % 1000) / 1000f;
+            float r2 = ((hash / 1000000) % 1000) / 1000f;
+
+            // 角度の分散（360度全体に均一に分散）
+            float baseAngle = (i / (float)spikeCount) * Mathf.PI * 2f;
+            float angle = baseAngle + (r0 - 0.5f) * (Mathf.PI * 2f / spikeCount) * 1.15f;
+
+            float cos = Mathf.Cos(angle);
+            float sin = Mathf.Sin(angle);
+
+            float tx = cos > 0.0001f ? (w - focus.x) / cos : (cos < -0.0001f ? -focus.x / cos : 99999f);
+            float ty = sin > 0.0001f ? (h - focus.y) / sin : (sin < -0.0001f ? -focus.y / sin : 99999f);
+            float rEdge = Mathf.Min(tx, ty);
+            if (rEdge < 30f) continue;
+
+            // 視界保護セーフゾーン
+            float rSafe = Mathf.Sqrt(Mathf.Pow(cos * 160f, 2f) + Mathf.Pow(sin * 100f, 2f));
+
+            // 外枠から中心方向へ伸びる長さ（3層のバリエーション）
+            float rOuter = rEdge + 12f;
+            float tier = (hash >> 5) % 3;
+            float reach = tier == 0
+                ? Mathf.Lerp(0.28f, 0.48f, intensity) * (0.8f + r1 * 0.4f)
+                : tier == 1
+                    ? Mathf.Lerp(0.50f, 0.75f, intensity) * (0.85f + r1 * 0.3f)
+                    : Mathf.Lerp(0.75f, boost ? 0.96f : 0.90f, intensity);
+
+            float rInner = Mathf.Max(rSafe, rOuter - (rOuter - rSafe) * reach);
+
+            Vector2 p1 = new Vector2(focus.x + cos * rOuter, focus.y + sin * rOuter);
+            Vector2 p2 = new Vector2(focus.x + cos * rInner, focus.y + sin * rInner);
+
+            float thick = Mathf.Lerp(3.2f, boost ? 8.5f : 6.0f, intensity) * (0.65f + r2 * 0.7f);
+
+            Color col;
+            if (boost)
+            {
+                int kind = (hash >> 3) % 4;
+                switch (kind)
+                {
+                    case 0: col = new Color(1f, 0.70f, 0.15f, 0.95f * intensity); break; // 炎ゴールド
+                    case 1: col = new Color(0.20f, 0.95f, 1f, 0.95f * intensity); break;  // ネオンシアン
+                    case 2: col = new Color(1f, 0.98f, 0.55f, 0.98f * intensity); break; // 高輝度イエロー
+                    default: col = new Color(1f, 1f, 1f, 1.0f); break;                   // 白熱コア
+                }
+            }
+            else
+            {
+                float a = Mathf.Clamp01(0.75f * intensity + r2 * 0.25f);
+                col = (i % 3 == 0)
+                    ? new Color(0.3f, 0.9f, 1f, a)
+                    : (i % 3 == 1)
+                        ? new Color(0.85f, 0.96f, 1f, a)
+                        : new Color(1f, 1f, 1f, a);
+            }
+
+            DrawSpeedStroke(p1, p2, thick, col, strokeTex, baseMatrix);
+        }
+
+        GUI.matrix = baseMatrix;
     }
 
-    void DrawSpeedStroke(Vector2 a, Vector2 b, float thickness, Color col)
+    void DrawSpeedStroke(Vector2 a, Vector2 b, float thickness, Color col, Texture2D tex, Matrix4x4 baseMatrix)
     {
-        var prev = GUI.color;
-        GUI.color = col;
         var d = b - a;
         float len = d.magnitude;
+        if (len < 1f) return;
         float ang = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
-        var m = GUI.matrix;
-        GUIUtility.RotateAroundPivot(ang, a);
-        GUI.DrawTexture(new Rect(a.x, a.y - thickness * 0.5f, len, thickness), Texture2D.whiteTexture);
-        GUI.matrix = m;
+        var prev = GUI.color;
+        GUI.color = col;
+        GUI.matrix = baseMatrix * Matrix4x4.TRS(new Vector3(a.x, a.y, 0f), Quaternion.Euler(0, 0, ang), Vector3.one);
+        GUI.DrawTexture(new Rect(0, -thickness * 0.5f, len, thickness), tex);
         GUI.color = prev;
     }
 
