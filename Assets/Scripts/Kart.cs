@@ -21,6 +21,8 @@ public class Kart : MonoBehaviour
     public string Name;
     public Color Color;
     public bool IsPlayer;
+    public int PlayerIndex;     // 人間操作時の識別（0 = P1、1 = P2）
+    public int ModelVariant = -1; // 人間操作時に使うキャラのモデル番号（-1 = 自動）
 
     // レース状況
     public int Index;
@@ -276,7 +278,7 @@ public class Kart : MonoBehaviour
 
     bool TryBuildKenneyModel()
     {
-        int variant = IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 1) % KenneyKarts.Length);
+        int variant = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 1) % KenneyKarts.Length);
         var kartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[variant]);
         var wheelPrefab = Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default");
         if (kartPrefab == null) return false;
@@ -414,6 +416,7 @@ public class Kart : MonoBehaviour
     KartInput PlayerInput()
     {
         var inp = new KartInput();
+        if (rm.TwoPlayer) return SplitScreenInput(inp);
         bool up = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.JoystickButton0);
         bool down = Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.JoystickButton1);
         inp.throttle = up ? 1f : down ? -1f : 0f;
@@ -421,6 +424,28 @@ public class Kart : MonoBehaviour
         inp.drift = Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.JoystickButton5);
         inp.driftDown = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.JoystickButton5);
         inp.useItem = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.JoystickButton2);
+        return inp;
+    }
+
+    // 2P 対戦時のキー割り当て：P1 = WASD、P2 = 矢印キー（キーボード 1 台で操作できる）
+    KartInput SplitScreenInput(KartInput inp)
+    {
+        if (PlayerIndex == 0)
+        {
+            inp.throttle = Input.GetKey(KeyCode.W) ? 1f : Input.GetKey(KeyCode.S) ? -1f : 0f;
+            inp.steer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
+            inp.drift = Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftShift);
+            inp.driftDown = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.LeftShift);
+            inp.useItem = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.LeftControl);
+        }
+        else
+        {
+            inp.throttle = Input.GetKey(KeyCode.UpArrow) ? 1f : Input.GetKey(KeyCode.DownArrow) ? -1f : 0f;
+            inp.steer = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
+            inp.drift = Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.Period);
+            inp.driftDown = Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.Period);
+            inp.useItem = Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.Slash);
+        }
         return inp;
     }
 
@@ -980,7 +1005,7 @@ public class Kart : MonoBehaviour
         {
             rm.Audio.Boost();
             rm.Shake(0.35f);
-            rm.Banner("BIG JUMP!", new Color(1f, 0.7f, 0.2f));
+            rm.Banner("BIG JUMP!", new Color(1f, 0.7f, 0.2f), PlayerIndex);
         }
         Fx.Burst(transform.position + Vector3.up * 0.5f, new Color(1f, 0.75f, 0.2f), 16, 7f, 0.4f);
     }
@@ -991,7 +1016,7 @@ public class Kart : MonoBehaviour
         if (IsPlayer)
         {
             float held = throttleHeldSince < 0 ? -1f : Time.time - throttleHeldSince;
-            if (held >= 0 && held < 1.1f) { Boost(1.2f); rm.Audio.Boost(); rm.Banner("ROCKET START!", new Color(1f, 0.8f, 0.2f)); }
+            if (held >= 0 && held < 1.1f) { Boost(1.2f); rm.Audio.Boost(); rm.Banner("ROCKET START!", new Color(1f, 0.8f, 0.2f), PlayerIndex); }
         }
         else if (Random.value < 0.5f) Boost(Random.Range(0.4f, 1.0f));
     }

@@ -7,8 +7,15 @@ public struct JumpRampDef
     public float Power; // 射出上向き速度 (例: 14f)
 }
 
+public struct TunnelDef
+{
+    public float Start; // 0.0 ~ 1.0 (コースの進行度)
+    public float End;
+}
+
 public struct TrackDef
 {
+    public TunnelDef[] Tunnels; // ビルを貫通する屋根付き区間
     public string Name;
     public string Description;
     public Vector3[] Control;
@@ -26,7 +33,7 @@ public struct TrackDef
     public Color WallColorA;
     public Color WallColorB;
     public Color ShoulderColor;
-    public int SceneryTheme; // 0 = Circuit, 1 = Desert, 2 = Snow
+    public int SceneryTheme; // 0 = Circuit, 1 = Desert, 2 = Snow, 3 = City
 }
 
 // コース。制御点からスプラインを作り、等間隔のサンプル点・路面メッシュ・装飾を生成する。
@@ -162,6 +169,52 @@ public class Track : MonoBehaviour
             WallColorB = new Color(0.88f, 0.92f, 0.98f),
             ShoulderColor = new Color(0.82f, 0.88f, 0.96f),
             SceneryTheme = 2
+        },
+        // 4. Neon Metropolis - 摩天楼の谷間を抜け、ビルの中を貫通する都市コース
+        new TrackDef
+        {
+            Name = "NEON METROPOLIS",
+            Description = "Dusk city dash through skyscraper canyons, an elevated expressway, and tunnels straight through the buildings.",
+            Control = new[]
+            {
+                new Vector3(0, 0, -140),        // スタート（中央大通り）
+                new Vector3(110, 0, -140),
+                new Vector3(190, 1, -130),      // 交差点を右折
+                new Vector3(235, 2, -70),
+                new Vector3(235, 4, 10),        // 高架への登り
+                new Vector3(215, 10, 70),
+                new Vector3(150, 13, 105),      // 高架ハイウェイ（ジャンプ台設置）
+                new Vector3(60, 13, 110),
+                new Vector3(-10, 9, 120),
+                new Vector3(-70, 3, 150),       // 高架から降下
+                new Vector3(-130, 1, 170),      // ビル貫通トンネルA
+                new Vector3(-190, 0, 130),
+                new Vector3(-215, 0, 60),
+                new Vector3(-175, 0, 0),        // ビル貫通トンネルB
+                new Vector3(-100, 0, -20),
+                new Vector3(-70, 0, -70),
+                new Vector3(-100, 0, -130)      // ホームストレートへ
+            },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.43f, Power = 15f } },
+            Tunnels = new[]
+            {
+                new TunnelDef { Start = 0.555f, End = 0.64f },
+                new TunnelDef { Start = 0.775f, End = 0.865f }
+            },
+            SkyTint = new Color(0.38f, 0.28f, 0.65f),
+            GroundColor = new Color(0.16f, 0.13f, 0.28f),
+            SunColor = new Color(1f, 0.62f, 0.45f),
+            SunIntensity = 1.05f,
+            SunRotation = new Vector3(18f, -50f, 0f),
+            FogColor = new Color(0.46f, 0.34f, 0.62f),
+            FogDistance = 650f,
+            RoadColor = new Color(0.2f, 0.2f, 0.24f),
+            CurbColorA = new Color(1f, 0.2f, 0.6f),
+            CurbColorB = new Color(0.1f, 0.9f, 1f),
+            WallColorA = new Color(0.12f, 0.14f, 0.3f),
+            WallColorB = new Color(0.55f, 0.6f, 0.75f),
+            ShoulderColor = new Color(0.5f, 0.52f, 0.6f),
+            SceneryTheme = 3
         }
     };
 
@@ -309,7 +362,9 @@ public class Track : MonoBehaviour
         var curbMat = new Material(rm.curbMaterial) { mainTexture = TextureGen.Stripes(def.CurbColorA, def.CurbColorB) };
         var wallMat = new Material(rm.wallMaterial) { mainTexture = TextureGen.Stripes(def.WallColorA, def.WallColorB) };
 
-        Texture2D groundTex = def.SceneryTheme == 1 ? TextureGen.Sand() : (def.SceneryTheme == 2 ? TextureGen.Snow() : TextureGen.Grass());
+        Texture2D groundTex = def.SceneryTheme == 1 ? TextureGen.Sand()
+            : def.SceneryTheme == 2 ? TextureGen.Snow()
+            : def.SceneryTheme == 3 ? TextureGen.Concrete() : TextureGen.Grass();
         var groundMat = new Material(rm.grassMaterial) { mainTexture = groundTex, color = Color.white };
         groundMat.mainTextureScale = new Vector2(160, 160);
 
@@ -350,6 +405,7 @@ public class Track : MonoBehaviour
         PlanItemBoxes();
         BuildBridgePillars(rm);
         BuildJumpRamps(rm);
+        BuildTunnels(rm, def);
         BuildScenery(rm, def);
         BuildSponsorBoards(rm);
         BuildCircuitProps(rm, def);
@@ -384,22 +440,25 @@ public class Track : MonoBehaviour
     }
 
     // a/b は (横オフセット, 高さ)。路面法線 Normals に沿って生成するため立体コースでも歪まない。
-    void Strip(string name, Vector2 a, Vector2 b, Material mat, float vScale)
+    // from/segments を指定すると周回の一部区間だけを生成する（トンネル用）
+    void Strip(string name, Vector2 a, Vector2 b, Material mat, float vScale, int from = 0, int segments = -1)
     {
         int c = Count;
-        var verts = new Vector3[(c + 1) * 2];
-        var uvs = new Vector2[(c + 1) * 2];
-        var tris = new int[c * 6];
-        for (int i = 0; i <= c; i++)
+        bool full = segments < 0;
+        int segs = full ? c : segments;
+        var verts = new Vector3[(segs + 1) * 2];
+        var uvs = new Vector2[(segs + 1) * 2];
+        var tris = new int[segs * 6];
+        for (int i = 0; i <= segs; i++)
         {
-            int k = i % c;
-            float v = (i == c ? Length : Dist[k]) / vScale;
+            int k = (from + i) % c;
+            float v = (full && i == c ? Length : Dist[k]) / vScale;
             verts[i * 2] = Pts[k] + Rights[k] * a.x + Normals[k] * a.y;
             verts[i * 2 + 1] = Pts[k] + Rights[k] * b.x + Normals[k] * b.y;
             uvs[i * 2] = new Vector2(0, v);
             uvs[i * 2 + 1] = new Vector2(1, v);
         }
-        for (int i = 0; i < c; i++)
+        for (int i = 0; i < segs; i++)
         {
             int a0 = i * 2, b0 = i * 2 + 1, a1 = i * 2 + 2, b1 = i * 2 + 3;
             tris[i * 6 + 0] = a0; tris[i * 6 + 1] = a1; tris[i * 6 + 2] = b0;
@@ -416,32 +475,167 @@ public class Track : MonoBehaviour
     {
         var pillarMat = rm.standMaterial;
         int step = 12;
+        float groundY = -0.3f;
+        float beamH = 1.4f;
+
         for (int i = 0; i < Count; i += step)
         {
             float y = Pts[i].y;
             if (y > 4.5f)
             {
                 var p = Pts[i];
-                float colH = y + 0.6f;
-                // コンクリート橋脚
-                var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                Destroy(col.GetComponent<Collider>());
-                col.name = "BridgePillar_" + i;
-                col.transform.SetParent(transform, false);
-                col.transform.position = new Vector3(p.x, colH * 0.5f, p.z);
-                col.transform.localScale = new Vector3(3.2f, colH * 0.5f, 3.2f);
-                col.GetComponent<Renderer>().sharedMaterial = pillarMat;
 
-                // 道路底面を支える横ビーム（クロスビーム）
+                // 道路底面（-0.35f）に接するように横ビームを配置
                 var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Destroy(beam.GetComponent<Collider>());
                 beam.name = "BridgeBeam_" + i;
                 beam.transform.SetParent(transform, false);
-                beam.transform.position = p - Normals[i] * 0.5f;
+                Vector3 beamPos = p - Normals[i] * (0.35f + beamH * 0.5f);
+                beam.transform.position = beamPos;
                 beam.transform.rotation = Quaternion.LookRotation(Dirs[i], Normals[i]);
-                beam.transform.localScale = new Vector3(WallOffset * 1.8f, 1.2f, 3.8f);
+                beam.transform.localScale = new Vector3(WallOffset * 1.8f, beamH, 3.8f);
                 beam.GetComponent<Renderer>().sharedMaterial = pillarMat;
+
+                // コンクリート橋脚（上端はビーム中心高さに接続し、路面を絶対に貫通しない）
+                float topY = beamPos.y;
+                float colH = topY - groundY;
+                if (colH > 0.8f)
+                {
+                    var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    Destroy(col.GetComponent<Collider>());
+                    col.name = "BridgePillar_" + i;
+                    col.transform.SetParent(transform, false);
+                    col.transform.position = new Vector3(beamPos.x, groundY + colH * 0.5f, beamPos.z);
+                    col.transform.localScale = new Vector3(3.4f, colH * 0.5f, 3.4f);
+                    col.GetComponent<Renderer>().sharedMaterial = pillarMat;
+                }
             }
+        }
+    }
+
+    Material[] cityMats;
+
+    // 窓の明かりが付いたビル外壁マテリアル（数種類を使い回す）
+    Material[] CityMaterials(RaceManager rm)
+    {
+        if (cityMats != null && cityMats[0] != null) return cityMats;
+        var walls = new[] { new Color(0.22f, 0.24f, 0.34f), new Color(0.32f, 0.26f, 0.36f), new Color(0.18f, 0.28f, 0.34f), new Color(0.36f, 0.34f, 0.40f), new Color(0.2f, 0.2f, 0.28f) };
+        var lits = new[] { new Color(1f, 0.85f, 0.45f), new Color(0.6f, 0.9f, 1f), new Color(1f, 0.6f, 0.8f), new Color(1f, 0.9f, 0.7f), new Color(0.7f, 1f, 0.8f) };
+        cityMats = new Material[walls.Length];
+        for (int i = 0; i < walls.Length; i++)
+            cityMats[i] = new Material(rm.wallMaterial) { mainTexture = TextureGen.Windows(walls[i], lits[i], 100 + i), color = Color.white };
+        return cityMats;
+    }
+
+    // 外壁の窓テクスチャを建物サイズに合わせてタイリングする（1タイル = 横12m x 縦28m）
+    void TileFacade(GameObject go, float width, float height)
+    {
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetVector("_MainTex_ST", new Vector4(Mathf.Max(1f, width / 12f), Mathf.Max(1f, height / 28f), 0, 0));
+        go.GetComponent<Renderer>().SetPropertyBlock(mpb);
+    }
+
+    // ビルを貫通する屋根付き区間：天井・側壁・照明と、その上に載るビル本体
+    void BuildTunnels(RaceManager rm, TrackDef def)
+    {
+        if (def.Tunnels == null) return;
+        const float H = 10f;
+        var concrete = new Material(rm.wallMaterial) { mainTexture = TextureGen.Concrete(), color = new Color(0.7f, 0.72f, 0.8f) };
+        var lightMat = new Material(rm.glowMaterial) { color = new Color(1f, 0.92f, 0.75f) };
+        var neonA = new Material(rm.glowMaterial) { color = def.CurbColorA };
+        var neonB = new Material(rm.glowMaterial) { color = def.CurbColorB };
+        var facade = CityMaterials(rm);
+
+        for (int t = 0; t < def.Tunnels.Length; t++)
+        {
+            int i0 = Mathf.Clamp(Mathf.RoundToInt(def.Tunnels[t].Start * Count), 0, Count - 2);
+            int i1 = Mathf.Clamp(Mathf.RoundToInt(def.Tunnels[t].End * Count), i0 + 1, Count - 1);
+            int segs = i1 - i0;
+            string id = "Tunnel" + t;
+
+            Strip(id + "Ceiling", new Vector2(WallOffset, H), new Vector2(-WallOffset, H), concrete, 8f, i0, segs);
+            // 側壁は両面
+            Strip(id + "WallL", new Vector2(-WallOffset, 0f), new Vector2(-WallOffset, H), concrete, 8f, i0, segs);
+            Strip(id + "WallL2", new Vector2(-WallOffset, H), new Vector2(-WallOffset, 0f), concrete, 8f, i0, segs);
+            Strip(id + "WallR", new Vector2(WallOffset, H), new Vector2(WallOffset, 0f), concrete, 8f, i0, segs);
+            Strip(id + "WallR2", new Vector2(WallOffset, 0f), new Vector2(WallOffset, H), concrete, 8f, i0, segs);
+
+            // 壁際のネオンライン
+            Strip(id + "NeonL", new Vector2(-WallOffset + 0.1f, 3.6f), new Vector2(-WallOffset + 0.1f, 4.1f), neonA, 8f, i0, segs);
+            Strip(id + "NeonR", new Vector2(WallOffset - 0.1f, 4.1f), new Vector2(WallOffset - 0.1f, 3.6f), neonB, 8f, i0, segs);
+
+            for (int i = i0; i <= i1; i += 4)
+            {
+                var rot = Quaternion.LookRotation(Dirs[i], Normals[i]);
+                if ((i - i0) % 8 == 0)
+                    Box("TunnelLight", Pts[i] + Normals[i] * (H - 0.15f), new Vector3(WallOffset * 1.2f, 0.2f, 0.8f), rot, lightMat);
+            }
+
+            // 上に載るビル本体（路面に沿って並べる）
+            for (int i = i0; i <= i1; i += 8)
+            {
+                float bh = 28f + ((i * 37) % 23);
+                var rot = Quaternion.LookRotation(Dirs[i], Vector3.up);
+                float w = WallOffset * 2f + 2f, len = 18f;
+                var b = Box("TunnelBuilding", Pts[i] + Vector3.up * (H + bh * 0.5f), new Vector3(w, bh, len), rot, facade[(t + i / 8) % facade.Length]);
+                TileFacade(b, (w + len) * 0.5f, bh);
+            }
+        }
+    }
+
+    // 都市テーマの街並み：道路に沿って摩天楼を敷き詰める
+    void BuildCityScenery(RaceManager rm, TrackDef def, System.Random rng)
+    {
+        var facade = CityMaterials(rm);
+        var placedB = new List<Vector3>(); // (x, z, 半径)
+        var antennaMat = new Material(rm.glowMaterial) { color = new Color(1f, 0.2f, 0.25f) };
+        int placed = 0;
+
+        for (int tries = 0; tries < 5000 && placed < 360; tries++)
+        {
+            float w = 10f + (float)rng.NextDouble() * 14f;
+            float d = 10f + (float)rng.NextDouble() * 14f;
+            float rad = Mathf.Max(w, d) * 0.72f;
+            var pos = new Vector3(
+                Mathf.Lerp(bounds.min.x - 110, bounds.max.x + 110, (float)rng.NextDouble()), 0,
+                Mathf.Lerp(bounds.min.z - 110, bounds.max.z + 110, (float)rng.NextDouble()));
+            if (DistanceToTrack(pos, true) < WallOffset + 7f + rad) continue;
+            if (new Vector2(pos.x - Pts[0].x, pos.z - Pts[0].z).magnitude < 75f + rad) continue; // スタート周辺（観客席・テント）を空ける
+
+            bool overlap = false;
+            foreach (var o in placedB)
+                if (new Vector2(pos.x - o.x, pos.z - o.y).magnitude < (rad + o.z) * 0.9f) { overlap = true; break; }
+            if (overlap) continue;
+            placedB.Add(new Vector3(pos.x, pos.z, rad));
+
+            // 中心部ほど高く
+            float centerDist = new Vector2(pos.x - bounds.center.x, pos.z - bounds.center.z).magnitude;
+            float h = 20f + (float)rng.NextDouble() * 45f + Mathf.Clamp01(1f - centerDist / 260f) * 45f;
+            var b = Box("Skyscraper", pos + Vector3.up * (h * 0.5f - 0.3f), new Vector3(w, h, d), Quaternion.identity, facade[rng.Next(facade.Length)]);
+            TileFacade(b, (w + d) * 0.5f, h);
+            if (h > 60f)
+            {
+                Box("Antenna", pos + Vector3.up * (h + 4f), new Vector3(0.5f, 4f, 0.5f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
+                Box("AntennaLight", pos + Vector3.up * (h + 8.3f), Vector3.one * 0.9f, Quaternion.identity, antennaMat, PrimitiveType.Sphere);
+            }
+            else if (rng.NextDouble() < 0.4)
+            {
+                // 屋上の設備ブロック
+                Box("RoofUnit", pos + Vector3.up * (h + 1.2f), new Vector3(w * 0.45f, 2.4f, d * 0.45f), Quaternion.identity, rm.standMaterial);
+            }
+            placed++;
+        }
+
+        // 遠景のスカイライン
+        for (int i = 0; i < 36; i++)
+        {
+            float a = i / 36f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.1f;
+            float r = 430f + (float)rng.NextDouble() * 140f;
+            float h = 90f + (float)rng.NextDouble() * 160f;
+            float w = 50f + (float)rng.NextDouble() * 60f;
+            var p = bounds.center + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+            var b = Box("Skyline", p + Vector3.up * (h * 0.5f - 0.3f), new Vector3(w, h, w), Quaternion.identity, facade[rng.Next(facade.Length)]);
+            TileFacade(b, w, h);
         }
     }
 
@@ -627,7 +821,10 @@ public class Track : MonoBehaviour
             new Material(rm.leavesMaterial) { color = new Color(0.45f, 0.7f, 0.2f) },
         };
 
-        for (int tries = 0; tries < 3000 && placed < 260; tries++)
+        bool city = def.SceneryTheme == 3;
+        if (city) BuildCityScenery(rm, def, rng);
+
+        for (int tries = 0; tries < 3000 && placed < 260 && !city; tries++)
         {
             var pos = new Vector3(
                 Mathf.Lerp(bounds.min.x - 90, bounds.max.x + 90, (float)rng.NextDouble()), 0,
@@ -694,7 +891,7 @@ public class Track : MonoBehaviour
 
         // 遠くの山
         Material bgMountainMat = def.SceneryTheme == 1 ? sandstoneMat : (def.SceneryTheme == 2 ? rm.snowMaterial : rm.mountainMaterial);
-        for (int i = 0; i < 22; i++)
+        for (int i = 0; i < (city ? 0 : 22); i++)
         {
             float a = i / 22f * Mathf.PI * 2f + (float)rng.NextDouble() * 0.2f;
             float r = 480f + (float)rng.NextDouble() * 120f;
@@ -892,10 +1089,15 @@ public class Track : MonoBehaviour
         foreach (var c in go.GetComponentsInChildren<Collider>()) Destroy(c);
     }
 
-    float DistanceToTrack(Vector3 p)
+    float DistanceToTrack(Vector3 p, bool flat = false)
     {
         float best = float.MaxValue;
-        for (int i = 0; i < Count; i += 3) best = Mathf.Min(best, (Pts[i] - p).sqrMagnitude);
+        for (int i = 0; i < Count; i += 3)
+        {
+            var d = Pts[i] - p;
+            if (flat) d.y = 0f;
+            best = Mathf.Min(best, d.sqrMagnitude);
+        }
         return Mathf.Sqrt(best);
     }
 

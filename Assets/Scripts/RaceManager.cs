@@ -57,17 +57,26 @@ public class RaceManager : MonoBehaviour
     readonly List<Missile> missiles = new List<Missile>();
     Font font;
 
-    float stateTime, raceTime, playerLapStart, lastLapTime, bestLapTime, shake, titleDist, camYaw, finishAt;
+    float stateTime, raceTime, shake, titleDist, finishAt;
     int lastCountdownBeep;
-    string bannerText; Color bannerColor; float bannerTime = 99f;
 
-    Camera cam;
+    // ローカル対戦（2P 画面分割）。インデックス 0 = P1、1 = P2
+    public bool TwoPlayer { get; private set; }
+    public Kart Player2 { get; private set; }
+    public int SelectedKart2 { get; private set; } = 1;
+    int P2Slot => playerGridSlot - 1;
+    readonly float[] lapStart = new float[2], bestLap = new float[2], camYaws = new float[2];
+    readonly string[] bannerTexts = new string[2];
+    readonly Color[] bannerColors = new Color[2];
+    readonly float[] bannerTimes = { 99f, 99f };
+
+    Camera cam, cam2;
     Texture2D minimap;
     Texture2D vignetteTex;
     Texture2D speedLineTex;
     Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
     Texture2D titleLogoTex;
-    Texture2D[] trackBadgeTex = new Texture2D[3];
+    Texture2D[] trackBadgeTex = new Texture2D[4];
     Texture2D cardPanelTex;
     Texture2D cardPopTex;
     Texture2D btnRaceTex;
@@ -148,6 +157,13 @@ public class RaceManager : MonoBehaviour
         cam.nearClipPlane = 0.2f;
         camGo.AddComponent<AudioListener>();
 
+        // 2P 対戦用の右画面カメラ（対戦中のみ有効）
+        cam2 = new GameObject("Camera P2").AddComponent<Camera>();
+        cam2.fieldOfView = 62f;
+        cam2.farClipPlane = 1500f;
+        cam2.nearClipPlane = 0.2f;
+        cam2.enabled = false;
+
         Sun = new GameObject("Sun").AddComponent<Light>();
         Sun.type = LightType.Directional;
         Sun.intensity = 1.25f;
@@ -189,6 +205,8 @@ public class RaceManager : MonoBehaviour
             placeOrder.Add(k);
             if (isPlayer) { Player = k; ApplyKartStats(); }
         }
+        Player2 = Karts[P2Slot]; // 普段は CPU。2P モード時のみ人間が操作する
+        if (args.Contains("-twoplayer")) SetTwoPlayer(true);
 
         LoadCourse(cIdx);
     }
@@ -198,6 +216,48 @@ public class RaceManager : MonoBehaviour
         var d = KartCharacters[SelectedKart];
         Player.ApplyStats(d.speed, d.accel, d.handling, d.weight);
     }
+
+    Kart HumanKart(int p) => p == 0 ? Player : Player2;
+
+    void SetTwoPlayer(bool on)
+    {
+        if (TwoPlayer == on) return;
+        TwoPlayer = on;
+        if (Audio != null) Audio.Beep();
+        ConfigureHuman(0);
+        ConfigureHuman(1);
+    }
+
+    // P1 / P2 のカートを人間操作（または P2 のみ CPU）に設定し、見た目と性能を選択キャラに合わせる
+    void ConfigureHuman(int p)
+    {
+        var k = HumanKart(p);
+        if (p == 0 || TwoPlayer)
+        {
+            int sel = p == 0 ? SelectedKart : SelectedKart2;
+            var d = KartCharacters[sel];
+            k.IsPlayer = true;
+            k.PlayerIndex = p;
+            k.ModelVariant = sel;
+            k.Name = TwoPlayer ? $"P{p + 1} ({d.name})" : "YOU (" + d.name + ")";
+            k.Color = d.color;
+            k.ApplyStats(d.speed, d.accel, d.handling, d.weight);
+        }
+        else
+        {
+            int ai = P2Slot; // P2Slot < playerGridSlot なので CPU 名簿のインデックスと一致
+            k.IsPlayer = false;
+            k.PlayerIndex = 0;
+            k.ModelVariant = -1;
+            k.Name = AiNames[ai];
+            k.Color = AiColors[ai];
+            k.ApplyStats(5, 5, 5, 5);
+        }
+        k.RebuildModel();
+        k.Hop();
+    }
+
+    bool AllHumansFinished() => Player.Finished && (!TwoPlayer || Player2.Finished);
 
     public void LoadCourse(int index)
     {
@@ -241,23 +301,14 @@ public class RaceManager : MonoBehaviour
         }
     }
 
-    void SwitchKart(int delta)
+    void SwitchKart(int p, int delta)
     {
-        int next = (SelectedKart + delta + KartCharacters.Length) % KartCharacters.Length;
-        if (next != SelectedKart)
-        {
-            SelectedKart = next;
-            if (Audio != null) Audio.Beep();
-            if (Player != null)
-            {
-                var def = KartCharacters[SelectedKart];
-                Player.Name = "YOU (" + def.name + ")";
-                Player.Color = def.color;
-                ApplyKartStats();
-                Player.RebuildModel();
-                Player.Hop();
-            }
-        }
+        int cur = p == 0 ? SelectedKart : SelectedKart2;
+        int next = (cur + delta + KartCharacters.Length) % KartCharacters.Length;
+        if (next == cur) return;
+        if (p == 0) SelectedKart = next; else SelectedKart2 = next;
+        if (Audio != null) Audio.Beep();
+        if (HumanKart(p) != null) ConfigureHuman(p);
     }
 
     void GridSlot(int slot, out int index, out float lateral)
@@ -290,14 +341,16 @@ public class RaceManager : MonoBehaviour
         }
 
         raceTime = 0;
-        playerLapStart = 0;
-        lastLapTime = 0;
-        bestLapTime = 0;
+        for (int p = 0; p < 2; p++)
+        {
+            lapStart[p] = 0;
+            bestLap[p] = 0;
+            camYaws[p] = HumanKart(p).Heading;
+            bannerTimes[p] = 99f;
+        }
         lastCountdownBeep = -1;
-        camYaw = Player.Heading;
         Audio.SetMusicTempo(1f);
         Audio.SetMusicVolume(0.3f);
-        bannerTime = 99f;
     }
 
     // ───────────────────────── Loop ─────────────────────────
@@ -342,20 +395,27 @@ public class RaceManager : MonoBehaviour
 
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
         stateTime += dt;
-        bannerTime += dt;
+        bannerTimes[0] += dt;
+        bannerTimes[1] += dt;
 
         bool enter = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.JoystickButton7);
         switch (state)
         {
             case State.Title:
-                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                if (Input.GetKeyDown(KeyCode.Tab))
+                    SetTwoPlayer(!TwoPlayer);
+                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
                     SwitchCourse(-1);
                 else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
                     SwitchCourse(1);
-                else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-                    SwitchKart(-1);
-                else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-                    SwitchKart(1);
+                else if (Input.GetKeyDown(KeyCode.W) || (!TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow)))
+                    SwitchKart(0, -1);
+                else if (Input.GetKeyDown(KeyCode.S) || (!TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow)))
+                    SwitchKart(0, 1);
+                else if (TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
+                    SwitchKart(1, -1);
+                else if (TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
+                    SwitchKart(1, 1);
 
                 if (!titleShotRequested && (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))) StartCountdown();
                 break;
@@ -411,45 +471,48 @@ public class RaceManager : MonoBehaviour
         {
             k.Finished = true;
             k.FinishTime = raceTime;
-            if (k == Player)
+            if (k.IsPlayer)
             {
                 Audio.Finish();
-                Banner("FINISH!", Color.white);
-                state = State.Results;
-                finishAt = Time.time;
-                Audio.SetMusicVolume(0.15f);
-                RecordLap();
+                Banner("FINISH!", Color.white, k.PlayerIndex);
+                RecordLap(k.PlayerIndex);
+                if (AllHumansFinished())
+                {
+                    state = State.Results;
+                    finishAt = Time.time;
+                    Audio.SetMusicVolume(0.15f);
+                }
             }
             return;
         }
-        if (k != Player || k.Lap < 2) return;
+        if (!k.IsPlayer || k.Lap < 2) return;
 
-        RecordLap();
+        RecordLap(k.PlayerIndex);
         if (k.Lap == totalLaps)
         {
-            Banner("FINAL LAP!", new Color(1f, 0.3f, 0.3f));
+            Banner("FINAL LAP!", new Color(1f, 0.3f, 0.3f), k.PlayerIndex);
             Audio.FinalLap();
             Audio.SetMusicTempo(1.1f);
         }
         else
         {
-            Banner("LAP " + k.Lap + "/" + totalLaps, Color.white);
+            Banner("LAP " + k.Lap + "/" + totalLaps, Color.white, k.PlayerIndex);
             Audio.Lap();
         }
     }
 
-    void RecordLap()
+    void RecordLap(int p)
     {
-        lastLapTime = raceTime - playerLapStart;
-        playerLapStart = raceTime;
-        if (bestLapTime <= 0 || lastLapTime < bestLapTime) bestLapTime = lastLapTime;
+        float lap = raceTime - lapStart[p];
+        lapStart[p] = raceTime;
+        if (bestLap[p] <= 0 || lap < bestLap[p]) bestLap[p] = lap;
     }
 
-    public void Banner(string text, Color color)
+    public void Banner(string text, Color color, int player = 0)
     {
-        bannerText = text;
-        bannerColor = color;
-        bannerTime = 0;
+        bannerTexts[player] = text;
+        bannerColors[player] = color;
+        bannerTimes[player] = 0;
     }
 
     public void Shake(float s) => shake = Mathf.Max(shake, s);
@@ -484,7 +547,7 @@ public class RaceManager : MonoBehaviour
             b.VelDir = (b.VelDir - n * 0.5f * wb).normalized;
             a.Speed *= 0.985f;
             b.Speed *= 0.985f;
-            if ((a == Player || b == Player) && Random.value < 0.15f) Audio.Bump();
+            if ((a.IsPlayer || b.IsPlayer) && Random.value < 0.15f) Audio.Bump();
         }
     }
 
@@ -499,7 +562,7 @@ public class RaceManager : MonoBehaviour
                 d.y = 0;
                 if (d.magnitude > 2.2f) continue;
                 box.Break();
-                if (k.GiveItem(RollItem(k)) && k == Player) Audio.Pickup();
+                if (k.GiveItem(RollItem(k)) && k.IsPlayer) Audio.Pickup();
                 break;
             }
         }
@@ -601,6 +664,11 @@ public class RaceManager : MonoBehaviour
         float dt = Time.unscaledDeltaTime;
         if (paused) return;
 
+        // 対戦中は左右 2 分割（P1 = 左、P2 = 右）
+        bool split = TwoPlayer && state != State.Title;
+        cam.rect = split ? new Rect(0f, 0f, 0.5f, 1f) : new Rect(0f, 0f, 1f, 1f);
+        if (cam2.enabled != split) cam2.enabled = split;
+
         if (state == State.Title)
         {
             if (Player != null && track != null && track.Count > 0)
@@ -625,11 +693,17 @@ public class RaceManager : MonoBehaviour
             return;
         }
 
-        var kp = Player.transform.position;
-        if (state == State.Results && Time.time > finishAt + 1.5f) camYaw += 25f * dt;
-        else camYaw = Mathf.LerpAngle(camYaw, Player.Heading, 1f - Mathf.Exp(-5f * dt));
+        UpdateChaseCamera(cam, Player, 0, dt);
+        if (split) UpdateChaseCamera(cam2, Player2, 1, dt);
+    }
 
-        float yaw = camYaw;
+    void UpdateChaseCamera(Camera c, Kart pl, int p, float dt)
+    {
+        var kp = pl.transform.position;
+        if (state == State.Results && Time.time > finishAt + 1.5f) camYaws[p] += 25f * dt;
+        else camYaws[p] = Mathf.LerpAngle(camYaws[p], pl.Heading, 1f - Mathf.Exp(-5f * dt));
+
+        float yaw = camYaws[p];
         float dist = 6.8f, height = 2.7f;
         if (state == State.Results) { dist = 9f; height = 5f; }
         if (state == State.Countdown)
@@ -642,16 +716,17 @@ public class RaceManager : MonoBehaviour
         var r = Quaternion.Euler(0, yaw, 0);
         var target = kp + r * new Vector3(0, height, -dist);
         bool snap = state == State.Countdown && stateTime < 0.05f;
-        cam.transform.position = snap ? target : Vector3.Lerp(cam.transform.position, target, 1f - Mathf.Exp(-12f * dt));
-        float pitchAng = Player.transform.eulerAngles.x;
+        c.transform.position = snap ? target : Vector3.Lerp(c.transform.position, target, 1f - Mathf.Exp(-12f * dt));
+        float pitchAng = pl.transform.eulerAngles.x;
         if (pitchAng > 180f) pitchAng -= 360f;
         float pitchOffset = Mathf.Clamp(pitchAng * -0.06f, -2.5f, 2.5f);
-        cam.transform.LookAt(kp + r * new Vector3(0, 1.1f + pitchOffset, 3.2f));
-        if (shake > 0) cam.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
+        c.transform.LookAt(kp + r * new Vector3(0, 1.1f + pitchOffset, 3.2f));
+        if (shake > 0) c.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
 
-        float fov = 62f + Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) * 4f + (Player.Boosting ? 10f : 0f);
-        if (Player != null && Player.IsAirborne) fov += 12f;
-        cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fov, 1f - Mathf.Exp(-6f * dt));
+        // 分割画面は横幅が狭いので視野角を広めに取る
+        float fov = (TwoPlayer ? 70f : 62f) + Mathf.Clamp01(pl.Speed / Kart.MaxSpeed) * 4f + (pl.Boosting ? 10f : 0f);
+        if (pl.IsAirborne) fov += 12f;
+        c.fieldOfView = Mathf.Lerp(c.fieldOfView, fov, 1f - Mathf.Exp(-6f * dt));
     }
 
     // ───────────────────────── UI ─────────────────────────
@@ -704,27 +779,18 @@ public class RaceManager : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
         float w = Screen.width / scale, h = 720f;
 
-        if (state != State.Title)
+        if (state != State.Title && !TwoPlayer)
         {
-            DrawVignette(w, h);
+            DrawVignette(Player, w, h);
             if (RaceRunning) DrawSpeedLines(w, h);
         }
 
         switch (state)
         {
             case State.Title: DrawTitle(w, h); break;
-            case State.Countdown: DrawHud(w, h); DrawCountdown(w, h); break;
-            case State.Racing: DrawHud(w, h); break;
-            case State.Results: DrawHud(w, h); if (Time.time > finishAt + 2.5f) DrawResults(w, h); break;
-        }
-
-        if (bannerTime < 1.6f)
-        {
-            float a = Mathf.Clamp01((1.6f - bannerTime) / 0.3f);
-            float pop = 1f + Mathf.Max(0, 0.3f - bannerTime) * 1.5f;
-            var st = St(sBig, (int)(72 * pop));
-            var c = bannerColor; c.a = a;
-            Outlined(new Rect(0, h * 0.28f, w, 120), bannerText, st, c);
+            case State.Countdown: DrawHuds(w, h, true); break;
+            case State.Racing: DrawHuds(w, h, false); break;
+            case State.Results: DrawHuds(w, h, false); if (Time.time > finishAt + 2.5f) DrawResults(w, h); break;
         }
 
         if (paused)
@@ -735,6 +801,43 @@ public class RaceManager : MonoBehaviour
             Outlined(new Rect(0, h * 0.35f, w, 100), "PAUSED", sBig, Color.white);
             Outlined(new Rect(0, h * 0.52f, w, 40), "ESC : Resume     R : Restart     Q : Quit", sSmall, Color.white);
         }
+    }
+
+    // 1P は全画面、2P は左右それぞれのビューにクリップして HUD・バナー・ビネットを描く
+    void DrawHuds(float w, float h, bool countdown)
+    {
+        if (!TwoPlayer)
+        {
+            DrawHud(Player, w, h, false, 0);
+            if (countdown) DrawCountdown(w, h);
+            DrawBanner(0, w, h);
+            return;
+        }
+
+        float hw = w * 0.5f;
+        for (int p = 0; p < 2; p++)
+        {
+            GUI.BeginClip(new Rect(p * hw, 0, hw, h));
+            DrawVignette(HumanKart(p), hw, h);
+            DrawHud(HumanKart(p), hw, h, true, p);
+            if (countdown) DrawCountdown(hw, h);
+            DrawBanner(p, hw, h);
+            GUI.EndClip();
+        }
+        GUI.color = Color.black;
+        GUI.DrawTexture(new Rect(hw - 2f, 0, 4f, h), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+    }
+
+    void DrawBanner(int p, float w, float h)
+    {
+        float t = bannerTimes[p];
+        if (t >= 1.6f) return;
+        float a = Mathf.Clamp01((1.6f - t) / 0.3f);
+        float pop = 1f + Mathf.Max(0, 0.3f - t) * 1.5f;
+        var st = St(sBig, (int)((TwoPlayer ? 54 : 72) * pop));
+        var c = bannerColors[p]; c.a = a;
+        Outlined(new Rect(0, h * 0.28f, w, 120), bannerTexts[p], st, c);
     }
 
     void DrawTitle(float w, float h)
@@ -774,8 +877,8 @@ public class RaceManager : MonoBehaviour
         var courseTitleStyle = St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.12f, 0.18f, 0.35f));
         GUI.Label(new Rect(leftX + 8, cardY + 192, cardW - 16, 28), $"< {curDef.Name.ToUpper()} >", courseTitleStyle);
 
-        string diffStr = SelectedCourse == 0 ? "★☆☆  NOVICE" : SelectedCourse == 1 ? "★★☆  ADVANCED" : "★★★  EXPERT";
-        Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : new Color(1f, 0.28f, 0.38f);
+        string diffStr = SelectedCourse == 0 ? "★☆☆  NOVICE" : SelectedCourse == 1 ? "★★☆  ADVANCED" : SelectedCourse == 2 ? "★★★  EXPERT" : "★★☆  URBAN";
+        Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : SelectedCourse == 2 ? new Color(1f, 0.28f, 0.38f) : new Color(0.62f, 0.3f, 0.95f);
         DrawPopPill(new Rect(leftX + (cardW - 140) * 0.5f, cardY + 224, 140, 22), diffStr, diffBg);
 
         var descStyle = St(sSmall, 13, TextAnchor.UpperCenter, FontStyle.Normal, true, new Color(0.26f, 0.30f, 0.42f));
@@ -787,7 +890,7 @@ public class RaceManager : MonoBehaviour
         // 3. 右カード：ドライバー＆マシンセレクター（DRIVER & MACHINE）
         float rightX = w - cardW - 35f;
         DrawPopCard(new Rect(rightX, cardY, cardW, cardH));
-        DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, "◄ DRIVER & KART [W][S] ►");
+        DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, TwoPlayer ? "◄ P1 DRIVER [W][S] ►" : "◄ DRIVER & KART [W][S] ►");
 
         var curChar = KartCharacters[SelectedKart];
         var charTitleStyle = St(sSmall, 23, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
@@ -806,7 +909,19 @@ public class RaceManager : MonoBehaviour
         DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
 
         var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
-        GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "Press [W][S] to switch machine", switchGuide);
+        GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), TwoPlayer ? "P1: [W][S]   P2: [UP][DOWN]" : "Press [W][S] to switch machine", switchGuide);
+
+        // 2P：P2 のマシン選択
+        if (TwoPlayer)
+        {
+            var c2 = KartCharacters[SelectedKart2];
+            Outlined(new Rect(rightX + 8, cardY + 296, cardW - 16, 28), $"P2  < {c2.name} >", St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c2.color, 2);
+            DrawPopPill(new Rect(rightX + 22, cardY + 328, cardW - 44, 24), c2.trait, c2.color * 0.9f);
+        }
+
+        // プレイ人数の切り替え
+        var modeBg = TwoPlayer ? new Color(0.95f, 0.3f, 0.5f) : new Color(0.18f, 0.52f, 0.88f);
+        DrawPopPill(new Rect((w - 300) * 0.5f, 556f, 300, 28), TwoPlayer ? "[TAB]  2 PLAYERS  (SPLIT SCREEN)" : "[TAB]  1 PLAYER", modeBg);
 
 
         // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
@@ -839,7 +954,9 @@ public class RaceManager : MonoBehaviour
         DrawFrame(new Rect(0, h - 34, w, 34), 1, new Color(0.2f, 0.3f, 0.45f, 0.6f));
 
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
-        string guideText = "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [ESC] Pause";
+        string guideText = TwoPlayer
+            ? "P1: [WASD] [SPACE] drift [E] item   •   P2: [ARROWS] [R-SHIFT] drift [R-CTRL] item   •   [TAB] 1P/2P   •   [ESC] Pause"
+            : "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [TAB] 2P Battle   •   [ESC] Pause";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 
@@ -937,7 +1054,7 @@ public class RaceManager : MonoBehaviour
         Outlined(new Rect(0, h * 0.25f, w, 200), text, st, c, 5);
     }
 
-    void DrawHud(float w, float h)
+    void DrawHud(Kart pl, float w, float h, bool compact, int pi)
     {
         // アイテム枠
         var slot = new Rect(24, 20, 114, 114);
@@ -946,8 +1063,8 @@ public class RaceManager : MonoBehaviour
         GUI.color = Color.white;
         DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
 
-        ItemType shown = Player.Item;
-        if (Player.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
+        ItemType shown = pl.Item;
+        if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
         if (shown != ItemType.None)
         {
             Texture2D icon = null;
@@ -975,42 +1092,42 @@ public class RaceManager : MonoBehaviour
                 Outlined(new Rect(slot.x, slot.y + 12, slot.width, 58), label, ls, Color.white, 2);
             }
 
-            if (Player.RouletteTimer <= 0)
+            if (pl.RouletteTimer <= 0)
                 Outlined(new Rect(slot.x, slot.yMax - 22, slot.width, 20), "[E]", St(sSmall, 15), new Color(1f, 1f, 0.3f), 1);
         }
 
         // 周回とタイム
         var right = St(sMid, 0, TextAnchor.UpperRight);
-        int lap = Mathf.Clamp(Player.MaxLap, 1, totalLaps);
+        int lap = Mathf.Clamp(pl.MaxLap, 1, totalLaps);
         Outlined(new Rect(w - 324, 18, 300, 50), "LAP " + lap + "/" + totalLaps, right, Color.white);
         var rs = St(sSmall, 0, TextAnchor.UpperRight);
-        Outlined(new Rect(w - 324, 66, 300, 30), FormatTime(Player.Finished ? Player.FinishTime : raceTime), rs, Color.white);
-        if (bestLapTime > 0) Outlined(new Rect(w - 324, 94, 300, 30), "BEST LAP " + FormatTime(bestLapTime), St(sSmall, 16, TextAnchor.UpperRight), new Color(1f, 0.9f, 0.5f));
+        Outlined(new Rect(w - 324, 66, 300, 30), FormatTime(pl.Finished ? pl.FinishTime : raceTime), rs, Color.white);
+        if (bestLap[pi] > 0) Outlined(new Rect(w - 324, 94, 300, 30), "BEST LAP " + FormatTime(bestLap[pi]), St(sSmall, 16, TextAnchor.UpperRight), new Color(1f, 0.9f, 0.5f));
 
         // 順位
-        string place = Ordinal(Player.Place);
+        string place = Ordinal(pl.Place);
         var ps = St(sBig, 120, TextAnchor.LowerRight);
-        Color pc = Player.Place == 1 ? new Color(1f, 0.85f, 0.15f) : Player.Place <= 3 ? new Color(0.85f, 0.9f, 1f) : Color.white;
+        Color pc = pl.Place == 1 ? new Color(1f, 0.85f, 0.15f) : pl.Place <= 3 ? new Color(0.85f, 0.9f, 1f) : Color.white;
         Outlined(new Rect(w - 324, h - 170, 300, 150), place, ps, pc, 5);
 
         // スピード
-        var ss = St(sMid, 0, TextAnchor.LowerCenter);
-        Outlined(new Rect(w / 2 - 150, h - 70, 300, 50), Mathf.RoundToInt(Mathf.Abs(Player.Speed) * 3.6f) + " km/h", ss, Color.white);
+        var ss = compact ? St(sMid, 30, TextAnchor.LowerLeft) : St(sMid, 0, TextAnchor.LowerCenter);
+        Outlined(compact ? new Rect(176, h - 70, 230, 50) : new Rect(w / 2 - 150, h - 70, 300, 50), Mathf.RoundToInt(Mathf.Abs(pl.Speed) * 3.6f) + " km/h", ss, Color.white);
 
         // ミニマップ
-        var mm = new Rect(20, h - 250, 230, 230);
+        var mm = compact ? new Rect(10, h - 170, 156, 156) : new Rect(20, h - 250, 230, 230);
         GUI.color = new Color(0, 0, 0, 0.3f);
         GUI.DrawTexture(mm, Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.DrawTexture(mm, minimap);
-        int playerIdx = Karts.IndexOf(Player);
+        int playerIdx = Karts.IndexOf(pl);
         for (int n = 1; n <= Karts.Count; n++) // プレイヤーを最後（最前面）に描く
         {
             var k = Karts[(playerIdx + n) % Karts.Count];
             var uv = toMap(k.transform.position);
             var p = new Vector2(mm.x + uv.x * mm.width, mm.y + (1f - uv.y) * mm.height);
-            float s = k == Player ? 14f : 10f;
-            GUI.color = k == Player ? Color.white : Color.black;
+            float s = k == pl ? 14f : k.IsPlayer ? 12f : 10f;
+            GUI.color = k == pl ? Color.white : k.IsPlayer ? new Color(1f, 0.85f, 0.2f) : Color.black;
             GUI.DrawTexture(new Rect(p.x - s / 2 - 2, p.y - s / 2 - 2, s + 4, s + 4), Texture2D.whiteTexture);
             GUI.color = k.Color;
             GUI.DrawTexture(new Rect(p.x - s / 2, p.y - s / 2, s, s), Texture2D.whiteTexture);
@@ -1018,8 +1135,8 @@ public class RaceManager : MonoBehaviour
         GUI.color = Color.white;
 
         // 逆走
-        if (RaceRunning && !Player.Finished && Vector3.Dot(Player.Forward, track.Dirs[Player.Index]) < -0.3f && Player.Speed > 3f && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
-            Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", St(sBig, 60), new Color(1f, 0.3f, 0.3f));
+        if (RaceRunning && !pl.Finished && Vector3.Dot(pl.Forward, track.Dirs[pl.Index]) < -0.3f && pl.Speed > 3f && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
+            Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", St(sBig, compact ? 44 : 60), new Color(1f, 0.3f, 0.3f));
     }
 
     void DrawResults(float w, float h)
@@ -1029,7 +1146,9 @@ public class RaceManager : MonoBehaviour
         GUI.DrawTexture(panel, Texture2D.whiteTexture);
         GUI.color = Color.white;
         DrawFrame(panel, 3, new Color(1f, 0.85f, 0.2f));
-        Outlined(new Rect(panel.x, panel.y + 10, panel.width, 60), "RESULTS", sMid, new Color(1f, 0.85f, 0.2f));
+        string head = "RESULTS";
+        if (TwoPlayer) head = Player.Place < Player2.Place ? "P1 WINS!" : "P2 WINS!";
+        Outlined(new Rect(panel.x, panel.y + 10, panel.width, 60), head, sMid, new Color(1f, 0.85f, 0.2f));
 
         var order = placeOrder;
         var left = St(sSmall, 0, TextAnchor.MiddleLeft);
@@ -1038,7 +1157,7 @@ public class RaceManager : MonoBehaviour
         {
             var k = order[i];
             var row = new Rect(panel.x + 30, panel.y + 80 + i * 44, panel.width - 60, 40);
-            if (k == Player)
+            if (k.IsPlayer)
             {
                 GUI.color = new Color(1f, 1f, 1f, 0.18f);
                 GUI.DrawTexture(row, Texture2D.whiteTexture);
@@ -1120,11 +1239,11 @@ public class RaceManager : MonoBehaviour
         }
     }
 
-    void DrawVignette(float w, float h)
+    void DrawVignette(Kart pl, float w, float h)
     {
         if (vignetteTex == null) return;
-        float speed01 = Player != null ? Mathf.Clamp01(Player.Speed / Kart.MaxSpeed) : 0f;
-        bool boost = Player != null && Player.Boosting;
+        float speed01 = pl != null ? Mathf.Clamp01(pl.Speed / Kart.MaxSpeed) : 0f;
+        bool boost = pl != null && pl.Boosting;
         float boostBonus = boost ? 0.35f : 0f;
         float alpha = Mathf.Clamp01(0.18f + speed01 * 0.25f + boostBonus);
 
@@ -1320,8 +1439,9 @@ public class RaceManager : MonoBehaviour
 
         string uiDir = Application.dataPath + "/Resources/UI/";
         titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < trackBadgeTex.Length; i++)
             trackBadgeTex[i] = LoadTexture($"UI/badge_track_{i}_pop", uiDir + $"badge_track_{i}_pop.png") ?? LoadTexture($"UI/badge_track_{i}", uiDir + $"badge_track_{i}.png");
+        if (trackBadgeTex[3] == null) trackBadgeTex[3] = TextureGen.CityBadge();
 
         cardPopTex = LoadTexture("UI/ui_card_pop", uiDir + "ui_card_pop.png");
         btnRaceTex = LoadTexture("UI/ui_btn_race", uiDir + "ui_btn_race.png");

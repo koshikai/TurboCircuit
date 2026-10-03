@@ -108,6 +108,80 @@ public static class TextureGen
         return New(n, n, px);
     }
 
+    // 都市の舗装（暗いコンクリート）
+    public static Texture2D Concrete()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        var rng = new System.Random(23);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float p = Mathf.PerlinNoise(x * 0.06f, y * 0.06f);
+            float r = (float)rng.NextDouble();
+            var c = Color.Lerp(new Color(0.30f, 0.31f, 0.34f), new Color(0.40f, 0.41f, 0.44f), p);
+            if (x % 32 == 0 || y % 32 == 0) c *= 0.8f; // 舗装の目地
+            c *= 0.94f + r * 0.12f;
+            c.a = 1;
+            px[y * n + x] = c;
+        }
+        return New(n, n, px);
+    }
+
+    // ビルの外壁（窓の明かり付き）。1タイル = 窓4列 x 8階
+    public static Texture2D Windows(Color wall, Color lit, int seed)
+    {
+        const int w = 64, h = 128;
+        var px = new Color[w * h];
+        var rng = new System.Random(seed);
+        var dark = new Color(0.08f, 0.11f, 0.18f);
+        bool[] on = new bool[4 * 8];
+        for (int i = 0; i < on.Length; i++) on[i] = rng.NextDouble() < 0.55;
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            int cx = x / 16, cy = y / 16;
+            int lx = x % 16, ly = y % 16;
+            Color c = wall * (0.92f + (float)rng.NextDouble() * 0.08f);
+            if (lx >= 3 && lx < 13 && ly >= 4 && ly < 13)
+                c = on[cy * 4 + cx] ? Color.Lerp(lit, Color.white, 0.15f * (ly - 4) / 9f) : dark;
+            c.a = 1;
+            px[y * w + x] = c;
+        }
+        return New(w, h, px);
+    }
+
+    // タイトル画面用の都市コースバッジ（夜景スカイライン）
+    public static Texture2D CityBadge()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        var rng = new System.Random(5);
+        var heights = new int[16];
+        for (int i = 0; i < heights.Length; i++) heights[i] = 28 + rng.Next(60);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float dx = x - n * 0.5f + 0.5f, dy = y - n * 0.5f + 0.5f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            var c = new Color(0, 0, 0, 0);
+            if (d < 60f)
+            {
+                c = Color.Lerp(new Color(0.95f, 0.45f, 0.65f), new Color(0.25f, 0.18f, 0.55f), y / (float)n);
+                int b = x / 8;
+                if (y < heights[b] && x % 8 != 0)
+                {
+                    c = new Color(0.08f, 0.07f, 0.18f);
+                    if (x % 4 == 2 && y % 6 < 3) c = new Color(1f, 0.85f, 0.4f);
+                }
+                if (d > 54f) c = Color.white;
+                c.a = 1f;
+            }
+            px[y * n + x] = c;
+        }
+        return New(n, n, px, false);
+    }
+
     public static Texture2D Checker()
     {
         var px = new[] { Color.white, new Color(0.08f, 0.08f, 0.08f), new Color(0.08f, 0.08f, 0.08f), Color.white };
