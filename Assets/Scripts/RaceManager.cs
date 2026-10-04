@@ -71,6 +71,17 @@ public class RaceManager : MonoBehaviour
     readonly float[] bannerTimes = { 99f, 99f };
 
     Camera cam, cam2;
+
+    // オンライン対戦（Unity Relay / IP 直接接続）
+    public NetSession Net { get; private set; }
+    public bool Online => Net != null && Net.Connected;
+    Kart rival;                 // オンライン相手のカート
+    int rivalKartIdx;
+    bool netMenu;
+    string joinCodeInput = "", ipInput = "127.0.0.1";
+    int nextBananaId;
+    GUIStyle sButton, sField;
+    readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
     Texture2D speedLineTex;
@@ -208,6 +219,22 @@ public class RaceManager : MonoBehaviour
         Player2 = Karts[P2Slot]; // 普段は CPU。2P モード時のみ人間が操作する
         if (args.Contains("-twoplayer")) SetTwoPlayer(true);
 
+        Net = gameObject.AddComponent<NetSession>();
+        Net.OnConnected = EnterOnline;
+        Net.OnDisconnected = OnNetDisconnected;
+        Net.OnRivalKart = OnRivalKart;
+        Net.OnCourse = c => { if (state == State.Title && c != SelectedCourse) LoadCourse(c); };
+        Net.OnStart = c => { if (c != SelectedCourse) LoadCourse(c); StartCountdown(); };
+        Net.OnState = (id, s) => { if (id >= 0 && id < Karts.Count && Karts[id].IsRemote) Karts[id].ApplyNetState(s); };
+        Net.OnBanana = (id, owner, pos) => { if (owner < Karts.Count) SpawnBananaInternal(id, pos, Karts[owner]); };
+        Net.OnBananaGone = RemoveBananaById;
+        Net.OnMissile = (owner, target) => { if (owner < Karts.Count) SpawnMissileInternal(Karts[owner], target < Karts.Count ? Karts[target] : null); };
+        // 動作確認用：-nethost / -netjoin <ip> で起動直後に直接接続する
+        if (args.Contains("-netmenu")) netMenu = true;
+        if (args.Contains("-nethost")) Net.HostDirect();
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "-netjoin") Net.JoinDirect(args[i + 1]);
+
         LoadCourse(cIdx);
     }
 
@@ -257,7 +284,110 @@ public class RaceManager : MonoBehaviour
         k.Hop();
     }
 
-    bool AllHumansFinished() => Player.Finished && (!TwoPlayer || Player2.Finished);
+    bool AllHumansFinished() => Player.Finished && (!TwoPlayer || Player2.Finished) && (!Online || rival.Finished);
+
+    // ───────────────────────── オンライン対戦 ─────────────────────────
+
+    // 接続成立：ホスト = 手前スロット(P1)、クライアント = 奥のスロット(P2)。CPU はホストだけが計算する
+    void EnterOnline()
+    {
+        netMenu = false;
+        if (TwoPlayer) SetTwoPlayer(false);
+        var mine = Net.IsHost ? Karts[playerGridSlot] : Karts[P2Slot];
+        rival = Net.IsHost ? Karts[P2Slot] : Karts[playerGridSlot];
+        Player = mine;
+        mine.IsRemote = false;
+        ConfigureHuman(0);
+
+        rival.IsPlayer = false;
+        rival.IsRemote = true;
+        ApplyRivalLook();
+        if (!Net.IsHost)
+            foreach (var k in Karts) if (k != mine && k != rival) k.IsRemote = true;
+
+        Net.SendHello(SelectedKart);
+        if (Net.IsHost) Net.SendCourse(SelectedCourse);
+        if (Audio != null) Audio.Beep();
+    }
+
+    void ApplyRivalLook()
+    {
+        var d = KartCharacters[rivalKartIdx];
+        rival.ModelVariant = rivalKartIdx;
+        rival.Name = "RIVAL (" + d.name + ")";
+        rival.Color = d.color;
+        rival.RebuildModel();
+    }
+
+    void OnRivalKart(int sel)
+    {
+        rivalKartIdx = Mathf.Clamp(sel, 0, KartCharacters.Length - 1);
+        if (Online && rival != null) ApplyRivalLook();
+    }
+
+    void MakeAI(Kart k, int slot)
+    {
+        int ai = slot < playerGridSlot ? slot : slot - 1;
+        bool named = slot != playerGridSlot;
+        k.IsPlayer = false;
+        k.IsRemote = false;
+        k.PlayerIndex = 0;
+        k.ModelVariant = -1;
+        k.Name = named ? AiNames[ai] : "Guest";
+        k.Color = named ? AiColors[ai] : new Color(0.7f, 0.75f, 0.85f);
+        k.ApplyStats(5, 5, 5, 5);
+        k.RebuildModel();
+    }
+
+    void OnNetDisconnected()
+    {
+        foreach (var k in Karts) k.IsRemote = false;
+        if (rival != null) MakeAI(rival, Karts.IndexOf(rival));
+        rival = null;
+        if (state == State.Title) RestoreRoles();
+        else Banner("OPPONENT LEFT", new Color(1f, 0.4f, 0.3f), 0);
+    }
+
+    // クライアントとして入れ替わっていた P1 / P2 スロットを元に戻す
+    void RestoreRoles()
+    {
+        var home = Karts[playerGridSlot];
+        if (Player == home) return;
+        MakeAI(Player, Karts.IndexOf(Player));
+        Player = home;
+        home.IsRemote = false;
+        ConfigureHuman(0);
+    }
+
+    void LeaveOnline()
+    {
+        netMenu = false;
+        Net.Disconnect();
+        if (state != State.Title) ReturnToTitle();
+        else RestoreRoles();
+    }
+
+    void ReturnToTitle()
+    {
+        paused = false;
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+        state = State.Title;
+        stateTime = 0;
+        RestoreRoles();
+        LoadCourse(SelectedCourse);
+        Audio.SetMusicVolume(0.3f);
+    }
+
+    void RemoveBananaById(int id)
+    {
+        for (int i = bananas.Count - 1; i >= 0; i--)
+            if (bananas[i] != null && bananas[i].NetId == id)
+            {
+                Destroy(bananas[i].gameObject);
+                bananas.RemoveAt(i);
+            }
+    }
 
     public void LoadCourse(int index)
     {
@@ -293,11 +423,13 @@ public class RaceManager : MonoBehaviour
 
     void SwitchCourse(int delta)
     {
+        if (Net.Busy && !Net.IsHost) return; // コースはホストが決める
         int next = (SelectedCourse + delta + Track.Courses.Length) % Track.Courses.Length;
         if (next != SelectedCourse)
         {
             if (Audio != null) Audio.Beep();
             LoadCourse(next);
+            if (Online) Net.SendCourse(next);
         }
     }
 
@@ -309,6 +441,7 @@ public class RaceManager : MonoBehaviour
         if (p == 0) SelectedKart = next; else SelectedKart2 = next;
         if (Audio != null) Audio.Beep();
         if (HumanKart(p) != null) ConfigureHuman(p);
+        if (p == 0 && Online) Net.SendHello(SelectedKart);
     }
 
     void GridSlot(int slot, out int index, out float lateral)
@@ -380,7 +513,11 @@ public class RaceManager : MonoBehaviour
         }
         if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
 
-        if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
+        if (Input.GetKeyDown(KeyCode.Escape) && (netMenu || Net.Busy))
+        {
+            LeaveOnline(); // オンライン中は一時停止できない。ESC で切断してタイトルへ戻る
+        }
+        else if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
         {
             paused = !paused;
             Time.timeScale = paused ? 0f : 1f;
@@ -402,7 +539,10 @@ public class RaceManager : MonoBehaviour
         switch (state)
         {
             case State.Title:
-                if (Input.GetKeyDown(KeyCode.Tab))
+                if (netMenu) break; // オンライン画面の入力中はタイトルのショートカットを無効にする
+                if (Input.GetKeyDown(KeyCode.O) && !Net.Busy)
+                    { netMenu = true; break; }
+                if (Input.GetKeyDown(KeyCode.Tab) && !Net.Busy)
                     SetTwoPlayer(!TwoPlayer);
                 else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
                     SwitchCourse(-1);
@@ -417,7 +557,8 @@ public class RaceManager : MonoBehaviour
                 else if (TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
                     SwitchKart(1, 1);
 
-                if (!titleShotRequested && (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))) StartCountdown();
+                if (!titleShotRequested && (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f)))
+                    StartRaceFromTitle();
                 break;
             case State.Countdown:
                 int beep = Mathf.FloorToInt(stateTime - 1f);
@@ -439,7 +580,7 @@ public class RaceManager : MonoBehaviour
                 break;
             case State.Results:
                 raceTime += dt;
-                if (Time.time > finishAt + 2.5f && enter) StartCountdown();
+                if (Time.time > finishAt + 2.5f && enter) StartRaceFromTitle();
                 break;
         }
 
@@ -454,12 +595,33 @@ public class RaceManager : MonoBehaviour
         }
         UpdatePlaces();
 
+        if (Online && state != State.Title && Net.SendDue)
+        {
+            sendBuf.Clear();
+            for (int i = 0; i < Karts.Count; i++)
+                if (!Karts[i].IsRemote && (Net.IsHost || Karts[i] == Player)) sendBuf.Add((i, Karts[i].MakeNetState()));
+            Net.SendStates(sendBuf);
+        }
+
         Audio.SetEngine(Player.Speed / Kart.MaxSpeed, state != State.Title, Player.Drifting && canDrive);
         shake = Mathf.MoveTowards(shake, 0, dt * 2.5f);
     }
 
+    // オンライン中はホストだけがレースを開始でき、クライアントには開始の合図が届く
+    void StartRaceFromTitle()
+    {
+        if (Net.Busy && !Online) return;
+        if (Online)
+        {
+            if (!Net.IsHost) return;
+            Net.SendStart(SelectedCourse);
+        }
+        StartCountdown();
+    }
+
     void StartCountdown()
     {
+        if (!Online) RestoreRoles();
         ResetRace();
         state = State.Countdown;
         stateTime = 0;
@@ -562,6 +724,7 @@ public class RaceManager : MonoBehaviour
                 d.y = 0;
                 if (d.magnitude > 2.2f) continue;
                 box.Break();
+                if (k.IsRemote) break; // 相手側のカートのアイテムは相手が決める
                 if (k.GiveItem(RollItem(k)) && k.IsPlayer) Audio.Pickup();
                 break;
             }
@@ -575,6 +738,7 @@ public class RaceManager : MonoBehaviour
             var b = bananas[i];
             foreach (var k in Karts)
             {
+                if (k.IsRemote) continue; // 当たり判定は持ち主側で行う
                 if (k == b.Owner && !b.Armed) continue;
                 var d = k.transform.position - b.transform.position;
                 d.y = 0;
@@ -583,6 +747,7 @@ public class RaceManager : MonoBehaviour
                 {
                     Fx.Burst(b.transform.position, new Color(1f, 0.95f, 0.3f), 12, 5f, 0.4f);
                     bananas.RemoveAt(i);
+                    if (Online) Net.SendBananaGone(b.NetId);
                     Destroy(b.gameObject);
                     break;
                 }
@@ -606,14 +771,29 @@ public class RaceManager : MonoBehaviour
 
     public void SpawnBanana(Vector3 pos, Kart owner)
     {
+        int ownerId = Karts.IndexOf(owner);
+        int id = ownerId * 100000 + (nextBananaId++ % 100000);
+        SpawnBananaInternal(id, pos, owner);
+        if (Online && !owner.IsRemote) Net.SendBanana(id, ownerId, pos);
+    }
+
+    void SpawnBananaInternal(int id, Vector3 pos, Kart owner)
+    {
         var b = new GameObject("Banana").AddComponent<Banana>();
         b.Init(pos, owner, bananaMaterial);
+        b.NetId = id;
         bananas.Add(b);
     }
 
     public void SpawnMissile(Kart owner)
     {
         var target = Karts.FirstOrDefault(k => k.Place == owner.Place - 1);
+        SpawnMissileInternal(owner, target);
+        if (Online && !owner.IsRemote) Net.SendMissile(Karts.IndexOf(owner), target == null ? -1 : Karts.IndexOf(target));
+    }
+
+    void SpawnMissileInternal(Kart owner, Kart target)
+    {
         var m = new GameObject("Missile").AddComponent<Missile>();
         m.Init(this, track, owner, target, missileMaterial);
         missiles.Add(m);
@@ -774,6 +954,8 @@ public class RaceManager : MonoBehaviour
             sBig.normal.textColor = Color.white;
             sMid = new GUIStyle(sBig) { fontSize = 38 };
             sSmall = new GUIStyle(sBig) { fontSize = 22, fontStyle = FontStyle.Bold };
+            sButton = new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
+            sField = new GUIStyle(GUI.skin.textField) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
         }
         float scale = Screen.height / 720f;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
@@ -787,7 +969,7 @@ public class RaceManager : MonoBehaviour
 
         switch (state)
         {
-            case State.Title: DrawTitle(w, h); break;
+            case State.Title: DrawTitle(w, h); if (netMenu) DrawNetMenu(w, h); break;
             case State.Countdown: DrawHuds(w, h, true); break;
             case State.Racing: DrawHuds(w, h, false); break;
             case State.Results: DrawHuds(w, h, false); if (Time.time > finishAt + 2.5f) DrawResults(w, h); break;
@@ -801,6 +983,49 @@ public class RaceManager : MonoBehaviour
             Outlined(new Rect(0, h * 0.35f, w, 100), "PAUSED", sBig, Color.white);
             Outlined(new Rect(0, h * 0.52f, w, 40), "ESC : Resume     R : Restart     Q : Quit", sSmall, Color.white);
         }
+    }
+
+    void DrawNetMenu(float w, float h)
+    {
+        var r = new Rect(w / 2 - 290, 110, 580, 470);
+        GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.97f);
+        GUI.DrawTexture(r, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        DrawFrame(r, 3, new Color(1f, 0.85f, 0.25f));
+        Outlined(new Rect(r.x, r.y + 8, r.width, 50), "ONLINE BATTLE", St(sMid, 34), new Color(1f, 0.85f, 0.25f), 2);
+        float x = r.x + 30, cw = r.width - 60, y = r.y + 70;
+        var info = St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.85f, 0.9f, 1f));
+
+        if (Net.Busy)
+        {
+            GUI.Label(new Rect(x, y, cw, 30), Net.IsHost ? "HOSTING" : "JOINING", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.Bold, false, Color.white));
+            if (!string.IsNullOrEmpty(Net.JoinCode))
+            {
+                GUI.Label(new Rect(x, y + 50, cw, 24), "Tell your friend this ROOM CODE:", info);
+                Outlined(new Rect(x, y + 80, cw, 80), Net.JoinCode, St(sBig, 64), new Color(0.4f, 1f, 0.6f), 3);
+            }
+            GUI.Label(new Rect(x, y + 190, cw, 60), Net.Message, info);
+            if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 70, 200, 42), "CANCEL", sButton)) Net.Disconnect();
+            return;
+        }
+
+        // インターネット経由（Unity Relay）
+        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
+        if (GUI.Button(new Rect(x, y + 32, 250, 40), "HOST ROOM", sButton)) Net.HostRelay();
+        joinCodeInput = GUI.TextField(new Rect(x + 270, y + 32, 120, 40), joinCodeInput, 8, sField).ToUpperInvariant();
+        if (GUI.Button(new Rect(x + 400, y + 32, cw - 400, 40), "JOIN", sButton)) Net.JoinRelay(joinCodeInput);
+
+        // IP 直接接続（LAN / VPN）
+        y += 110;
+        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
+        if (GUI.Button(new Rect(x, y + 32, 250, 40), "HOST (LISTEN)", sButton)) Net.HostDirect();
+        ipInput = GUI.TextField(new Rect(x + 270, y + 32, 150, 40), ipInput, 40, sField);
+        if (GUI.Button(new Rect(x + 430, y + 32, cw - 430, 40), "JOIN", sButton)) Net.JoinDirect(ipInput);
+
+        if (!string.IsNullOrEmpty(Net.Message))
+            GUI.Label(new Rect(x, y + 90, cw, 50), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(1f, 0.5f, 0.4f)));
+        GUI.Label(new Rect(x, r.yMax - 120, cw, 48), "Host picks the course and starts the race. 1-vs-1 online, CPU karts fill the grid.", info);
+        if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 62, 200, 40), "CLOSE  [ESC]", sButton)) netMenu = false;
     }
 
     // 1P は全画面、2P は左右それぞれのビューにクリップして HUD・バナー・ビネットを描く
@@ -921,7 +1146,10 @@ public class RaceManager : MonoBehaviour
 
         // プレイ人数の切り替え
         var modeBg = TwoPlayer ? new Color(0.95f, 0.3f, 0.5f) : new Color(0.18f, 0.52f, 0.88f);
-        DrawPopPill(new Rect((w - 300) * 0.5f, 556f, 300, 28), TwoPlayer ? "[TAB]  2 PLAYERS  (SPLIT SCREEN)" : "[TAB]  1 PLAYER", modeBg);
+        if (Online)
+            DrawPopPill(new Rect((w - 340) * 0.5f, 556f, 340, 28), Net.IsHost ? "ONLINE  VS  RIVAL  (YOU = HOST)" : "ONLINE  VS  RIVAL  (HOST DECIDES START)", new Color(0.18f, 0.7f, 0.4f));
+        else
+            DrawPopPill(new Rect((w - 300) * 0.5f, 556f, 300, 28), TwoPlayer ? "[TAB]  2 PLAYERS  (SPLIT SCREEN)" : "[TAB]  1 PLAYER", modeBg);
 
 
         // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
@@ -956,7 +1184,7 @@ public class RaceManager : MonoBehaviour
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = TwoPlayer
             ? "P1: [WASD] [SPACE] drift [E] item   •   P2: [ARROWS] [R-SHIFT] drift [R-CTRL] item   •   [TAB] 1P/2P   •   [ESC] Pause"
-            : "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [TAB] 2P Battle   •   [ESC] Pause";
+            : "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [TAB] 2P Battle   •   [O] Online   •   [ESC] Pause";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 
@@ -1148,6 +1376,7 @@ public class RaceManager : MonoBehaviour
         DrawFrame(panel, 3, new Color(1f, 0.85f, 0.2f));
         string head = "RESULTS";
         if (TwoPlayer) head = Player.Place < Player2.Place ? "P1 WINS!" : "P2 WINS!";
+        else if (Online && rival != null) head = Player.Place < rival.Place ? "YOU WIN!" : "YOU LOSE...";
         Outlined(new Rect(panel.x, panel.y + 10, panel.width, 60), head, sMid, new Color(1f, 0.85f, 0.2f));
 
         var order = placeOrder;
@@ -1157,7 +1386,7 @@ public class RaceManager : MonoBehaviour
         {
             var k = order[i];
             var row = new Rect(panel.x + 30, panel.y + 80 + i * 44, panel.width - 60, 40);
-            if (k.IsPlayer)
+            if (k.IsPlayer || (Online && k == rival))
             {
                 GUI.color = new Color(1f, 1f, 1f, 0.18f);
                 GUI.DrawTexture(row, Texture2D.whiteTexture);

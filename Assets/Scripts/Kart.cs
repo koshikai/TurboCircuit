@@ -22,6 +22,7 @@ public class Kart : MonoBehaviour
     public Color Color;
     public bool IsPlayer;
     public int PlayerIndex;     // 人間操作時の識別（0 = P1、1 = P2）
+    public bool IsRemote;       // オンライン対戦で相手側が計算しているカート（受信した状態を再現するだけ）
     public int ModelVariant = -1; // 人間操作時に使うキャラのモデル番号（-1 = 自動）
 
     // レース状況
@@ -136,6 +137,7 @@ public class Kart : MonoBehaviour
         airTrickSpin = 0;
         jumpCooldown = 0;
         aiSteer = 0;
+        hasNet = false;
         aiItemTimer = Random.Range(1f, 3f);
         if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
         UpdateVisual(0, 0);
@@ -409,6 +411,80 @@ public class Kart : MonoBehaviour
             shieldMpb.SetColor("_Color", c);
             shieldRenderer.SetPropertyBlock(shieldMpb);
         }
+    }
+
+    // ───────────────────────── オンライン同期 ─────────────────────────
+
+    NetKartState net;
+    bool hasNet;
+    float netAge;
+
+    public NetKartState MakeNetState()
+    {
+        byte f = 0;
+        if (drifting) f |= NetKartState.FDrift;
+        if (boostTimer > 0) f |= NetKartState.FBoost;
+        if (shieldTimer > 0) f |= NetKartState.FShield;
+        if (spinTimer > 0) f |= NetKartState.FSpin;
+        if (isAirborne) f |= NetKartState.FAir;
+        if (isBraking) f |= NetKartState.FBrake;
+        if (Finished) f |= NetKartState.FDone;
+        return new NetKartState
+        {
+            Pos = transform.position, Heading = Heading, Speed = Speed, Steer = steerVis, Progress = Progress,
+            FinishTime = FinishTime, Flags = f, DriftLevel = DriftLevel, DriftDir = driftDir, Lap = Lap, MaxLap = MaxLap,
+        };
+    }
+
+    public void ApplyNetState(NetKartState s)
+    {
+        net = s;
+        netAge = 0;
+        if (!hasNet) { transform.position = s.Pos; Heading = s.Heading; }
+        hasNet = true;
+    }
+
+    // 受信した状態に追従し、見た目とエフェクトだけを再現する
+    void RemoteTick(float dt)
+    {
+        if (hasNet)
+        {
+            netAge += dt;
+            Vector3 fwd = Quaternion.Euler(0, net.Heading, 0) * Vector3.forward;
+            Vector3 target = net.Pos + fwd * net.Speed * Mathf.Min(netAge, 0.25f);
+            float k = 1f - Mathf.Exp(-14f * dt);
+            transform.position = (target - transform.position).sqrMagnitude > 64f ? target : Vector3.Lerp(transform.position, target, k);
+            Heading = Mathf.LerpAngle(Heading, net.Heading, k);
+            Speed = net.Speed;
+            VelDir = Forward;
+
+            byte f = net.Flags;
+            drifting = (f & NetKartState.FDrift) != 0;
+            driftDir = net.DriftDir == 0 ? 1 : net.DriftDir;
+            driftCharge = net.DriftLevel == 3 ? 2.7f : net.DriftLevel == 2 ? 1.7f : net.DriftLevel == 1 ? 0.9f : 0f;
+            boostTimer = (f & NetKartState.FBoost) != 0 ? 0.3f : 0f;
+            shieldTimer = (f & NetKartState.FShield) != 0 ? 3f : 0f;
+            spinTimer = (f & NetKartState.FSpin) != 0 ? 0.3f : 0f;
+            isAirborne = (f & NetKartState.FAir) != 0;
+            isBraking = (f & NetKartState.FBrake) != 0;
+            Lap = net.Lap;
+            MaxLap = net.MaxLap;
+            Finished = (f & NetKartState.FDone) != 0;
+            FinishTime = net.FinishTime;
+        }
+        airTrickSpin = isAirborne ? airTrickSpin + 720f * dt : 0f;
+        track.Locate(transform.position, ref Index, out Lateral, out float localProgress);
+        Progress = hasNet ? net.Progress : localProgress;
+        Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
+
+        bool skidding = drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f);
+        if (skidTrails[0] != null)
+        {
+            skidTrails[0].emitting = skidding;
+            skidTrails[1].emitting = skidding;
+        }
+        Effects(dt);
+        UpdateVisual(dt, spinTimer > 0 ? 0 : net.Steer);
     }
 
     // ───────────────────────── 入力 ─────────────────────────
@@ -717,6 +793,7 @@ public class Kart : MonoBehaviour
 
     public void Tick(float dt, bool canDrive)
     {
+        if (IsRemote) { RemoteTick(dt); return; }
         var inp = (IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt);
 
         if (IsPlayer)
@@ -1012,6 +1089,7 @@ public class Kart : MonoBehaviour
 
     public void OnGo()
     {
+        if (IsRemote) return;
         // スタートダッシュ：「1」が出てから GO までにアクセルを押し始めると成功
         if (IsPlayer)
         {
@@ -1023,6 +1101,7 @@ public class Kart : MonoBehaviour
 
     public bool Spin()
     {
+        if (IsRemote) return false; // スピンの判定は持ち主側で行い、状態として届く
         if (invulnTimer > 0 || shieldTimer > 0 || spinTimer > 0) return false;
         spinTimer = 1.2f;
         invulnTimer = 2.2f;

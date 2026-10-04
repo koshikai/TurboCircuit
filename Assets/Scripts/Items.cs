@@ -79,6 +79,7 @@ public class ItemBox : MonoBehaviour
 public class Banana : MonoBehaviour
 {
     public Kart Owner;
+    public int NetId;
     float age;
     public bool Armed => age > 0.4f;
 
