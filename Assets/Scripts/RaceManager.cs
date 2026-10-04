@@ -254,7 +254,7 @@ public class RaceManager : MonoBehaviour
     {
         if (TwoPlayer == on) return;
         TwoPlayer = on;
-        if (Audio != null) Audio.Beep();
+        if (Audio != null) Audio.Select();
         ConfigureHuman(0);
         ConfigureHuman(1);
     }
@@ -311,7 +311,7 @@ public class RaceManager : MonoBehaviour
 
         Net.SendHello(SelectedKart);
         if (Net.IsHost) Net.SendCourse(SelectedCourse);
-        if (Audio != null) Audio.Beep();
+        if (Audio != null) Audio.Select();
     }
 
     void ApplyRivalLook()
@@ -403,6 +403,7 @@ public class RaceManager : MonoBehaviour
         foreach (var m in missiles) if (m) Destroy(m.gameObject);
         missiles.Clear();
 
+        Audio.SetCourseMusic(SelectedCourse);
         track.BuildPath(SelectedCourse);
         track.BuildVisuals(this, SelectedCourse);
         track.ApplyEnvironment(this, SelectedCourse);
@@ -431,7 +432,7 @@ public class RaceManager : MonoBehaviour
         int next = (SelectedCourse + delta + Track.Courses.Length) % Track.Courses.Length;
         if (next != SelectedCourse)
         {
-            if (Audio != null) Audio.Beep();
+            if (Audio != null) Audio.Select();
             LoadCourse(next);
             if (Online) Net.SendCourse(next);
         }
@@ -443,7 +444,7 @@ public class RaceManager : MonoBehaviour
         int next = (cur + delta + KartCharacters.Length) % KartCharacters.Length;
         if (next == cur) return;
         if (p == 0) SelectedKart = next; else SelectedKart2 = next;
-        if (Audio != null) Audio.Beep();
+        if (Audio != null) Audio.Select();
         if (HumanKart(p) != null) ConfigureHuman(p);
         if (p == 0 && Online) Net.SendHello(SelectedKart);
     }

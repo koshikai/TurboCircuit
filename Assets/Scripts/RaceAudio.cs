@@ -1,6 +1,7 @@
 using UnityEngine;
 
-// 効果音・エンジン音・BGM をすべてコードで合成する
+// 効果音・エンジン音・BGM。Resources/Audio の CC0 素材（Kenney / OpenGameArt）を使い、
+// 素材が無い場合はコードで合成した音にフォールバックする
 public class RaceAudio : MonoBehaviour
 {
     const int Rate = 44100;
@@ -8,7 +9,15 @@ public class RaceAudio : MonoBehaviour
     AudioSource[] pool;
     int next;
     AudioSource engine, driftLoop, music;
-    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, shield;
+    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, shield, select, explosion;
+    AudioClip[] bumps;
+    readonly AudioClip[] bgm = new AudioClip[4];
+
+    static AudioClip Load(string name, AudioClip fallback)
+    {
+        var clip = Resources.Load<AudioClip>("Audio/" + name);
+        return clip != null ? clip : fallback;
+    }
 
     void Awake()
     {
@@ -36,9 +45,51 @@ public class RaceAudio : MonoBehaviour
         pop = Make(0.3f, (t, d) => (Noise() * 0.5f + Sq(Mathf.Lerp(200, 800, t / d), t) * 0.3f) * Env(t, d));
         shield = Make(1.0f, (t, d) => Sq(Arp(t, 0.06f, 523, 659, 784, 1047, 1319, 1568, 2093), t) * 0.2f * Env(t, d));
 
-        engine = Loop(MakeEngine(), 0f);
+        // 実素材があるものは差し替える（lap / finalLap / finish のジングルと drift ループは合成のまま）
+        beep = Load("sfx_beep", beep);
+        go = Load("sfx_go", go);
+        pickup = Load("sfx_pickup", pickup);
+        tick = Load("sfx_tick", tick);
+        gotItem = Load("sfx_gotitem", gotItem);
+        boost = Load("sfx_boost", boost);
+        hit = Load("sfx_hit", hit);
+        missile = Load("sfx_missile", missile);
+        drop = Load("sfx_drop", drop);
+        pop = Load("sfx_pop", pop);
+        shield = Load("sfx_shield", shield);
+        select = Load("sfx_select", beep);
+        explosion = Load("sfx_explosion", hit);
+        bumps = new[] { Load("sfx_bump_0", bump), Load("sfx_bump_1", bump), Load("sfx_bump_2", bump) };
+
+        var engineClip = Resources.Load<AudioClip>("Audio/sfx_engine");
+        useRealEngine = engineClip != null;
+        engine = Loop(engineClip != null ? engineClip : MakeEngine(), 0f);
         driftLoop = Loop(Make(1f, (t, d) => Noise() * 0.5f + Mathf.Sin(2 * Mathf.PI * 1800 * t) * 0.15f), 0f);
-        music = Loop(MakeMusic(), 0.3f);
+
+        // コースごとの BGM。1 曲でも欠けていたら合成 BGM で補う
+        bool missing = false;
+        for (int i = 0; i < bgm.Length; i++)
+        {
+            bgm[i] = Resources.Load<AudioClip>("Audio/bgm_" + i);
+            if (bgm[i] == null) missing = true;
+        }
+        if (missing)
+        {
+            var synth = MakeMusic();
+            for (int i = 0; i < bgm.Length; i++) if (bgm[i] == null) bgm[i] = synth;
+        }
+        music = Loop(bgm[0], 0.3f);
+    }
+
+    bool useRealEngine;
+
+    // コースに合わせて BGM を切り替える（同じ曲なら再生を続ける）
+    public void SetCourseMusic(int course)
+    {
+        var clip = bgm[Mathf.Clamp(course, 0, bgm.Length - 1)];
+        if (music.clip == clip) return;
+        music.clip = clip;
+        music.Play();
     }
 
     AudioSource Loop(AudioClip clip, float vol)
@@ -54,13 +105,15 @@ public class RaceAudio : MonoBehaviour
     public void SetEngine(float speed01, bool active, bool drifting)
     {
         engine.volume = active ? 0.18f : 0f;
-        engine.pitch = 0.55f + Mathf.Abs(speed01) * 1.25f;
+        engine.pitch = useRealEngine ? 0.7f + Mathf.Abs(speed01) * 1.1f : 0.55f + Mathf.Abs(speed01) * 1.25f;
         driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, drifting ? 0.12f : 0f, Time.unscaledDeltaTime * 2f);
     }
 
     public void SetMusicTempo(float pitch) => music.pitch = pitch;
     public void SetMusicVolume(float v) => music.volume = v;
 
+    public void Select() => Play(select, 0.5f);
+    public void Explode() => Play(explosion, 0.8f);
     public void Beep() => Play(beep, 0.6f);
     public void Go() => Play(go, 0.6f);
     public void Pickup() => Play(pickup, 0.5f);
@@ -68,7 +121,7 @@ public class RaceAudio : MonoBehaviour
     public void GotItem() => Play(gotItem, 0.5f);
     public void Boost() => Play(boost, 0.5f);
     public void Hit() => Play(hit, 0.7f);
-    public void Bump() => Play(bump, 0.5f, Random.Range(0.8f, 1.2f));
+    public void Bump() => Play(bumps[Random.Range(0, bumps.Length)], 0.5f, Random.Range(0.9f, 1.15f));
     public void Missile() => Play(missile, 0.6f);
     public void Drop() => Play(drop, 0.6f);
     public void Lap() => Play(lap, 0.6f);

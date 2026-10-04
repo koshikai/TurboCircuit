@@ -56,3 +56,5 @@ Unity.exe -batchmode -nographics -quit -projectPath . -executeMethod BuildTool.B
 ## クレジット
 
 カートと小物のモデルは [Kenney](https://kenney.nl/) のアセット（CC0）を使用しています。
+
+効果音は [Kenney](https://kenney.nl/) の Interface / Impact / Sci-fi Sounds（CC0）、BGM は OpenGameArt の CC0 楽曲（cynicmusic、Julie Damsgaard、Centurion_of_war、wipics）を使用しています。曲名とリンクは [Assets/Resources/Audio/CREDITS.md](Assets/Resources/Audio/CREDITS.md) に記載しています。

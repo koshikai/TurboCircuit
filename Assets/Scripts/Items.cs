@@ -190,6 +190,7 @@ public class Missile : MonoBehaviour
     {
         Fx.Burst(transform.position, new Color(1f, 0.45f, 0.1f), 30, 9f, 0.8f);
         Fx.Burst(transform.position, new Color(1f, 0.9f, 0.4f), 15, 5f, 0.6f);
+        rm.Audio.Explode();
         rm.RemoveMissile(this);
         Destroy(gameObject);
     }
