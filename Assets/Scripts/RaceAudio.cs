@@ -5,6 +5,7 @@ using UnityEngine;
 public class RaceAudio : MonoBehaviour
 {
     const int Rate = 44100;
+    const float MusicGain = 0.6f; // BGM 全体の音量倍率（効果音より控えめにする）
 
     AudioSource[] pool;
     int next;
@@ -78,7 +79,7 @@ public class RaceAudio : MonoBehaviour
             var synth = MakeMusic();
             for (int i = 0; i < bgm.Length; i++) if (bgm[i] == null) bgm[i] = synth;
         }
-        music = Loop(bgm[0], 0.3f);
+        music = Loop(bgm[0], 0.3f * MusicGain);
     }
 
     bool useRealEngine;
@@ -110,7 +111,7 @@ public class RaceAudio : MonoBehaviour
     }
 
     public void SetMusicTempo(float pitch) => music.pitch = pitch;
-    public void SetMusicVolume(float v) => music.volume = v;
+    public void SetMusicVolume(float v) => music.volume = v * MusicGain;
 
     public void Select() => Play(select, 0.5f);
     public void Explode() => Play(explosion, 0.8f);
