@@ -71,6 +71,7 @@ public class NetSession : MonoBehaviour
             driver.Bind(NetworkEndpoint.AnyIpv4);
             driver.Listen();
             JoinCode = code;
+            Debug.Log("[Net] Room code: " + code);
             State = Phase.Waiting;
             Message = "Waiting for a player...";
         }
@@ -86,6 +87,7 @@ public class NetSession : MonoBehaviour
         try
         {
             await EnsureServices();
+            Debug.Log("[Net] Joining room " + code);
             var alloc = await RelayService.Instance.JoinAllocationAsync(code);
             var ep = alloc.ServerEndpoints.FirstOrDefault(e => e.ConnectionType == "dtls") ?? alloc.ServerEndpoints.First();
             var data = new RelayServerData(ep.Host, (ushort)ep.Port, alloc.AllocationIdBytes, alloc.ConnectionData, alloc.HostConnectionData, alloc.Key, ep.Secure);
@@ -96,6 +98,7 @@ public class NetSession : MonoBehaviour
             conn = driver.Connect(data.Endpoint);
             State = Phase.Connecting;
             Message = "Connecting...";
+            Debug.Log("[Net] Connecting via Relay");
         }
         catch (Exception e) { Fail("Relay error: " + e.Message); }
     }
@@ -201,6 +204,7 @@ public class NetSession : MonoBehaviour
             if (accepted.IsCreated)
             {
                 conn = accepted;
+                Debug.Log("[Net] Accepted a client");
                 State = Phase.Connected;
                 Message = "Connected";
                 OnConnected?.Invoke();
@@ -213,6 +217,7 @@ public class NetSession : MonoBehaviour
         {
             if (cmd == NetworkEvent.Type.Connect)
             {
+                Debug.Log("[Net] Connected");
                 State = Phase.Connected;
                 Message = "Connected";
                 OnConnected?.Invoke();
@@ -223,6 +228,7 @@ public class NetSession : MonoBehaviour
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
             {
+                Debug.Log("[Net] Disconnected (was connected: " + Connected + ")");
                 bool wasConnected = Connected;
                 Teardown();
                 Message = wasConnected ? "Opponent disconnected." : "Could not connect.";

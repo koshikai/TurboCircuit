@@ -153,6 +153,7 @@ public class RaceManager : MonoBehaviour
             if (args[i] == "-shotname")
                 customShotName = args[i + 1];
         }
+        Application.runInBackground = true; // オンライン対戦中に別ウィンドウへ切り替えても接続が切れないように
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         EnsureMaterials();
         LoadUIAssets();
@@ -232,6 +233,9 @@ public class RaceManager : MonoBehaviour
         // 動作確認用：-nethost / -netjoin <ip> で起動直後に直接接続する
         if (args.Contains("-netmenu")) netMenu = true;
         if (args.Contains("-nethost")) Net.HostDirect();
+        if (args.Contains("-relayhost")) Net.HostRelay();
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "-relayjoin") Net.JoinRelay(args[i + 1]);
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "-netjoin") Net.JoinDirect(args[i + 1]);
 
