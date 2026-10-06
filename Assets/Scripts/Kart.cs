@@ -895,7 +895,7 @@ public class Kart : MonoBehaviour
         else if (prevProgress < L * 0.25f && Progress > L * 0.75f) Lap--;
 
         // 壁
-        float limit = Track.WallOffset - 0.9f;
+        float limit = Track.WallOffset - 1.7f; // 車体の半幅(ホイール含む)ぶん内側で止める
         if (Mathf.Abs(Lateral) > limit)
         {
             float side = Mathf.Sign(Lateral);
