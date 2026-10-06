@@ -977,8 +977,6 @@ public class Track : MonoBehaviour
     void BuildCircuitProps(RaceManager rm, TrackDef def)
     {
         var conePrefab = Resources.Load<GameObject>("Props/cone");
-        var barrierRed = Resources.Load<GameObject>("Props/barrierRed");
-        var barrierWhite = Resources.Load<GameObject>("Props/barrierWhite");
         var lightPost = Resources.Load<GameObject>("Props/lightPostLarge");
         var checkersFlag = Resources.Load<GameObject>("Props/flagCheckers");
         var tent = Resources.Load<GameObject>("Props/tent");
@@ -999,36 +997,7 @@ public class Track : MonoBehaviour
             }
         }
 
-        // 2. タイヤバリア（急カーブ外側にテーマ色で交互配置）
-        if (barrierRed != null && barrierWhite != null)
-        {
-            var matA = new Material(rm.wallMaterial) { color = def.CurbColorA };
-            var matB = new Material(rm.wallMaterial) { color = def.CurbColorB };
-            for (int i = 10; i < Count - 10; i += 3)
-            {
-                float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 10)], Vector3.up);
-                if (Mathf.Abs(bend) > 12f)
-                {
-                    float side = bend > 0 ? -1f : 1f;
-                    var pos = PointAt(i, side * (WallOffset - 0.25f));
-                    var rot = Quaternion.LookRotation(Dirs[i]);
-                    var prefab = (i / 3 % 2 == 0) ? barrierRed : barrierWhite;
-                    var anchor = new GameObject("BarrierAnchor").transform;
-                    anchor.SetParent(transform, false);
-                    anchor.position = pos;
-                    anchor.rotation = rot;
-                    var go = Instantiate(prefab, anchor);
-                    go.transform.localPosition = new Vector3(-1.25f, 0, -0.62f);
-                    go.transform.localRotation = Quaternion.identity;
-                    go.transform.localScale = Vector3.one * 1.3f;
-                    StripColliders(anchor.gameObject);
-                    foreach (var r in go.GetComponentsInChildren<Renderer>())
-                        r.sharedMaterial = (i / 3 % 2 == 0) ? matA : matB;
-                }
-            }
-        }
-
-        // 3. コーナーのコーン（パイロン：イン側クリッピングポイント）
+        // 2. コーナーのコーン（パイロン：イン側クリッピングポイント）
         if (conePrefab != null)
         {
             var coneMat = new Material(rm.boostPadMaterial) { color = def.SceneryTheme == 2 ? new Color(0.2f, 0.7f, 1f) : new Color(1f, 0.45f, 0.05f) };
@@ -1051,7 +1020,7 @@ public class Track : MonoBehaviour
             }
         }
 
-        // 4. ピットテントとチェッカーフラッグ（スタート付近）
+        // 3. ピットテントとチェッカーフラッグ（スタート付近）
         if (tent != null)
         {
             var tentColor = def.SceneryTheme == 1 ? new Color(0.9f, 0.5f, 0.1f) : (def.SceneryTheme == 2 ? new Color(0.2f, 0.5f, 0.85f) : new Color(0.15f, 0.45f, 0.95f));
