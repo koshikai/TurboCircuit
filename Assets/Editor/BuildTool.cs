@@ -74,6 +74,7 @@ public static class BuildTool
         PlayerSettings.defaultScreenHeight = 720;
         PlayerSettings.resizableWindow = true;
 
+        AssetDatabase.Refresh();
         AssetDatabase.SaveAssets();
         Debug.Log("[BuildTool] Scene setup complete: " + ScenePath);
     }

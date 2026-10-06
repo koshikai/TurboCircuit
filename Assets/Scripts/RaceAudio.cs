@@ -20,8 +20,33 @@ public class RaceAudio : MonoBehaviour
         return clip != null ? clip : fallback;
     }
 
+    public static float MasterBgmVolume { get; private set; } = 0.7f;
+    public static float MasterSfxVolume { get; private set; } = 1.0f;
+    float currentMusicLevel = 0.3f;
+
+    public void SetMasterBgm(float v)
+    {
+        MasterBgmVolume = Mathf.Clamp01(v);
+        PlayerPrefs.SetFloat("Audio_BgmVolume", MasterBgmVolume);
+        RefreshMusicVolume();
+    }
+
+    public void SetMasterSfx(float v)
+    {
+        MasterSfxVolume = Mathf.Clamp01(v);
+        PlayerPrefs.SetFloat("Audio_SfxVolume", MasterSfxVolume);
+    }
+
+    void RefreshMusicVolume()
+    {
+        if (music != null) music.volume = currentMusicLevel * MusicGain * MasterBgmVolume;
+    }
+
     void Awake()
     {
+        MasterBgmVolume = PlayerPrefs.GetFloat("Audio_BgmVolume", 0.7f);
+        MasterSfxVolume = PlayerPrefs.GetFloat("Audio_SfxVolume", 1.0f);
+
         pool = new AudioSource[12];
         for (int i = 0; i < pool.Length; i++)
         {
@@ -79,7 +104,7 @@ public class RaceAudio : MonoBehaviour
             var synth = MakeMusic();
             for (int i = 0; i < bgm.Length; i++) if (bgm[i] == null) bgm[i] = synth;
         }
-        music = Loop(bgm[0], 0.3f * MusicGain);
+        music = Loop(bgm[0], currentMusicLevel * MusicGain * MasterBgmVolume);
     }
 
     bool useRealEngine;
@@ -105,7 +130,8 @@ public class RaceAudio : MonoBehaviour
         {
             music.time = 0;
             music.pitch = 1f;
-            music.volume = 0.3f * MusicGain;
+            currentMusicLevel = 0.3f;
+            RefreshMusicVolume();
             music.Play();
         }
     }
@@ -122,13 +148,17 @@ public class RaceAudio : MonoBehaviour
 
     public void SetEngine(float speed01, bool active, bool drifting)
     {
-        engine.volume = active ? 0.18f : 0f;
+        engine.volume = (active ? 0.18f : 0f) * MasterSfxVolume;
         engine.pitch = useRealEngine ? 0.7f + Mathf.Abs(speed01) * 1.1f : 0.55f + Mathf.Abs(speed01) * 1.25f;
-        driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, drifting ? 0.12f : 0f, Time.unscaledDeltaTime * 2f);
+        driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, drifting ? 0.12f * MasterSfxVolume : 0f, Time.unscaledDeltaTime * 2f);
     }
 
     public void SetMusicTempo(float pitch) => music.pitch = pitch;
-    public void SetMusicVolume(float v) => music.volume = v * MusicGain;
+    public void SetMusicVolume(float v)
+    {
+        currentMusicLevel = v;
+        RefreshMusicVolume();
+    }
 
     public void Select() => Play(select, 0.5f);
     public void Explode() => Play(explosion, 0.8f);
@@ -150,10 +180,11 @@ public class RaceAudio : MonoBehaviour
 
     void Play(AudioClip clip, float vol, float pitch = 1f)
     {
+        if (clip == null) return;
         var s = pool[next];
         next = (next + 1) % pool.Length;
         s.pitch = pitch;
-        s.PlayOneShot(clip, vol);
+        s.PlayOneShot(clip, vol * MasterSfxVolume);
     }
 
     delegate float Gen(float t, float dur);

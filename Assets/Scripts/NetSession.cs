@@ -54,10 +54,10 @@ public class NetSession : MonoBehaviour
     public int ConnectedCount => IsHost ? (hostConnections.Count + 1) : (Connected ? syncedPlayerCount : 1);
 
     public Action OnConnected, OnDisconnected;
-    public Action<NetworkConnection, int> OnClientHello;
+    public Action<NetworkConnection, int, string> OnClientHello;
     public Action<NetworkConnection> OnClientConnected, OnClientDisconnected;
     public Action<int, int> OnWelcome; // (assignedSlot, course)
-    public Action<List<(int slot, int kartChar)>> OnLobbySync;
+    public Action<List<(int slot, int kartChar, string name)>> OnLobbySync;
     public Action<int> OnCourse, OnStart, OnBananaGone;
     public Action<int, NetKartState> OnState;
     public Action<int, int, Vector3> OnBanana;
@@ -308,7 +308,8 @@ public class NetSession : MonoBehaviour
         {
             case Msg.Hello:
                 int kartChar = r.ReadByte();
-                if (IsHost) OnClientHello?.Invoke(sourceConn, kartChar);
+                string pName = ReadString(ref r);
+                if (IsHost) OnClientHello?.Invoke(sourceConn, kartChar, pName);
                 break;
             case Msg.Welcome:
                 int mySlot = r.ReadByte();
@@ -318,12 +319,13 @@ public class NetSession : MonoBehaviour
             case Msg.LobbySync:
                 int pCount = r.ReadByte();
                 syncedPlayerCount = pCount;
-                var pList = new List<(int slot, int kartChar)>(pCount);
+                var pList = new List<(int slot, int kartChar, string name)>(pCount);
                 for (int i = 0; i < pCount; i++)
                 {
                     int slot = r.ReadByte();
                     int kIdx = r.ReadByte();
-                    pList.Add((slot, kIdx));
+                    string pNick = ReadString(ref r);
+                    pList.Add((slot, kIdx, pNick));
                 }
                 OnLobbySync?.Invoke(pList);
                 break;
@@ -346,7 +348,7 @@ public class NetSession : MonoBehaviour
                 if (IsHost && states.Count > 0)
                 {
                     // ホスト経由で他の全クライアントへ即座に中継
-                    BroadcastExcept(sourceConn, false, Msg.State, w => WriteStates(w, states));
+                    BroadcastExcept(sourceConn, false, Msg.State, (ref DataStreamWriter w) => WriteStates(ref w, states));
                 }
                 break;
             case Msg.BananaSpawn:
@@ -355,7 +357,7 @@ public class NetSession : MonoBehaviour
                 OnBanana?.Invoke(bid, owner, bpos);
                 if (IsHost)
                 {
-                    BroadcastExcept(sourceConn, true, Msg.BananaSpawn, w =>
+                    BroadcastExcept(sourceConn, true, Msg.BananaSpawn, (ref DataStreamWriter w) =>
                     {
                         w.WriteInt(bid);
                         w.WriteByte((byte)owner);
@@ -368,7 +370,7 @@ public class NetSession : MonoBehaviour
                 OnBananaGone?.Invoke(bgId);
                 if (IsHost)
                 {
-                    BroadcastExcept(sourceConn, true, Msg.BananaGone, w => w.WriteInt(bgId));
+                    BroadcastExcept(sourceConn, true, Msg.BananaGone, (ref DataStreamWriter w) => w.WriteInt(bgId));
                 }
                 break;
             case Msg.MissileSpawn:
@@ -376,7 +378,7 @@ public class NetSession : MonoBehaviour
                 OnMissile?.Invoke(mOwner, mTarget);
                 if (IsHost)
                 {
-                    BroadcastExcept(sourceConn, true, Msg.MissileSpawn, w =>
+                    BroadcastExcept(sourceConn, true, Msg.MissileSpawn, (ref DataStreamWriter w) =>
                     {
                         w.WriteByte((byte)mOwner);
                         w.WriteByte((byte)mTarget);
@@ -404,7 +406,7 @@ public class NetSession : MonoBehaviour
         };
     }
 
-    static void WriteStates(DataStreamWriter w, List<(int id, NetKartState s)> states)
+    static void WriteStates(ref DataStreamWriter w, List<(int id, NetKartState s)> states)
     {
         w.WriteByte((byte)states.Count);
         foreach (var (id, s) in states)
@@ -426,6 +428,9 @@ public class NetSession : MonoBehaviour
 
     // ───────────────────────── 送信 ─────────────────────────
 
+    // DataStreamWriter は書き込み位置を構造体内に持つため、必ず ref で受け渡す（値渡しだと EndSend 時に書いた内容が失われる）
+    delegate void WriteFn(ref DataStreamWriter w);
+
     bool Open(NetworkConnection c, bool isReliable, Msg type, out DataStreamWriter w)
     {
         w = default;
@@ -436,7 +441,7 @@ public class NetSession : MonoBehaviour
         return true;
     }
 
-    void Broadcast(bool isReliable, Msg type, Action<DataStreamWriter> write)
+    void Broadcast(bool isReliable, Msg type, WriteFn write)
     {
         for (int i = 0; i < hostConnections.Count; i++)
         {
@@ -444,13 +449,13 @@ public class NetSession : MonoBehaviour
             if (!c.IsCreated) continue;
             if (Open(c, isReliable, type, out var w))
             {
-                write?.Invoke(w);
+                write?.Invoke(ref w);
                 driver.EndSend(w);
             }
         }
     }
 
-    void BroadcastExcept(NetworkConnection exclude, bool isReliable, Msg type, Action<DataStreamWriter> write)
+    void BroadcastExcept(NetworkConnection exclude, bool isReliable, Msg type, WriteFn write)
     {
         for (int i = 0; i < hostConnections.Count; i++)
         {
@@ -458,18 +463,19 @@ public class NetSession : MonoBehaviour
             if (!c.IsCreated || c == exclude) continue;
             if (Open(c, isReliable, type, out var w))
             {
-                write?.Invoke(w);
+                write?.Invoke(ref w);
                 driver.EndSend(w);
             }
         }
     }
 
-    public void SendHello(int kart)
+    public void SendHello(int kart, string playerName)
     {
         if (IsHost) return;
         if (Open(clientConn, true, Msg.Hello, out var w))
         {
             w.WriteByte((byte)kart);
+            WriteString(ref w, playerName);
             driver.EndSend(w);
         }
     }
@@ -484,37 +490,57 @@ public class NetSession : MonoBehaviour
         }
     }
 
-    public void SendLobbySync(List<(int slot, int kartChar)> players)
+    public void SendLobbySync(List<(int slot, int kartChar, string name)> players)
     {
         syncedPlayerCount = players.Count;
-        Broadcast(true, Msg.LobbySync, w =>
+        Broadcast(true, Msg.LobbySync, (ref DataStreamWriter w) =>
         {
             w.WriteByte((byte)players.Count);
-            foreach (var (slot, kartChar) in players)
+            foreach (var (slot, kartChar, name) in players)
             {
                 w.WriteByte((byte)slot);
                 w.WriteByte((byte)kartChar);
+                WriteString(ref w, name);
             }
         });
+    }
+
+    public static void WriteString(ref DataStreamWriter w, string s)
+    {
+        if (string.IsNullOrEmpty(s)) { w.WriteByte(0); return; }
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(s);
+        int len = Mathf.Min(bytes.Length, 32);
+        w.WriteByte((byte)len);
+        for (int i = 0; i < len; i++) w.WriteByte(bytes[i]);
+    }
+
+    public static string ReadString(ref DataStreamReader r)
+    {
+        if (r.GetBytesRead() >= r.Length) return "";
+        int len = r.ReadByte();
+        if (len <= 0) return "";
+        byte[] bytes = new byte[len];
+        for (int i = 0; i < len; i++) bytes[i] = r.ReadByte();
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
     public void SendCourse(int course)
     {
         if (!IsHost) return;
-        Broadcast(true, Msg.Course, w => w.WriteByte((byte)course));
+        Broadcast(true, Msg.Course, (ref DataStreamWriter w) => w.WriteByte((byte)course));
     }
 
     public void SendStart(int course)
     {
         if (!IsHost) return;
-        Broadcast(true, Msg.Start, w => w.WriteByte((byte)course));
+        Broadcast(true, Msg.Start, (ref DataStreamWriter w) => w.WriteByte((byte)course));
     }
 
     public void SendBananaGone(int id)
     {
         if (IsHost)
         {
-            Broadcast(true, Msg.BananaGone, w => w.WriteInt(id));
+            Broadcast(true, Msg.BananaGone, (ref DataStreamWriter w) => w.WriteInt(id));
         }
         else
         {
@@ -528,7 +554,7 @@ public class NetSession : MonoBehaviour
     {
         if (IsHost)
         {
-            Broadcast(true, Msg.MissileSpawn, w =>
+            Broadcast(true, Msg.MissileSpawn, (ref DataStreamWriter w) =>
             {
                 w.WriteByte((byte)owner);
                 w.WriteByte((byte)(target < 0 ? 255 : target));
@@ -547,7 +573,7 @@ public class NetSession : MonoBehaviour
     {
         if (IsHost)
         {
-            Broadcast(true, Msg.BananaSpawn, w =>
+            Broadcast(true, Msg.BananaSpawn, (ref DataStreamWriter w) =>
             {
                 w.WriteInt(id);
                 w.WriteByte((byte)owner);
@@ -571,13 +597,13 @@ public class NetSession : MonoBehaviour
         if (states.Count == 0) return;
         if (IsHost)
         {
-            Broadcast(false, Msg.State, w => WriteStates(w, states));
+            Broadcast(false, Msg.State, (ref DataStreamWriter w) => WriteStates(ref w, states));
         }
         else
         {
             if (Open(clientConn, false, Msg.State, out var w))
             {
-                WriteStates(w, states);
+                WriteStates(ref w, states);
                 driver.EndSend(w);
             }
         }
