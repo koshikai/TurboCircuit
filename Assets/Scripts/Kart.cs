@@ -11,7 +11,7 @@ public struct KartInput
 // カート本体。プレイヤーも CPU も同じ物理で動き、入力の出どころだけが違う。
 public class Kart : MonoBehaviour
 {
-    public const float MaxSpeed = 30f;
+    public const float MaxSpeed = 30f + (10f / 3.6f); // 基準最高速度: 108km/h + 10km/h = 約 118km/h (32.78m/s)
     public const float Radius = 1.15f;
 
     // キャラ性能（1〜8、5 が標準）。選択キャラのステータスを物理に反映する。

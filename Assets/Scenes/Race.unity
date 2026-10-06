@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1253123180
+--- !u!1 &709018530
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1253123182}
-  - component: {fileID: 1253123181}
+  - component: {fileID: 709018532}
+  - component: {fileID: 709018531}
   m_Layer: 0
   m_Name: Race
   m_TagString: Untagged
@@ -136,13 +136,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1253123181
+--- !u!114 &709018531
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1253123180}
+  m_GameObject: {fileID: 709018530}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a463fa498fa25be43ad02734929ebc04, type: 3}
@@ -173,13 +173,13 @@ MonoBehaviour:
   bannerMaterial: {fileID: 2100000, guid: 8a63cae8f92dba84ea0db69f821d2039, type: 2}
   totalLaps: 3
   playerGridSlot: 5
---- !u!4 &1253123182
+--- !u!4 &709018532
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1253123180}
+  m_GameObject: {fileID: 709018530}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -192,4 +192,4 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1253123182}
+  - {fileID: 709018532}
