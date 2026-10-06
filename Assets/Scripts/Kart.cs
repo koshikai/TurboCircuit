@@ -964,7 +964,6 @@ public class Kart : MonoBehaviour
         else
         {
             curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
-            if (curPos.y < roadY) curPos.y = roadY;
             if (curPos.y > roadY + 0.9f && Speed > 20f && verticalVel <= 0)
             {
                 isAirborne = true;

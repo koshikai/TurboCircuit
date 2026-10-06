@@ -613,6 +613,7 @@ public class RaceManager : MonoBehaviour
         var skills = new List<float> { 0.985f, 0.97f, 0.96f, 0.95f, 0.94f, 0.93f, 0.91f };
         foreach (var k in Karts.Where(k => !k.IsPlayer))
         {
+            if (skills.Count == 0) { k.SetSkill(0.95f); continue; }
             int j = Random.Range(0, skills.Count);
             k.SetSkill(skills[j]);
             skills.RemoveAt(j);
