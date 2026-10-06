@@ -1827,14 +1827,13 @@ public class RaceManager : MonoBehaviour
 
     void EnsureMaterials()
     {
-        if (skidmarkMaterial == null)
-        {
-            // Sprites/Default はアルファ透過で URP でも描画される(URP/Unlit は既定が不透明)
-            var shader = Shader.Find("Sprites/Default")
+        // シリアライズ済みの Skidmark.mat は加算合成(白く光る)なので、黒いタイヤ痕は常に実行時に作り直す。
+        // Sprites/Default はアルファ透過で URP でも描画される(URP/Unlit は既定が不透明)
+        var skidShader = Shader.Find("Sprites/Default")
                          ?? Shader.Find("Legacy Shaders/Particles/Alpha Blended")
                          ?? Shader.Find("Universal Render Pipeline/Unlit");
-            skidmarkMaterial = new Material(shader) { mainTexture = TextureGen.TireMark() };
-        }
+        if (skidShader != null)
+            skidmarkMaterial = new Material(skidShader) { mainTexture = TextureGen.TireMark() };
         var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
         bool isUrp = litShader != null && litShader.name.Contains("Universal");
 
