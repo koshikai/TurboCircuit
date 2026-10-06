@@ -79,6 +79,7 @@ public class RaceManager : MonoBehaviour
     int mySlot = 5;
     readonly Dictionary<int, int> playerKarts = new Dictionary<int, int>(); // slot -> kartCharIdx
     readonly Dictionary<Unity.Networking.Transport.NetworkConnection, int> clientSlots = new Dictionary<Unity.Networking.Transport.NetworkConnection, int>();
+    bool LobbyActive => state == State.Title && Net != null && Net.Busy && playerKarts.Count > 0;
     public int OnlinePlayerCount => Net != null && Net.Busy ? Mathf.Max(1, playerKarts.Count) : 1;
     float firstFinishTime = -1f;
     bool netMenu;
@@ -658,7 +659,7 @@ public class RaceManager : MonoBehaviour
         }
         if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
 
-        if (Input.GetKeyDown(KeyCode.Escape) && netMenu)
+        if (Input.GetKeyDown(KeyCode.Escape) && netMenu && !LobbyActive)
         {
             netMenu = false;
         }
@@ -697,7 +698,7 @@ public class RaceManager : MonoBehaviour
         switch (state)
         {
             case State.Title:
-                if (netMenu) break; // オンライン画面の入力中はタイトルのショートカットを無効にする
+                if (netMenu && !LobbyActive) break; // 接続画面の入力中はタイトルのショートカットを無効にする
                 float vAxis = Input.GetAxisRaw("Vertical");
                 stickNavTimer -= dt;
                 bool stickUp = false;
@@ -833,6 +834,7 @@ public class RaceManager : MonoBehaviour
     void StartCountdown()
     {
         if (!Online) RestoreRoles();
+        ShowAllKarts();
         ResetRace();
         firstFinishTime = -1f;
         state = State.Countdown;
@@ -1066,8 +1068,13 @@ public class RaceManager : MonoBehaviour
 
         if (state == State.Title)
         {
-            if (Player != null && track != null && track.Count > 0)
+            if (LobbyActive && track != null && track.Count > 0)
             {
+                UpdateLobbyStage(dt);
+            }
+            else if (Player != null && track != null && track.Count > 0)
+            {
+                ShowAllKarts();
                 var trackPt = track.PointAt(0, 0);
                 var trackDir = track.Dirs[0];
                 var trackRight = track.Rights[0];
@@ -1090,6 +1097,63 @@ public class RaceManager : MonoBehaviour
 
         UpdateChaseCamera(cam, Player, 0, dt);
         if (split) UpdateChaseCamera(cam2, Player2, 1, dt);
+    }
+
+    // ───────────────────────── Online lobby stage ─────────────────────────
+
+    // 部屋に入っている人間のカートだけをスタート地点に整列させ、カメラで全員を映す
+    readonly List<int> lobbySlots = new List<int>();
+
+    void ShowAllKarts()
+    {
+        foreach (var k in Karts)
+            if (!k.gameObject.activeSelf) k.gameObject.SetActive(true);
+    }
+
+    void UpdateLobbyStage(float dt)
+    {
+        lobbySlots.Clear();
+        foreach (var s in HumanSlots)
+            if (playerKarts.ContainsKey(s)) lobbySlots.Add(s); // ホストが先頭
+
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            bool show = playerKarts.ContainsKey(i);
+            if (Karts[i].gameObject.activeSelf != show) Karts[i].gameObject.SetActive(show);
+        }
+
+        int n = lobbySlots.Count;
+        int front = n <= 4 ? n : (n + 1) / 2;
+        int back = n - front;
+        const float spacing = 3.4f, rowGap = 4.5f;
+
+        var origin = track.PointAt(0, 0);
+        var dir = track.Dirs[0];
+        var right = track.Rights[0];
+        float baseHeading = Quaternion.LookRotation(dir).eulerAngles.y;
+
+        for (int i = 0; i < n; i++)
+        {
+            bool isFront = i < front;
+            int idx = isFront ? i : i - front;
+            int count = isFront ? front : back;
+            float x = (idx - (count - 1) * 0.5f) * spacing;
+            float z = isFront ? 0f : rowGap;
+            var k = Karts[lobbySlots[i]];
+            k.transform.position = origin + right * x - dir * z;
+            k.Heading = baseHeading - 18f + Mathf.Sin(Time.time * 1.3f + i * 0.9f) * 7f;
+        }
+
+        int rows = back > 0 ? 2 : 1;
+        float width = spacing * (front - 1) + 3.5f;
+        float dist = Mathf.Max(6f, width * 0.78f) + (rows - 1) * 2.5f;
+        var center = origin - dir * ((rows - 1) * rowGap * 0.5f);
+        var camPos = center + dir * dist + right * 1.2f + Vector3.up * (1.6f + rows * 0.9f);
+        var look = center + Vector3.up * -0.6f;
+        float k2 = 1f - Mathf.Exp(-5f * dt);
+        cam.transform.position = Vector3.Lerp(cam.transform.position, camPos, k2);
+        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look - cam.transform.position), k2);
+        cam.fieldOfView = 48f;
     }
 
     void UpdateChaseCamera(Camera c, Kart pl, int p, float dt)
@@ -1184,7 +1248,10 @@ public class RaceManager : MonoBehaviour
 
         switch (state)
         {
-            case State.Title: DrawTitle(w, h); if (netMenu) DrawNetMenu(w, h); break;
+            case State.Title:
+                if (LobbyActive) DrawLobby(w, h);
+                else { DrawTitle(w, h); if (netMenu) DrawNetMenu(w, h); }
+                break;
             case State.Countdown: DrawHuds(w, h, true); break;
             case State.Racing: DrawHuds(w, h, false); break;
             case State.Results: DrawHuds(w, h, false); if (Time.time > finishAt + 2.5f) DrawResults(w, h); break;
@@ -1213,49 +1280,10 @@ public class RaceManager : MonoBehaviour
 
         if (Net.Busy)
         {
-            GUI.Label(new Rect(x, y, cw, 28), Net.IsHost ? "HOST LOBBY" : "CONNECTED TO LOBBY", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.Bold, false, Color.white));
-            y += 32;
-            if (!string.IsNullOrEmpty(Net.JoinCode))
-            {
-                GUI.Label(new Rect(x, y, cw, 22), "Share this ROOM CODE with your friends (up to 8 players):", info);
-                y += 24;
-                Outlined(new Rect(x, y, cw, 60), Net.JoinCode, St(sBig, 56), new Color(0.4f, 1f, 0.6f), 3);
-                y += 66;
-            }
-
-            int count = OnlinePlayerCount;
-            GUI.Label(new Rect(x, y, cw, 24), $"PLAYERS IN LOBBY ({count} / 8):", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(1f, 0.85f, 0.2f)));
-            y += 26;
-
-            int slotIdx = 0;
-            foreach (var slot in HumanSlots)
-            {
-                if (playerKarts.TryGetValue(slot, out int charIdx))
-                {
-                    var d = KartCharacters[charIdx];
-                    string pTag = (slot == mySlot) ? "YOU" : (slot == 5 ? "HOST" : $"P{slotIdx + 1}");
-                    string line = $"  • [{pTag}] {d.name} ({d.driver}) - {d.trait}";
-                    GUI.Label(new Rect(x, y, cw, 22), line, St(sSmall, 14, TextAnchor.MiddleLeft, FontStyle.Normal, false, (slot == mySlot) ? new Color(0.4f, 1f, 0.6f) : Color.white));
-                    y += 22;
-                }
-                slotIdx++;
-            }
-
-            if (Net.IsHost)
-            {
-                if (GUI.Button(new Rect(x + cw / 2 - 130, r.yMax - 110, 260, 44), "START RACE  [ENTER]", sButton))
-                {
-                    netMenu = false;
-                    StartRaceFromTitle();
-                }
-            }
-            else
-            {
-                GUI.Label(new Rect(x, r.yMax - 105, cw, 30), "Waiting for host to start the race...", info);
-            }
-
-            if (GUI.Button(new Rect(x + 20, r.yMax - 56, 200, 38), "CLOSE  [ESC]", sButton)) netMenu = false;
-            if (GUI.Button(new Rect(x + cw - 220, r.yMax - 56, 200, 38), "LEAVE ROOM", sButton)) LeaveOnline();
+            // ロビー（参加者一覧）に入る前の接続待ち。入室後は DrawLobby に切り替わる
+            string msg = string.IsNullOrEmpty(Net.Message) ? "Connecting..." : Net.Message;
+            GUI.Label(new Rect(x, y + 60, cw, 60), msg, St(sSmall, 22, TextAnchor.MiddleCenter, FontStyle.Bold, true, Color.white));
+            if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 56, 200, 38), "CANCEL  [ESC]", sButton)) LeaveOnline();
             return;
         }
 
@@ -1276,6 +1304,91 @@ public class RaceManager : MonoBehaviour
             GUI.Label(new Rect(x, y + 90, cw, 50), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(1f, 0.5f, 0.4f)));
         GUI.Label(new Rect(x, r.yMax - 110, cw, 48), "Host picks the course and starts the race. Up to 8 players, CPU karts fill empty slots.", info);
         if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 54, 200, 40), "CLOSE  [ESC]", sButton)) netMenu = false;
+    }
+
+    // オンラインロビー：3D ステージ上に全員のカートを並べ、頭上に名前タグ、下に操作パネルを表示する
+    void DrawLobby(float w, float h)
+    {
+        float scale = Screen.height / 720f;
+        var gold = new Color(1f, 0.85f, 0.25f);
+
+        // 上部バー：タイトル・ルームコード・コース
+        GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.88f);
+        GUI.DrawTexture(new Rect(0, 0, w, 84), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        DrawFrame(new Rect(0, 0, w, 84), 1, new Color(1f, 0.85f, 0.25f, 0.5f));
+        Outlined(new Rect(24, 8, 360, 40), "ONLINE LOBBY", St(sMid, 32, TextAnchor.MiddleLeft), gold, 2);
+        GUI.Label(new Rect(28, 50, 360, 26), $"PLAYERS  {playerKarts.Count} / 8   (CPU fills empty slots)", St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.85f, 0.9f, 1f)));
+
+        if (!string.IsNullOrEmpty(Net.JoinCode))
+        {
+            GUI.Label(new Rect(w / 2 - 150, 4, 300, 20), "ROOM CODE", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
+            Outlined(new Rect(w / 2 - 150, 20, 300, 60), Net.JoinCode, St(sBig, 52), new Color(0.4f, 1f, 0.6f), 3);
+        }
+        else
+        {
+            Outlined(new Rect(w / 2 - 150, 20, 300, 50), Net.IsHost ? "DIRECT  (port " + NetSession.DefaultPort + ")" : "DIRECT CONNECTION", St(sMid, 22), new Color(0.4f, 1f, 0.6f), 2);
+        }
+
+        var curDef = Track.Courses[SelectedCourse];
+        GUI.Label(new Rect(w - 384, 8, 360, 40), $"◄  {curDef.Name.ToUpper()}  ►", St(sSmall, 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
+        GUI.Label(new Rect(w - 384, 50, 360, 26), Net.IsHost ? "[A][D]  you pick the course" : "course is picked by the host", St(sSmall, 14, TextAnchor.MiddleRight, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
+
+        // 各カート頭上の名前タグ
+        for (int i = 0; i < lobbySlots.Count; i++)
+        {
+            int slot = lobbySlots[i];
+            var d = KartCharacters[Mathf.Clamp(playerKarts[slot], 0, KartCharacters.Length - 1)];
+            var sp = cam.WorldToScreenPoint(Karts[slot].transform.position + Vector3.up * 1.9f);
+            if (sp.z <= 0f) continue;
+            float gx = sp.x / scale, gy = (Screen.height - sp.y) / scale;
+            bool me = slot == mySlot;
+            string role = me ? (slot == 5 ? "YOU · HOST" : "YOU") : (slot == 5 ? "HOST" : $"P{i + 1}");
+            float tw = 150f;
+            var bg = me ? new Color(0.15f, 0.7f, 0.38f) : new Color(0.16f, 0.2f, 0.4f);
+            DrawPopPill(new Rect(gx - tw / 2, gy - 44, tw, 20), role, bg);
+            DrawPopPill(new Rect(gx - tw / 2, gy - 22, tw, 22), d.name, d.color * 0.85f);
+        }
+
+        // 下部パネル
+        float py = h - 190;
+        GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.88f);
+        GUI.DrawTexture(new Rect(0, py, w, 190), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        DrawFrame(new Rect(0, py, w, 190), 1, new Color(1f, 0.85f, 0.25f, 0.5f));
+
+        // 左：自分のドライバー
+        var me2 = KartCharacters[SelectedKart];
+        var card = new Rect(24, py + 14, 340, 164);
+        DrawPopCard(card);
+        Outlined(new Rect(card.x + 8, card.y + 6, card.width - 16, 28), $"< {me2.name} >", St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), me2.color, 2);
+        DrawPopPill(new Rect(card.x + 20, card.y + 38, card.width - 40, 20), me2.trait, me2.color * 0.9f);
+        float gy0 = card.y + 66;
+        DrawToonStatGauge(card.x + 20, gy0 + 0, card.width - 40, "SPEED", me2.speed, 8, new Color(0.08f, 0.72f, 0.98f));
+        DrawToonStatGauge(card.x + 20, gy0 + 22, card.width - 40, "ACCEL", me2.accel, 8, new Color(1f, 0.72f, 0.05f));
+        DrawToonStatGauge(card.x + 20, gy0 + 44, card.width - 40, "STEER", me2.handling, 8, new Color(0.25f, 0.85f, 0.35f));
+        GUI.Label(new Rect(card.x + 10, card.y + 138, card.width - 20, 20), "[W][S]  change driver", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f)));
+
+        // 中央：スタート
+        float cx = w / 2;
+        if (Net.IsHost)
+        {
+            float pulse = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
+            var br = new Rect(cx - 190, py + 40, 380, 64 + pulse * 4f);
+            if (btnRaceTex != null) GUI.DrawTexture(br, btnRaceTex, ScaleMode.StretchToFill);
+            else { GUI.color = new Color(1f, 0.7f, 0.1f); GUI.DrawTexture(br, Texture2D.whiteTexture); GUI.color = Color.white; DrawFrame(br, 3, new Color(0.1f, 0.15f, 0.3f)); }
+            Outlined(br, "►► START RACE ◄◄", St(sMid, 26, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), Color.white, 2.5f);
+            if (GUI.Button(br, GUIContent.none, GUIStyle.none)) StartRaceFromTitle();
+            GUI.Label(new Rect(cx - 190, py + 118, 380, 24), "[ENTER] to start for everyone", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
+        }
+        else
+        {
+            string dots = new string('.', 1 + (int)(Time.time * 2f) % 3);
+            Outlined(new Rect(cx - 220, py + 44, 440, 50), "Waiting for host" + dots, St(sMid, 26), Color.white, 2);
+        }
+
+        // 右：退出
+        if (GUI.Button(new Rect(w - 224, py + 126, 200, 44), "LEAVE ROOM  [ESC]", sButton)) LeaveOnline();
     }
 
     // 1P は全画面、2P は左右それぞれのビューにクリップして HUD・バナー・ビネットを描く
