@@ -61,6 +61,7 @@ public class ItemBox : MonoBehaviour
 
         var hue = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.3f + phase, 1f), 0.75f, 1f);
         mpb.SetColor("_Color", hue * 0.6f + Color.white * 0.4f);
+        mpb.SetColor("_BaseColor", hue * 0.6f + Color.white * 0.4f);
         mpb.SetColor("_EmissionColor", hue * 0.9f);
         rend.SetPropertyBlock(mpb);
 

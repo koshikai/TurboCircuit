@@ -154,8 +154,10 @@ public class Kart : MonoBehaviour
 
         var paint = new MaterialPropertyBlock();
         paint.SetColor("_Color", Color);
+        paint.SetColor("_BaseColor", Color);
         var dark = new MaterialPropertyBlock();
         dark.SetColor("_Color", Color * 0.55f);
+        dark.SetColor("_BaseColor", Color * 0.55f);
 
         kenneyReady = TryBuildKenneyModel();
         if (!kenneyReady)
@@ -293,6 +295,7 @@ public class Kart : MonoBehaviour
 
         var paint = new MaterialPropertyBlock();
         paint.SetColor("_Color", Color.Lerp(Color.white, Color, 0.65f));
+        paint.SetColor("_BaseColor", Color.Lerp(Color.white, Color, 0.65f));
         foreach (var r in body.GetComponentsInChildren<Renderer>())
         {
             r.SetPropertyBlock(paint);
@@ -409,6 +412,7 @@ public class Kart : MonoBehaviour
             if (shieldTimer < 1.5f && Mathf.Repeat(Time.time, 0.2f) < 0.1f) c *= 0.2f;
             shieldMpb.SetColor("_TintColor", c);
             shieldMpb.SetColor("_Color", c);
+            shieldMpb.SetColor("_BaseColor", c);
             shieldRenderer.SetPropertyBlock(shieldMpb);
         }
     }

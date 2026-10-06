@@ -40,6 +40,7 @@
     "com.unity.modules.xr": "1.0.0",
     "com.unity.services.authentication": "3.8.0",
     "com.unity.services.relay": "1.2.0",
-    "com.unity.transport": "2.7.4"
+    "com.unity.transport": "2.7.4",
+    "com.unity.render-pipelines.universal": "17.0.3"
   }
 }

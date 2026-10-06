@@ -97,16 +97,34 @@ public static class BuildTool
 
     static Material Lit(string name, Color albedo, float smoothness, float metallic = 0f, Color? emission = null)
     {
-        var mat = LoadOrCreate(name, Shader.Find("Standard"));
-        mat.SetColor("_Color", albedo);
-        mat.SetFloat("_Glossiness", smoothness);
-        mat.SetFloat("_Metallic", metallic);
-        if (emission.HasValue)
+        var urpShader = Shader.Find("Universal Render Pipeline/Lit");
+        var shader = urpShader != null ? urpShader : Shader.Find("Standard");
+        var mat = LoadOrCreate(name, shader);
+
+        if (urpShader != null && mat.shader == urpShader)
         {
-            mat.EnableKeyword("_EMISSION");
-            mat.SetColor("_EmissionColor", emission.Value);
+            mat.SetColor("_BaseColor", albedo);
+            mat.SetFloat("_Smoothness", smoothness);
+            mat.SetFloat("_Metallic", metallic);
+            if (emission.HasValue)
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", emission.Value);
+            }
+            else mat.DisableKeyword("_EMISSION");
         }
-        else mat.DisableKeyword("_EMISSION");
+        else
+        {
+            mat.SetColor("_Color", albedo);
+            mat.SetFloat("_Glossiness", smoothness);
+            mat.SetFloat("_Metallic", metallic);
+            if (emission.HasValue)
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", emission.Value);
+            }
+            else mat.DisableKeyword("_EMISSION");
+        }
         mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         mat.enableInstancing = true;
         EditorUtility.SetDirty(mat);

@@ -1829,31 +1829,56 @@ public class RaceManager : MonoBehaviour
     {
         if (skidmarkMaterial == null)
         {
-            var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Legacy Shaders/Particles/Alpha Blended");
+            // Sprites/Default はアルファ透過で URP でも描画される(URP/Unlit は既定が不透明)
+            var shader = Shader.Find("Sprites/Default")
+                         ?? Shader.Find("Legacy Shaders/Particles/Alpha Blended")
+                         ?? Shader.Find("Universal Render Pipeline/Unlit");
             skidmarkMaterial = new Material(shader) { mainTexture = TextureGen.TireMark() };
         }
+        var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        bool isUrp = litShader != null && litShader.name.Contains("Universal");
+
         if (headlightMaterial == null)
         {
-            var shader = Shader.Find("Standard");
-            headlightMaterial = new Material(shader);
-            headlightMaterial.SetColor("_Color", new Color(1f, 1f, 0.95f));
+            headlightMaterial = new Material(litShader);
+            if (isUrp)
+            {
+                headlightMaterial.SetColor("_BaseColor", new Color(1f, 1f, 0.95f));
+            }
+            else
+            {
+                headlightMaterial.SetColor("_Color", new Color(1f, 1f, 0.95f));
+            }
             headlightMaterial.EnableKeyword("_EMISSION");
             headlightMaterial.SetColor("_EmissionColor", new Color(1.4f, 1.4f, 1.1f));
         }
         if (taillightMaterial == null)
         {
-            var shader = Shader.Find("Standard");
-            taillightMaterial = new Material(shader);
-            taillightMaterial.SetColor("_Color", new Color(0.9f, 0.1f, 0.1f));
+            taillightMaterial = new Material(litShader);
+            if (isUrp)
+            {
+                taillightMaterial.SetColor("_BaseColor", new Color(0.9f, 0.1f, 0.1f));
+            }
+            else
+            {
+                taillightMaterial.SetColor("_Color", new Color(0.9f, 0.1f, 0.1f));
+            }
             taillightMaterial.EnableKeyword("_EMISSION");
             taillightMaterial.SetColor("_EmissionColor", new Color(0.8f, 0.05f, 0.05f));
         }
         if (bannerMaterial == null)
         {
-            var shader = Shader.Find("Standard");
-            bannerMaterial = new Material(shader);
-            bannerMaterial.SetColor("_Color", Color.white);
-            bannerMaterial.SetFloat("_Glossiness", 0.4f);
+            bannerMaterial = new Material(litShader);
+            if (isUrp)
+            {
+                bannerMaterial.SetColor("_BaseColor", Color.white);
+                bannerMaterial.SetFloat("_Smoothness", 0.4f);
+            }
+            else
+            {
+                bannerMaterial.SetColor("_Color", Color.white);
+                bannerMaterial.SetFloat("_Glossiness", 0.4f);
+            }
         }
     }
 

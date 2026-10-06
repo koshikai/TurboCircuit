@@ -776,6 +776,7 @@ public class Track : MonoBehaviour
                 var fan = Box("Fan", basePos, Vector3.one * 0.6f, Quaternion.identity, rm.kartPaintMaterial, PrimitiveType.Sphere);
                 var mpb = new MaterialPropertyBlock();
                 mpb.SetColor("_Color", Color.HSVToRGB((float)rng.NextDouble(), 0.7f, 1f));
+                mpb.SetColor("_BaseColor", Color.HSVToRGB((float)rng.NextDouble(), 0.7f, 1f));
                 fan.GetComponent<Renderer>().SetPropertyBlock(mpb);
                 fan.AddComponent<Bouncer>().Init((float)rng.NextDouble() * 5f);
             }
@@ -912,6 +913,7 @@ public class Track : MonoBehaviour
                 var flag = Box("Flag", p + Vector3.up * 4.3f + Dirs[i] * 0.6f, new Vector3(0.05f, 0.8f, 1.2f), Quaternion.LookRotation(Dirs[i]), rm.kartPaintMaterial);
                 var mpb = new MaterialPropertyBlock();
                 mpb.SetColor("_Color", Color.HSVToRGB((i / 25 % 6) / 6f, 0.8f, 1f));
+                mpb.SetColor("_BaseColor", Color.HSVToRGB((i / 25 % 6) / 6f, 0.8f, 1f));
                 flag.GetComponent<Renderer>().SetPropertyBlock(mpb);
             }
         }
