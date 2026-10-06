@@ -941,13 +941,13 @@ public class Track : MonoBehaviour
         {
             float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 12)], Vector3.up);
             float side = bend > 2f ? -1f : 1f; // カーブ外側を優先
-            var pos = PointAt(i, side * (WallOffset + 0.1f)) + Vector3.up * 1.6f;
+            var pos = PointAt(i, side * (WallOffset + 0.6f)) + Vector3.up * 1.6f;
             var rot = Quaternion.LookRotation(Dirs[i]);
             var mat = bannerMats[(i / 22) % 4];
 
             // 看板の支柱とボード
-            Box("BoardPole1", pos - Dirs[i] * 1.8f - Vector3.up * 0.8f, new Vector3(0.18f, 1.8f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
-            Box("BoardPole2", pos + Dirs[i] * 1.8f - Vector3.up * 0.8f, new Vector3(0.18f, 1.8f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("BoardPole1", pos - Dirs[i] * 1.8f - Vector3.up * 0.3f, new Vector3(0.18f, 1.3f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("BoardPole2", pos + Dirs[i] * 1.8f - Vector3.up * 0.3f, new Vector3(0.18f, 1.3f, 0.18f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
             Box("SponsorBoard", pos, new Vector3(0.15f, 1.3f, 4.6f), rot, mat);
         }
 
@@ -1059,7 +1059,7 @@ public class Track : MonoBehaviour
             for (int t = 1; t <= 3; t++)
             {
                 int idx = Wrap(-t * 9);
-                var pos = PointAt(idx, WallOffset + 8.5f);
+                var pos = PointAt(idx, WallOffset + 10f); // 壁の上の縁(+0.4m)にテントの屋根が食い込まないよう外側へ
                 var rot = Quaternion.LookRotation(-Rights[idx], Vector3.up);
                 var anchor = new GameObject("TentAnchor").transform;
                 anchor.SetParent(transform, false);
