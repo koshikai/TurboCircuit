@@ -86,7 +86,7 @@ public class Banana : MonoBehaviour
     public void Init(Vector3 pos, Kart owner, Material mat)
     {
         Owner = owner;
-        transform.position = new Vector3(pos.x, 0, pos.z);
+        transform.position = pos;
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         Destroy(body.GetComponent<Collider>());
         body.transform.SetParent(transform, false);
@@ -175,7 +175,7 @@ public class Missile : MonoBehaviour
 
         foreach (var k in rm.Karts)
         {
-            if (k == Owner && age < 1.5f) continue;
+            if (k == Owner) continue;
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
                 k.Spin();

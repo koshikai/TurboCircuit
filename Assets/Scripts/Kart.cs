@@ -499,7 +499,7 @@ public class Kart : MonoBehaviour
         inp.steer = Mathf.Clamp(Input.GetAxisRaw("Horizontal"), -1f, 1f);
         inp.drift = Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.JoystickButton5);
         inp.driftDown = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.JoystickButton5);
-        inp.useItem = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.JoystickButton2);
+        inp.useItem = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.JoystickButton2) || Input.GetKeyDown(KeyCode.JoystickButton4);
         return inp;
     }
 
@@ -733,15 +733,16 @@ public class Kart : MonoBehaviour
 
         if (aiStuck > 2.5f)
         {
-            aiReverse = 0.4f;
+            aiReverse = 0.5f;
             aiStuck = 0;
         }
 
         if (aiReverse > 0)
         {
             aiReverse -= dt;
-            inp.throttle = -1f; // 0.4秒だけ後退
-            inp.steer = -Mathf.Sign(headingError);
+            inp.throttle = -1f; // 0.5秒だけ後退脱出
+            inp.steer = -Mathf.Sign(headingError != 0 ? headingError : (Lateral >= 0 ? 1f : -1f));
+            aiSteer = inp.steer;
             inp.drift = false;
         }
 
@@ -928,7 +929,7 @@ public class Kart : MonoBehaviour
             foreach (var ramp in track.JumpRamps)
             {
                 int di = track.Wrap(Index - ramp.index);
-                if ((di <= 1 || di >= track.Count - 2) && Speed > 8f)
+                if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral) <= 7.8f && Speed > 8f)
                 {
                     LaunchJump(ramp.power);
                     break;
@@ -963,12 +964,31 @@ public class Kart : MonoBehaviour
         else
         {
             curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
+            if (curPos.y < roadY) curPos.y = roadY;
             if (curPos.y > roadY + 0.9f && Speed > 20f && verticalVel <= 0)
             {
                 isAirborne = true;
                 verticalVel = 4f;
             }
             transform.position = curPos;
+        }
+
+        // 奈落落下・コース外転落時の安全復帰（レスキュー）
+        if (curPos.y < -12f || Mathf.Abs(Lateral) > Track.WallOffset + 15f)
+        {
+            curPos = track.PointAt(Index, 0f) + Vector3.up * 0.4f;
+            Speed = Mathf.Clamp(Speed * 0.5f, -5f, 10f);
+            verticalVel = 0f;
+            isAirborne = false;
+            airTrickSpin = 0f;
+            VelDir = Forward;
+            transform.position = curPos;
+            if (IsPlayer)
+            {
+                rm.Shake(0.5f);
+                rm.Audio.Bump();
+            }
+            Fx.Burst(curPos, new Color(0.3f, 0.8f, 1f), 18, 6f, 0.4f);
         }
 
         isBraking = inp.throttle < 0 && Speed > 2f;

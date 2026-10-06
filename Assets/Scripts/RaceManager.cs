@@ -74,9 +74,13 @@ public class RaceManager : MonoBehaviour
 
     // オンライン対戦（Unity Relay / IP 直接接続）
     public NetSession Net { get; private set; }
-    public bool Online => Net != null && Net.Connected;
-    Kart rival;                 // オンライン相手のカート
-    int rivalKartIdx;
+    public bool Online => Net != null && (Net.Connected || (Net.IsHost && Net.State == NetSession.Phase.Waiting));
+    public static readonly int[] HumanSlots = { 5, 4, 3, 2, 1, 0, 6, 7 };
+    int mySlot = 5;
+    readonly Dictionary<int, int> playerKarts = new Dictionary<int, int>(); // slot -> kartCharIdx
+    readonly Dictionary<Unity.Networking.Transport.NetworkConnection, int> clientSlots = new Dictionary<Unity.Networking.Transport.NetworkConnection, int>();
+    public int OnlinePlayerCount => Net != null && Net.Busy ? Mathf.Max(1, playerKarts.Count) : 1;
+    float firstFinishTime = -1f;
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
@@ -131,6 +135,7 @@ public class RaceManager : MonoBehaviour
     };
 
     public int SelectedKart { get; private set; } = 0;
+    float stickNavTimer = 0f;
 
     static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
     static readonly Color[] AiColors =
@@ -221,15 +226,19 @@ public class RaceManager : MonoBehaviour
         if (args.Contains("-twoplayer")) SetTwoPlayer(true);
 
         Net = gameObject.AddComponent<NetSession>();
-        Net.OnConnected = EnterOnline;
+        Net.OnConnected = OnNetClientConnected;
         Net.OnDisconnected = OnNetDisconnected;
-        Net.OnRivalKart = OnRivalKart;
+        Net.OnClientConnected = OnNetHostClientConnected;
+        Net.OnClientDisconnected = OnNetHostClientDisconnected;
+        Net.OnClientHello = OnNetClientHello;
+        Net.OnWelcome = OnNetWelcome;
+        Net.OnLobbySync = OnNetLobbySync;
         Net.OnCourse = c => { if (state == State.Title && c != SelectedCourse) LoadCourse(c); };
         Net.OnStart = c => { if (c != SelectedCourse) LoadCourse(c); StartCountdown(); };
         Net.OnState = (id, s) => { if (id >= 0 && id < Karts.Count && Karts[id].IsRemote) Karts[id].ApplyNetState(s); };
-        Net.OnBanana = (id, owner, pos) => { if (owner < Karts.Count) SpawnBananaInternal(id, pos, Karts[owner]); };
+        Net.OnBanana = (id, owner, pos) => { if (owner >= 0 && owner < Karts.Count) SpawnBananaInternal(id, pos, Karts[owner]); };
         Net.OnBananaGone = RemoveBananaById;
-        Net.OnMissile = (owner, target) => { if (owner < Karts.Count) SpawnMissileInternal(Karts[owner], target < Karts.Count ? Karts[target] : null); };
+        Net.OnMissile = (owner, target) => { if (owner >= 0 && owner < Karts.Count) SpawnMissileInternal(Karts[owner], (target >= 0 && target < Karts.Count) ? Karts[target] : null); };
         // 動作確認用：-nethost / -netjoin <ip> で起動直後に直接接続する
         if (args.Contains("-netmenu")) netMenu = true;
         if (args.Contains("-nethost")) Net.HostDirect();
@@ -288,45 +297,146 @@ public class RaceManager : MonoBehaviour
         k.Hop();
     }
 
-    bool AllHumansFinished() => Player.Finished && (!TwoPlayer || Player2.Finished) && (!Online || rival.Finished);
+    bool AllHumansFinished()
+    {
+        if (Online)
+        {
+            if (!Player.Finished) return false;
+            foreach (var slot in playerKarts.Keys)
+            {
+                if (slot >= 0 && slot < Karts.Count && !Karts[slot].Finished) return false;
+            }
+            return true;
+        }
+        return Player.Finished && (!TwoPlayer || Player2.Finished);
+    }
 
     // ───────────────────────── オンライン対戦 ─────────────────────────
 
-    // 接続成立：ホスト = 手前スロット(P1)、クライアント = 奥のスロット(P2)。CPU はホストだけが計算する
-    void EnterOnline()
+    void OnNetHostClientConnected(Unity.Networking.Transport.NetworkConnection conn)
     {
-        netMenu = false;
         if (TwoPlayer) SetTwoPlayer(false);
-        var mine = Net.IsHost ? Karts[playerGridSlot] : Karts[P2Slot];
-        rival = Net.IsHost ? Karts[P2Slot] : Karts[playerGridSlot];
-        Player = mine;
-        mine.IsRemote = false;
-        ConfigureHuman(0);
-
-        rival.IsPlayer = false;
-        rival.IsRemote = true;
-        ApplyRivalLook();
-        if (!Net.IsHost)
-            foreach (var k in Karts) if (k != mine && k != rival) k.IsRemote = true;
-
-        Net.SendHello(SelectedKart);
-        if (Net.IsHost) Net.SendCourse(SelectedCourse);
+        playerKarts[5] = SelectedKart;
+        // 未割り当ての人間スロットを探す
+        int nextSlot = HumanSlots.FirstOrDefault(s => !playerKarts.ContainsKey(s));
+        if (nextSlot == 0 && playerKarts.ContainsKey(0)) nextSlot = 6;
+        clientSlots[conn] = nextSlot;
+        playerKarts[nextSlot] = 0; // 初期選択
+        Net.SendWelcome(conn, nextSlot, SelectedCourse);
+        SyncLobby();
         if (Audio != null) Audio.Select();
     }
 
-    void ApplyRivalLook()
+    void OnNetHostClientDisconnected(Unity.Networking.Transport.NetworkConnection conn)
     {
-        var d = KartCharacters[rivalKartIdx];
-        rival.ModelVariant = rivalKartIdx;
-        rival.Name = "RIVAL (" + d.name + ")";
-        rival.Color = d.color;
-        rival.RebuildModel();
+        if (clientSlots.TryGetValue(conn, out int slot))
+        {
+            clientSlots.Remove(conn);
+            playerKarts.Remove(slot);
+            MakeAI(Karts[slot], slot);
+            SyncLobby();
+            Banner("PLAYER LEFT", new Color(1f, 0.4f, 0.3f), 0);
+        }
     }
 
-    void OnRivalKart(int sel)
+    void OnNetClientHello(Unity.Networking.Transport.NetworkConnection conn, int kartChar)
     {
-        rivalKartIdx = Mathf.Clamp(sel, 0, KartCharacters.Length - 1);
-        if (Online && rival != null) ApplyRivalLook();
+        if (clientSlots.TryGetValue(conn, out int slot))
+        {
+            playerKarts[slot] = Mathf.Clamp(kartChar, 0, KartCharacters.Length - 1);
+            SyncLobby();
+        }
+    }
+
+    void OnNetClientConnected()
+    {
+        if (TwoPlayer) SetTwoPlayer(false);
+        if (Net.IsHost)
+        {
+            playerKarts[5] = SelectedKart;
+            SyncLobby();
+        }
+        else
+        {
+            Net.SendHello(SelectedKart);
+        }
+        if (Audio != null) Audio.Select();
+    }
+
+    void OnNetWelcome(int assignedSlot, int course)
+    {
+        mySlot = assignedSlot;
+        Player = Karts[mySlot];
+        Player.IsRemote = false;
+        Player.IsPlayer = true;
+        ConfigureHuman(0);
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            if (i != mySlot) Karts[i].IsRemote = true;
+        }
+        if (SelectedCourse != course) LoadCourse(course);
+        Net.SendHello(SelectedKart);
+        if (Audio != null) Audio.Select();
+    }
+
+    void OnNetLobbySync(List<(int slot, int kartChar)> list)
+    {
+        playerKarts.Clear();
+        foreach (var (slot, kartChar) in list)
+        {
+            playerKarts[slot] = kartChar;
+        }
+        ApplyLobbyKarts();
+    }
+
+    void SyncLobby()
+    {
+        playerKarts[5] = SelectedKart;
+        var list = playerKarts.Select(kv => (kv.Key, kv.Value)).ToList();
+        Net.SendLobbySync(list);
+        ApplyLobbyKarts();
+    }
+
+    void ApplyLobbyKarts()
+    {
+        var synced = new HashSet<int>(playerKarts.Keys);
+        foreach (var kv in playerKarts)
+        {
+            int slot = kv.Key;
+            int kIdx = Mathf.Clamp(kv.Value, 0, KartCharacters.Length - 1);
+            var d = KartCharacters[kIdx];
+            var k = Karts[slot];
+            k.ModelVariant = kIdx;
+            k.Color = d.color;
+            k.ApplyStats(d.speed, d.accel, d.handling, d.weight);
+
+            int order = System.Array.IndexOf(HumanSlots, slot);
+            string title = (slot == mySlot)
+                ? $"YOU ({d.name})"
+                : (slot == 5 ? $"P1 HOST ({d.name})" : $"P{order + 1} ({d.name})");
+            k.Name = title;
+            k.RebuildModel();
+
+            if (slot == mySlot)
+            {
+                k.IsPlayer = true;
+                k.IsRemote = false;
+            }
+            else
+            {
+                k.IsPlayer = false;
+                k.IsRemote = true;
+            }
+        }
+
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            if (!synced.Contains(i))
+            {
+                MakeAI(Karts[i], i);
+                Karts[i].IsRemote = !Net.IsHost; // ホストが AI 挙動をシミュレート、クライアントは同期受信
+            }
+        }
     }
 
     void MakeAI(Kart k, int slot)
@@ -345,30 +455,49 @@ public class RaceManager : MonoBehaviour
 
     void OnNetDisconnected()
     {
+        playerKarts.Clear();
+        clientSlots.Clear();
+        mySlot = playerGridSlot;
         foreach (var k in Karts) k.IsRemote = false;
-        if (rival != null) MakeAI(rival, Karts.IndexOf(rival));
-        rival = null;
-        if (state == State.Title) RestoreRoles();
-        else Banner("OPPONENT LEFT", new Color(1f, 0.4f, 0.3f), 0);
+        RestoreRoles();
+        if (state == State.Title)
+        {
+            // タイトル画面のまま
+        }
+        else
+        {
+            ReturnToTitle();
+            Banner("HOST DISCONNECTED", new Color(1f, 0.4f, 0.3f), 0);
+        }
     }
 
-    // クライアントとして入れ替わっていた P1 / P2 スロットを元に戻す
+    // スロット配置をシングルプレイ状態に元に戻す
     void RestoreRoles()
     {
-        var home = Karts[playerGridSlot];
-        if (Player == home) return;
-        MakeAI(Player, Karts.IndexOf(Player));
-        Player = home;
-        home.IsRemote = false;
-        ConfigureHuman(0);
+        playerKarts.Clear();
+        clientSlots.Clear();
+        mySlot = playerGridSlot;
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            if (i == playerGridSlot)
+            {
+                Player = Karts[i];
+                Player.IsRemote = false;
+                ConfigureHuman(0);
+            }
+            else
+            {
+                MakeAI(Karts[i], i);
+            }
+        }
     }
 
     void LeaveOnline()
     {
         netMenu = false;
         Net.Disconnect();
+        RestoreRoles();
         if (state != State.Title) ReturnToTitle();
-        else RestoreRoles();
     }
 
     void ReturnToTitle()
@@ -446,7 +575,18 @@ public class RaceManager : MonoBehaviour
         if (p == 0) SelectedKart = next; else SelectedKart2 = next;
         if (Audio != null) Audio.Select();
         if (HumanKart(p) != null) ConfigureHuman(p);
-        if (p == 0 && Online) Net.SendHello(SelectedKart);
+        if (p == 0 && Online)
+        {
+            if (Net.IsHost)
+            {
+                playerKarts[mySlot] = SelectedKart;
+                SyncLobby();
+            }
+            else
+            {
+                Net.SendHello(SelectedKart);
+            }
+        }
     }
 
     void GridSlot(int slot, out int index, out float lateral)
@@ -487,8 +627,7 @@ public class RaceManager : MonoBehaviour
             bannerTimes[p] = 99f;
         }
         lastCountdownBeep = -1;
-        Audio.SetMusicTempo(1f);
-        Audio.SetMusicVolume(0.3f);
+        Audio.RestartMusic(SelectedCourse);
     }
 
     // ───────────────────────── Loop ─────────────────────────
@@ -518,20 +657,32 @@ public class RaceManager : MonoBehaviour
         }
         if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
 
-        if (Input.GetKeyDown(KeyCode.Escape) && (netMenu || Net.Busy))
+        if (Input.GetKeyDown(KeyCode.Escape) && netMenu)
         {
-            LeaveOnline(); // オンライン中は一時停止できない。ESC で切断してタイトルへ戻る
+            netMenu = false;
         }
-        else if (Input.GetKeyDown(KeyCode.Escape) && state != State.Title)
+        else if (Input.GetKeyDown(KeyCode.Escape) && Net.Busy && state == State.Title)
         {
-            paused = !paused;
-            Time.timeScale = paused ? 0f : 1f;
-            AudioListener.pause = paused;
+            LeaveOnline();
+        }
+        else if ((Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.JoystickButton7)) && state != State.Title)
+        {
+            if (Online)
+            {
+                LeaveOnline();
+            }
+            else
+            {
+                paused = !paused;
+                Time.timeScale = paused ? 0f : 1f;
+                AudioListener.pause = paused;
+            }
         }
         if (paused)
         {
-            if (Input.GetKeyDown(KeyCode.Q)) Application.Quit();
-            if (Input.GetKeyDown(KeyCode.R)) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); }
+            if (Input.GetKeyDown(KeyCode.Q) || Input.GetKeyDown(KeyCode.JoystickButton6)) Application.Quit();
+            if (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.JoystickButton2)) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); }
+            if (Input.GetKeyDown(KeyCode.T) || Input.GetKeyDown(KeyCode.JoystickButton3)) { ReturnToTitle(); return; }
             return;
         }
 
@@ -540,22 +691,41 @@ public class RaceManager : MonoBehaviour
         bannerTimes[0] += dt;
         bannerTimes[1] += dt;
 
-        bool enter = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.JoystickButton7);
+        bool enter = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) 
+                  || Input.GetKeyDown(KeyCode.JoystickButton7) || Input.GetKeyDown(KeyCode.JoystickButton0);
         switch (state)
         {
             case State.Title:
                 if (netMenu) break; // オンライン画面の入力中はタイトルのショートカットを無効にする
-                if (Input.GetKeyDown(KeyCode.O) && !Net.Busy)
+                float vAxis = Input.GetAxisRaw("Vertical");
+                stickNavTimer -= dt;
+                bool stickUp = false;
+                bool stickDown = false;
+                if (Mathf.Abs(vAxis) > 0.6f)
+                {
+                    if (stickNavTimer <= 0f)
+                    {
+                        if (vAxis > 0.6f) stickUp = true;
+                        else if (vAxis < -0.6f) stickDown = true;
+                        stickNavTimer = 0.25f;
+                    }
+                }
+                else if (Mathf.Abs(vAxis) < 0.2f)
+                {
+                    stickNavTimer = 0f;
+                }
+
+                if ((Input.GetKeyDown(KeyCode.O) || Input.GetKeyDown(KeyCode.JoystickButton2)) && !Net.Busy)
                     { netMenu = true; break; }
-                if (Input.GetKeyDown(KeyCode.Tab) && !Net.Busy)
+                if ((Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.JoystickButton3)) && !Net.Busy)
                     SetTwoPlayer(!TwoPlayer);
-                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.JoystickButton4))
                     SwitchCourse(-1);
-                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.JoystickButton5))
                     SwitchCourse(1);
-                else if (Input.GetKeyDown(KeyCode.W) || (!TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow)))
+                else if (Input.GetKeyDown(KeyCode.W) || stickUp || (!TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow)))
                     SwitchKart(0, -1);
-                else if (Input.GetKeyDown(KeyCode.S) || (!TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow)))
+                else if (Input.GetKeyDown(KeyCode.S) || stickDown || (!TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow)))
                     SwitchKart(0, 1);
                 else if (TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
                     SwitchKart(1, -1);
@@ -582,10 +752,38 @@ public class RaceManager : MonoBehaviour
                 break;
             case State.Racing:
                 raceTime += dt;
+                if (Online)
+                {
+                    if (firstFinishTime < 0f)
+                    {
+                        if (Player.Finished || playerKarts.Keys.Any(s => s >= 0 && s < Karts.Count && Karts[s].Finished))
+                            firstFinishTime = Time.time;
+                    }
+                    else if (Time.time - firstFinishTime > 25f)
+                    {
+                        state = State.Results;
+                        finishAt = Time.time;
+                        Audio.SetMusicVolume(0.15f);
+                    }
+                }
+                if (AllHumansFinished())
+                {
+                    state = State.Results;
+                    finishAt = Time.time;
+                    Audio.SetMusicVolume(0.15f);
+                }
                 break;
             case State.Results:
                 raceTime += dt;
-                if (Time.time > finishAt + 2.5f && enter) StartRaceFromTitle();
+                if (Time.time > finishAt + 2.5f)
+                {
+                    if (enter || Input.GetKeyDown(KeyCode.JoystickButton0)) StartRaceFromTitle();
+                    else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.T) || Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.JoystickButton1) || Input.GetKeyDown(KeyCode.JoystickButton3))
+                    {
+                        if (Online) LeaveOnline();
+                        else ReturnToTitle();
+                    }
+                }
                 break;
         }
 
@@ -608,7 +806,14 @@ public class RaceManager : MonoBehaviour
             Net.SendStates(sendBuf);
         }
 
-        Audio.SetEngine(Player.Speed / Kart.MaxSpeed, state != State.Title, Player.Drifting && canDrive);
+        float engSpeed = Mathf.Abs(Player.Speed);
+        bool anyDrift = Player.Drifting;
+        if (TwoPlayer && Player2 != null)
+        {
+            engSpeed = Mathf.Max(engSpeed, Mathf.Abs(Player2.Speed));
+            anyDrift = anyDrift || Player2.Drifting;
+        }
+        Audio.SetEngine(engSpeed / Kart.MaxSpeed, state != State.Title, anyDrift && canDrive);
         shake = Mathf.MoveTowards(shake, 0, dt * 2.5f);
     }
 
@@ -628,6 +833,7 @@ public class RaceManager : MonoBehaviour
     {
         if (!Online) RestoreRoles();
         ResetRace();
+        firstFinishTime = -1f;
         state = State.Countdown;
         stateTime = 0;
     }
@@ -643,12 +849,12 @@ public class RaceManager : MonoBehaviour
                 Audio.Finish();
                 Banner("FINISH!", Color.white, k.PlayerIndex);
                 RecordLap(k.PlayerIndex);
-                if (AllHumansFinished())
-                {
-                    state = State.Results;
-                    finishAt = Time.time;
-                    Audio.SetMusicVolume(0.15f);
-                }
+            }
+            if (AllHumansFinished())
+            {
+                state = State.Results;
+                finishAt = Time.time;
+                Audio.SetMusicVolume(0.15f);
             }
             return;
         }
@@ -696,6 +902,7 @@ public class RaceManager : MonoBehaviour
         for (int j = i + 1; j < Karts.Count; j++)
         {
             var a = Karts[i]; var b = Karts[j];
+            if (Mathf.Abs(a.transform.position.y - b.transform.position.y) > 2.0f) continue;
             var d = a.transform.position - b.transform.position;
             d.y = 0;
             float m = d.magnitude, min = Kart.Radius * 2f;
@@ -725,6 +932,7 @@ public class RaceManager : MonoBehaviour
             if (!box.Active) continue;
             foreach (var k in Karts)
             {
+                if (Mathf.Abs(k.transform.position.y - box.transform.position.y) > 2.2f) continue;
                 var d = k.transform.position - box.transform.position;
                 d.y = 0;
                 if (d.magnitude > 2.2f) continue;
@@ -745,6 +953,7 @@ public class RaceManager : MonoBehaviour
             {
                 if (k.IsRemote) continue; // 当たり判定は持ち主側で行う
                 if (k == b.Owner && !b.Armed) continue;
+                if (Mathf.Abs(k.transform.position.y - b.transform.position.y) > 2.0f) continue;
                 var d = k.transform.position - b.transform.position;
                 d.y = 0;
                 if (d.magnitude > 1.5f) continue;
@@ -986,36 +1195,71 @@ public class RaceManager : MonoBehaviour
             GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
             Outlined(new Rect(0, h * 0.35f, w, 100), "PAUSED", sBig, Color.white);
-            Outlined(new Rect(0, h * 0.52f, w, 40), "ESC : Resume     R : Restart     Q : Quit", sSmall, Color.white);
+            Outlined(new Rect(0, h * 0.52f, w, 40), "ESC / START : Resume     R [X] : Restart     T [Y] : Title     Q [BACK] : Quit", sSmall, Color.white);
         }
     }
 
     void DrawNetMenu(float w, float h)
     {
-        var r = new Rect(w / 2 - 290, 110, 580, 470);
+        var r = new Rect(w / 2 - 290, 100, 580, 510);
         GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.97f);
         GUI.DrawTexture(r, Texture2D.whiteTexture);
         GUI.color = Color.white;
         DrawFrame(r, 3, new Color(1f, 0.85f, 0.25f));
-        Outlined(new Rect(r.x, r.y + 8, r.width, 50), "ONLINE BATTLE", St(sMid, 34), new Color(1f, 0.85f, 0.25f), 2);
-        float x = r.x + 30, cw = r.width - 60, y = r.y + 70;
+        Outlined(new Rect(r.x, r.y + 8, r.width, 50), "ONLINE MULTIPLAYER", St(sMid, 34), new Color(1f, 0.85f, 0.25f), 2);
+        float x = r.x + 30, cw = r.width - 60, y = r.y + 65;
         var info = St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.85f, 0.9f, 1f));
 
         if (Net.Busy)
         {
-            GUI.Label(new Rect(x, y, cw, 30), Net.IsHost ? "HOSTING" : "JOINING", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.Bold, false, Color.white));
+            GUI.Label(new Rect(x, y, cw, 28), Net.IsHost ? "HOST LOBBY" : "CONNECTED TO LOBBY", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.Bold, false, Color.white));
+            y += 32;
             if (!string.IsNullOrEmpty(Net.JoinCode))
             {
-                GUI.Label(new Rect(x, y + 50, cw, 24), "Tell your friend this ROOM CODE:", info);
-                Outlined(new Rect(x, y + 80, cw, 80), Net.JoinCode, St(sBig, 64), new Color(0.4f, 1f, 0.6f), 3);
+                GUI.Label(new Rect(x, y, cw, 22), "Share this ROOM CODE with your friends (up to 8 players):", info);
+                y += 24;
+                Outlined(new Rect(x, y, cw, 60), Net.JoinCode, St(sBig, 56), new Color(0.4f, 1f, 0.6f), 3);
+                y += 66;
             }
-            GUI.Label(new Rect(x, y + 190, cw, 60), Net.Message, info);
-            if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 70, 200, 42), "CANCEL", sButton)) Net.Disconnect();
+
+            int count = OnlinePlayerCount;
+            GUI.Label(new Rect(x, y, cw, 24), $"PLAYERS IN LOBBY ({count} / 8):", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(1f, 0.85f, 0.2f)));
+            y += 26;
+
+            int slotIdx = 0;
+            foreach (var slot in HumanSlots)
+            {
+                if (playerKarts.TryGetValue(slot, out int charIdx))
+                {
+                    var d = KartCharacters[charIdx];
+                    string pTag = (slot == mySlot) ? "YOU" : (slot == 5 ? "HOST" : $"P{slotIdx + 1}");
+                    string line = $"  • [{pTag}] {d.name} ({d.driver}) - {d.trait}";
+                    GUI.Label(new Rect(x, y, cw, 22), line, St(sSmall, 14, TextAnchor.MiddleLeft, FontStyle.Normal, false, (slot == mySlot) ? new Color(0.4f, 1f, 0.6f) : Color.white));
+                    y += 22;
+                }
+                slotIdx++;
+            }
+
+            if (Net.IsHost)
+            {
+                if (GUI.Button(new Rect(x + cw / 2 - 130, r.yMax - 110, 260, 44), "START RACE  [ENTER]", sButton))
+                {
+                    netMenu = false;
+                    StartRaceFromTitle();
+                }
+            }
+            else
+            {
+                GUI.Label(new Rect(x, r.yMax - 105, cw, 30), "Waiting for host to start the race...", info);
+            }
+
+            if (GUI.Button(new Rect(x + 20, r.yMax - 56, 200, 38), "CLOSE  [ESC]", sButton)) netMenu = false;
+            if (GUI.Button(new Rect(x + cw - 220, r.yMax - 56, 200, 38), "LEAVE ROOM", sButton)) LeaveOnline();
             return;
         }
 
         // インターネット経由（Unity Relay）
-        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
+        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
         if (GUI.Button(new Rect(x, y + 32, 250, 40), "HOST ROOM", sButton)) Net.HostRelay();
         joinCodeInput = GUI.TextField(new Rect(x + 270, y + 32, 120, 40), joinCodeInput, 8, sField).ToUpperInvariant();
         if (GUI.Button(new Rect(x + 400, y + 32, cw - 400, 40), "JOIN", sButton)) Net.JoinRelay(joinCodeInput);
@@ -1029,8 +1273,8 @@ public class RaceManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(Net.Message))
             GUI.Label(new Rect(x, y + 90, cw, 50), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(1f, 0.5f, 0.4f)));
-        GUI.Label(new Rect(x, r.yMax - 120, cw, 48), "Host picks the course and starts the race. 1-vs-1 online, CPU karts fill the grid.", info);
-        if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 62, 200, 40), "CLOSE  [ESC]", sButton)) netMenu = false;
+        GUI.Label(new Rect(x, r.yMax - 110, cw, 48), "Host picks the course and starts the race. Up to 8 players, CPU karts fill empty slots.", info);
+        if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 54, 200, 40), "CLOSE  [ESC]", sButton)) netMenu = false;
     }
 
     // 1P は全画面、2P は左右それぞれのビューにクリップして HUD・バナー・ビネットを描く
@@ -1122,44 +1366,70 @@ public class RaceManager : MonoBehaviour
         DrawPopCard(new Rect(rightX, cardY, cardW, cardH));
         DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, TwoPlayer ? "◄ P1 DRIVER [W][S] ►" : "◄ DRIVER & KART [W][S] ►");
 
-        var curChar = KartCharacters[SelectedKart];
-        var charTitleStyle = St(sSmall, 23, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
-        Outlined(new Rect(rightX + 8, cardY + 48, cardW - 16, 30), $"< {curChar.name} >", charTitleStyle, curChar.color, 2);
-
-        var driverNickStyle = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.22f, 0.26f, 0.38f));
-        GUI.Label(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle);
-
-        DrawPopPill(new Rect(rightX + 22, cardY + 106, cardW - 44, 24), curChar.trait, curChar.color * 0.9f);
-
-        // 4項目ポップキャンディステータスゲージ
-        float statStartY = cardY + 146f;
-        DrawToonStatGauge(rightX + 22, statStartY + 0, cardW - 44, "SPEED", curChar.speed, 8, new Color(0.08f, 0.72f, 0.98f));
-        DrawToonStatGauge(rightX + 22, statStartY + 42, cardW - 44, "ACCEL", curChar.accel, 8, new Color(1f, 0.72f, 0.05f));
-        DrawToonStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.25f, 0.85f, 0.35f));
-        DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
-
-        var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
-        GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), TwoPlayer ? "P1: [W][S]   P2: [UP][DOWN]" : "Press [W][S] to switch machine", switchGuide);
-
-        // 2P：P2 のマシン選択
-        if (TwoPlayer)
+        if (!TwoPlayer)
         {
+            var curChar = KartCharacters[SelectedKart];
+            var charTitleStyle = St(sSmall, 23, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
+            Outlined(new Rect(rightX + 8, cardY + 48, cardW - 16, 30), $"< {curChar.name} >", charTitleStyle, curChar.color, 2);
+
+            var driverNickStyle = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.22f, 0.26f, 0.38f));
+            GUI.Label(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle);
+
+            DrawPopPill(new Rect(rightX + 22, cardY + 106, cardW - 44, 24), curChar.trait, curChar.color * 0.9f);
+
+            // 4項目ポップキャンディステータスゲージ
+            float statStartY = cardY + 146f;
+            DrawToonStatGauge(rightX + 22, statStartY + 0, cardW - 44, "SPEED", curChar.speed, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, statStartY + 42, cardW - 44, "ACCEL", curChar.accel, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
+
+            var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
+            GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "Press [W][S] to switch machine", switchGuide);
+        }
+        else
+        {
+            // 2P: P1 & P2 の両方の情報をすっきり分割表示
+            var c1 = KartCharacters[SelectedKart];
+            Outlined(new Rect(rightX + 8, cardY + 44, cardW - 16, 26), $"P1: < {c1.name} >", St(sSmall, 19, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c1.color, 2);
+            DrawPopPill(new Rect(rightX + 22, cardY + 72, cardW - 44, 20), c1.trait, c1.color * 0.9f);
+            float s1Y = cardY + 98f;
+            DrawToonStatGauge(rightX + 22, s1Y + 0, cardW - 44, "SPD", c1.speed, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, s1Y + 20, cardW - 44, "ACC", c1.accel, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, s1Y + 40, cardW - 44, "STR", c1.handling, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, s1Y + 60, cardW - 44, "WGT", c1.weight, 8, new Color(1f, 0.32f, 0.38f));
+
             var c2 = KartCharacters[SelectedKart2];
-            Outlined(new Rect(rightX + 8, cardY + 296, cardW - 16, 28), $"P2  < {c2.name} >", St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c2.color, 2);
-            DrawPopPill(new Rect(rightX + 22, cardY + 328, cardW - 44, 24), c2.trait, c2.color * 0.9f);
+            Outlined(new Rect(rightX + 8, cardY + 194, cardW - 16, 26), $"P2: < {c2.name} >", St(sSmall, 19, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c2.color, 2);
+            DrawPopPill(new Rect(rightX + 22, cardY + 222, cardW - 44, 20), c2.trait, c2.color * 0.9f);
+            float s2Y = cardY + 248f;
+            DrawToonStatGauge(rightX + 22, s2Y + 0, cardW - 44, "SPD", c2.speed, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, s2Y + 20, cardW - 44, "ACC", c2.accel, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, s2Y + 40, cardW - 44, "STR", c2.handling, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, s2Y + 60, cardW - 44, "WGT", c2.weight, 8, new Color(1f, 0.32f, 0.38f));
+
+            var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
+            GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "P1: [W][S]   •   P2: [UP][DOWN]", switchGuide);
         }
 
         // プレイ人数の切り替え
         var modeBg = TwoPlayer ? new Color(0.95f, 0.3f, 0.5f) : new Color(0.18f, 0.52f, 0.88f);
         if (Online)
-            DrawPopPill(new Rect((w - 340) * 0.5f, 556f, 340, 28), Net.IsHost ? "ONLINE  VS  RIVAL  (YOU = HOST)" : "ONLINE  VS  RIVAL  (HOST DECIDES START)", new Color(0.18f, 0.7f, 0.4f));
+        {
+            string codeStr = string.IsNullOrEmpty(Net.JoinCode) ? "" : $"  |  CODE: {Net.JoinCode}";
+            string statusStr = Net.IsHost
+                ? $"ONLINE ({OnlinePlayerCount}/8 PLAYERS{codeStr})  -  YOU = HOST [ENTER TO RACE]"
+                : $"ONLINE ({OnlinePlayerCount}/8 PLAYERS{codeStr})  -  HOST DECIDES START";
+            DrawPopPill(new Rect((w - 560) * 0.5f, 556f, 560, 28), statusStr, new Color(0.18f, 0.7f, 0.4f));
+        }
         else
             DrawPopPill(new Rect((w - 300) * 0.5f, 556f, 300, 28), TwoPlayer ? "[TAB]  2 PLAYERS  (SPLIT SCREEN)" : "[TAB]  1 PLAYER", modeBg);
 
 
         // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
         float pulse = (Mathf.Sin(t * 6f) + 1f) * 0.5f;
-        float btnW = 440f + pulse * 10f;
+        float maxAvailableBtnW = Mathf.Max(260f, w - (cardW + 35f) * 2f - 20f);
+        float btnW = Mathf.Min(440f + pulse * 10f, maxAvailableBtnW);
         float btnH = 50f + pulse * 4f;
         float btnX = (w - btnW) * 0.5f;
         float btnY = 598f - pulse * 2f;
@@ -1188,8 +1458,8 @@ public class RaceManager : MonoBehaviour
 
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = TwoPlayer
-            ? "P1: [WASD] [SPACE] drift [E] item   •   P2: [ARROWS] [R-SHIFT] drift [R-CTRL] item   •   [TAB] 1P/2P   •   [ESC] Pause"
-            : "[W][S] Driver   •   [A][D] Track   •   [SPACE] Drift / Hop   •   [E] Item   •   [TAB] 2P Battle   •   [O] Online   •   [ESC] Pause";
+            ? "P1: [WASD] [SPACE] drift [E/LB] item  •  P2: [ARROWS] [R-SHIFT] drift [R-CTRL] item  •  [TAB/Y] 1P/2P  •  [ESC/START] Pause"
+            : "[W][S] Driver  •  [A][D/LB/RB] Track  •  [SPACE/RB] Drift  •  [E/LB/X] Item  •  [TAB/Y] 2P  •  [O/X] Net  •  [ESC/START] Pause";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 
@@ -1381,7 +1651,7 @@ public class RaceManager : MonoBehaviour
         DrawFrame(panel, 3, new Color(1f, 0.85f, 0.2f));
         string head = "RESULTS";
         if (TwoPlayer) head = Player.Place < Player2.Place ? "P1 WINS!" : "P2 WINS!";
-        else if (Online && rival != null) head = Player.Place < rival.Place ? "YOU WIN!" : "YOU LOSE...";
+        else if (Online) head = Player.Place == 1 ? "YOU WIN!" : $"{Ordinal(Player.Place)} PLACE";
         Outlined(new Rect(panel.x, panel.y + 10, panel.width, 60), head, sMid, new Color(1f, 0.85f, 0.2f));
 
         var order = placeOrder;
@@ -1391,7 +1661,7 @@ public class RaceManager : MonoBehaviour
         {
             var k = order[i];
             var row = new Rect(panel.x + 30, panel.y + 80 + i * 44, panel.width - 60, 40);
-            if (k.IsPlayer || (Online && k == rival))
+            if (k.IsPlayer || (Online && playerKarts.ContainsKey(Karts.IndexOf(k))))
             {
                 GUI.color = new Color(1f, 1f, 1f, 0.18f);
                 GUI.DrawTexture(row, Texture2D.whiteTexture);
@@ -1405,7 +1675,7 @@ public class RaceManager : MonoBehaviour
             Outlined(new Rect(row.x, row.y, row.width - 10, 40), k.Finished ? FormatTime(k.FinishTime) : "--:--.--", rightS, Color.white, 1);
         }
         if (Mathf.Repeat(Time.time, 1.1f) < 0.75f)
-            Outlined(new Rect(0, panel.yMax + 20, w, 50), "PRESS ENTER TO RACE AGAIN", St(sMid, 30), Color.white);
+            Outlined(new Rect(0, panel.yMax + 18, w, 40), "ENTER [A] : Race Again       ESC / T [B] : Title", St(sMid, 23), Color.white);
     }
 
     static string Ordinal(int n) => n + (n == 1 ? "st" : n == 2 ? "nd" : n == 3 ? "rd" : "th");

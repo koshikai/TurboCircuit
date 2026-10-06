@@ -90,7 +90,24 @@ public class RaceAudio : MonoBehaviour
         var clip = bgm[Mathf.Clamp(course, 0, bgm.Length - 1)];
         if (music.clip == clip) return;
         music.clip = clip;
+        music.time = 0;
         music.Play();
+    }
+
+    public void RestartMusic(int course = -1)
+    {
+        if (course >= 0)
+        {
+            var clip = bgm[Mathf.Clamp(course, 0, bgm.Length - 1)];
+            music.clip = clip;
+        }
+        if (music != null && music.clip != null)
+        {
+            music.time = 0;
+            music.pitch = 1f;
+            music.volume = 0.3f * MusicGain;
+            music.Play();
+        }
     }
 
     AudioSource Loop(AudioClip clip, float vol)
