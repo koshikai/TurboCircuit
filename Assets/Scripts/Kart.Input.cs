@@ -5,7 +5,7 @@ public partial class Kart
 {
     // ───────────────────────── 入力 ─────────────────────────
 
-    KartInput PlayerInput()
+    public KartInput PlayerInput()
     {
         var inp = new KartInput();
         if (rm.TwoPlayer) return SplitScreenInput(inp);
@@ -51,4 +51,29 @@ public partial class Kart
         }
         return inp;
     }
+}
+
+// カートの入力供給インターフェース（責務分離: 単一責任の原則）
+public interface IKartInputProvider
+{
+    KartInput GetInput(Kart kart, float dt);
+}
+
+// 人間プレイヤーの入力プロバイダー（キーボード / ゲームパッド）
+public class PlayerInputProvider : IKartInputProvider
+{
+    public KartInput GetInput(Kart kart, float dt) => kart.PlayerInput();
+}
+
+// AI (CPU) の自動運転入力プロバイダー（Stanley制御 / MPC予測）
+public class AIInputProvider : IKartInputProvider
+{
+    public KartInput GetInput(Kart kart, float dt) => kart.AIInput(dt);
+}
+
+// リプレイやゴーストカー用の再生プロバイダー（将来の拡張用）
+public class GhostInputProvider : IKartInputProvider
+{
+    public KartInput RecordedInput;
+    public KartInput GetInput(Kart kart, float dt) => RecordedInput;
 }

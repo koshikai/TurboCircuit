@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: Course_03_NEON_METROPOLIS
+  m_EditorClassIdentifier: Assembly-CSharp::CourseData
+  courseName: NEON METROPOLIS
+  description: Dusk city dash through skyscraper canyons, an elevated expressway, and tunnels straight through the buildings.
+  controlPoints:
+  - {x: 0, y: 0, z: -140}
+  - {x: 110, y: 0, z: -140}
+  - {x: 190, y: 1, z: -130}
+  - {x: 235, y: 2, z: -70}
+  - {x: 235, y: 4, z: 10}
+  - {x: 215, y: 10, z: 70}
+  - {x: 150, y: 13, z: 105}
+  - {x: 60, y: 13, z: 110}
+  - {x: -10, y: 9, z: 120}
+  - {x: -70, y: 3, z: 150}
+  - {x: -130, y: 1, z: 170}
+  - {x: -190, y: 0, z: 130}
+  - {x: -215, y: 0, z: 60}
+  - {x: -175, y: 0, z: 0}
+  - {x: -100, y: 0, z: -20}
+  - {x: -70, y: 0, z: -70}
+  - {x: -100, y: 0, z: -130}
+  ramps:
+  - Ratio: 0.43
+    Power: 15
+  tunnels:
+  - Start: 0.555
+    End: 0.64
+  - Start: 0.775
+    End: 0.865
+  skyTint: {r: 0.38, g: 0.28, b: 0.65, a: 1}
+  groundColor: {r: 0.16, g: 0.13, b: 0.28, a: 1}
+  sunColor: {r: 1, g: 0.62, b: 0.45, a: 1}
+  sunIntensity: 1.05
+  sunRotation: {x: 18, y: -50, z: 0}
+  fogColor: {r: 0.46, g: 0.34, b: 0.62, a: 1}
+  fogDistance: 650
+  roadColor: {r: 0.2, g: 0.2, b: 0.24, a: 1}
+  curbColorA: {r: 1, g: 0.2, b: 0.6, a: 1}
+  curbColorB: {r: 0.1, g: 0.9, b: 1, a: 1}
+  wallColorA: {r: 0.12, g: 0.14, b: 0.3, a: 1}
+  wallColorB: {r: 0.55, g: 0.6, b: 0.75, a: 1}
+  shoulderColor: {r: 0.5, g: 0.52, b: 0.6, a: 1}
+  sceneryTheme: 3

@@ -1,18 +1,22 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
+[System.Serializable]
 public struct JumpRampDef
 {
     public float Ratio; // 0.0 ~ 1.0 (コースの進行度)
     public float Power; // 射出上向き速度 (例: 14f)
 }
 
+[System.Serializable]
 public struct TunnelDef
 {
     public float Start; // 0.0 ~ 1.0 (コースの進行度)
     public float End;
 }
 
+[System.Serializable]
 public struct TrackDef
 {
     public TunnelDef[] Tunnels; // ビルを貫通する屋根付き区間
@@ -45,7 +49,7 @@ public partial class Track : MonoBehaviour
     public const float WallOffset = 15f;
     const float Spacing = 2f;
 
-    public static readonly TrackDef[] Courses =
+    public static readonly TrackDef[] DefaultCourses =
     {
         // 1. Turbo Circuit - 緩やかな丘陵と高架橋立体交差、終盤のビッグジャンプ
         new TrackDef
@@ -218,6 +222,28 @@ public partial class Track : MonoBehaviour
         }
     };
 
+    static TrackDef[] runtimeCourses;
+    public static TrackDef[] Courses
+    {
+        get
+        {
+            if (runtimeCourses == null)
+            {
+                var loaded = Resources.LoadAll<CourseData>("Data/Courses");
+                if (loaded != null && loaded.Length > 0)
+                {
+                    System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
+                    runtimeCourses = loaded.Select(c => c.ToDef()).ToArray();
+                }
+                else
+                {
+                    runtimeCourses = DefaultCourses;
+                }
+            }
+            return runtimeCourses;
+        }
+    }
+
     public int ActiveCourseIndex { get; private set; }
     public Vector3[] Pts { get; private set; }
     public Vector3[] Dirs { get; private set; }
@@ -379,4 +405,66 @@ public class Bouncer : MonoBehaviour
     float phase; Vector3 basePos;
     public void Init(float p) { phase = p; basePos = transform.position; }
     void Update() => transform.position = basePos + Vector3.up * Mathf.Abs(Mathf.Sin(Time.time * 5f + phase)) * 0.35f;
+}
+
+// コース定義の ScriptableObject
+[CreateAssetMenu(fileName = "NewCourseData", menuName = "Turbo Circuit/Course Data")]
+public class CourseData : ScriptableObject
+{
+    [Header("Information")]
+    public string courseName = "TURBO CIRCUIT";
+    [TextArea(2, 4)]
+    public string description = "Grand Prix circuit with sweeping hills and flyover bridge.";
+
+    [Header("Geometry")]
+    public Vector3[] controlPoints;
+    public JumpRampDef[] ramps;
+    public TunnelDef[] tunnels;
+
+    [Header("Environment & Lighting")]
+    public Color skyTint = new Color(0.45f, 0.6f, 1f);
+    public Color groundColor = new Color(0.45f, 0.55f, 0.4f);
+    public Color sunColor = new Color(1f, 0.96f, 0.88f);
+    public float sunIntensity = 1.25f;
+    public Vector3 sunRotation = new Vector3(48f, -35f, 0f);
+    public Color fogColor = new Color(0.72f, 0.82f, 0.95f);
+    public float fogDistance = 900f;
+
+    [Header("Materials & Colors")]
+    public Color roadColor = new Color(0.28f, 0.28f, 0.29f);
+    public Color curbColorA = new Color(0.9f, 0.1f, 0.1f);
+    public Color curbColorB = Color.white;
+    public Color wallColorA = new Color(0.15f, 0.35f, 0.95f);
+    public Color wallColorB = Color.white;
+    public Color shoulderColor = new Color(0.85f, 0.75f, 0.55f);
+
+    [Header("Theme (0=Circuit, 1=Desert, 2=Snow, 3=City)")]
+    [Range(0, 3)]
+    public int sceneryTheme = 0;
+
+    public TrackDef ToDef()
+    {
+        return new TrackDef
+        {
+            Name = courseName,
+            Description = description,
+            Control = controlPoints,
+            Ramps = ramps,
+            Tunnels = tunnels,
+            SkyTint = skyTint,
+            GroundColor = groundColor,
+            SunColor = sunColor,
+            SunIntensity = sunIntensity,
+            SunRotation = sunRotation,
+            FogColor = fogColor,
+            FogDistance = fogDistance,
+            RoadColor = roadColor,
+            CurbColorA = curbColorA,
+            CurbColorB = curbColorB,
+            WallColorA = wallColorA,
+            WallColorB = wallColorB,
+            ShoulderColor = shoulderColor,
+            SceneryTheme = sceneryTheme
+        };
+    }
 }

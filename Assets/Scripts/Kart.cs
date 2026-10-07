@@ -24,6 +24,7 @@ public partial class Kart : MonoBehaviour
     public int PlayerIndex;     // 人間操作時の識別（0 = P1、1 = P2）
     public bool IsRemote;       // オンライン対戦で相手側が計算しているカート（受信した状態を再現するだけ）
     public int ModelVariant = -1; // 人間操作時に使うキャラのモデル番号（-1 = 自動）
+    public IKartInputProvider InputProvider { get; set; }
 
     // レース状況
     public int Index;
@@ -41,6 +42,7 @@ public partial class Kart : MonoBehaviour
     public ItemType Item;
     public float RouletteTimer;
     public bool Drifting => drifting;
+    public float DriftCharge => driftCharge;
     public int DriftLevel => driftCharge >= 2.6f ? 3 : driftCharge >= 1.6f ? 2 : driftCharge >= 0.8f ? 1 : 0;
     public bool Boosting => boostTimer > 0;
     public bool Shielded => shieldTimer > 0;
@@ -148,7 +150,9 @@ public partial class Kart : MonoBehaviour
     public void Tick(float dt, bool canDrive)
     {
         if (IsRemote) { RemoteTick(dt); return; }
-        var inp = (IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt);
+        var inp = InputProvider != null 
+            ? InputProvider.GetInput(this, dt) 
+            : ((IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt));
 
         if (IsPlayer && !rm.Demo)
         {
@@ -259,7 +263,7 @@ public partial class Kart : MonoBehaviour
                 if (impact > 0.25f && Speed > 8f)
                 {
                     Fx.Burst(transform.position + outward * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
-                    if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.3f); }
+                    if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.3f); GamepadHaptics.Vibrate(PlayerIndex, 0.75f, 0.25f, 0.2f); }
                 }
             }
         }
@@ -271,7 +275,7 @@ public partial class Kart : MonoBehaviour
             if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral - pad.lateral) < 2.4f && boostTimer < 0.8f)
             {
                 Boost(1.1f);
-                if (IsPlayer) rm.Audio.Boost();
+                if (IsPlayer) { rm.Audio.Boost(); GamepadHaptics.Vibrate(PlayerIndex, 0.2f, 0.85f, 0.25f); }
             }
         }
 
@@ -310,7 +314,7 @@ public partial class Kart : MonoBehaviour
                 airTrickSpin = 0;
                 Boost(0.65f); // 着地ミニターボ！
                 Fx.Smoke(curPos, -Forward * 3f + Vector3.up * 1.5f, new Color(0.9f, 0.9f, 0.95f, 0.6f), 1.2f, 0.5f, 3);
-                if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.45f); }
+                if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.45f); GamepadHaptics.Vibrate(PlayerIndex, 0.55f, 0.2f, 0.15f); }
             }
             transform.position = curPos;
         }
@@ -339,6 +343,7 @@ public partial class Kart : MonoBehaviour
             {
                 rm.Shake(0.5f);
                 rm.Audio.Bump();
+                GamepadHaptics.Vibrate(PlayerIndex, 0.8f, 0.4f, 0.3f);
             }
             Fx.Burst(curPos, new Color(0.3f, 0.8f, 1f), 18, 6f, 0.4f);
         }
@@ -351,6 +356,8 @@ public partial class Kart : MonoBehaviour
             skidTrails[1].emitting = skidding;
         }
 
+        if (IsPlayer) GamepadHaptics.SetDrift(PlayerIndex, drifting ? DriftLevel : 0);
+
         Effects(dt);
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
     }
@@ -360,10 +367,19 @@ public partial class Kart : MonoBehaviour
         int lv = DriftLevel;
         drifting = false;
         driftCharge = 0;
-        if (lv > 0)
+        if (IsPlayer)
+        {
+            GamepadHaptics.SetDrift(PlayerIndex, 0);
+            if (lv > 0)
+            {
+                Boost(0.35f + 0.35f * lv);
+                rm.Audio.Pop(lv);
+                GamepadHaptics.Vibrate(PlayerIndex, 0.25f, 0.65f + 0.12f * lv, 0.25f);
+            }
+        }
+        else if (lv > 0)
         {
             Boost(0.35f + 0.35f * lv);
-            if (IsPlayer) rm.Audio.Pop(lv);
         }
     }
 
@@ -401,12 +417,14 @@ public partial class Kart : MonoBehaviour
                 Boost(1.5f);
                 rm.Audio.Boost();
                 rm.Banner("ROCKET START!", new Color(1f, 0.85f, 0.2f), PlayerIndex);
+                GamepadHaptics.Vibrate(PlayerIndex, 0.4f, 1.0f, 0.45f);
             }
             else if (held > 0.85f && held <= 1.2f)
             {
                 Boost(0.8f);
                 rm.Audio.Boost();
                 rm.Banner("GOOD START!", new Color(0.4f, 0.9f, 1f), PlayerIndex);
+                GamepadHaptics.Vibrate(PlayerIndex, 0.25f, 0.65f, 0.3f);
             }
             else if (held > 1.2f)
             {
@@ -415,6 +433,7 @@ public partial class Kart : MonoBehaviour
                 Speed = -1.5f;
                 rm.Audio.Bump();
                 rm.Banner("BURNOUT!", new Color(1f, 0.3f, 0.2f), PlayerIndex);
+                GamepadHaptics.Vibrate(PlayerIndex, 0.85f, 0.15f, 0.5f);
                 Fx.Burst(transform.position, new Color(0.2f, 0.2f, 0.2f), 24, 7f, 0.6f);
                 Fx.Smoke(transform.position, Vector3.up * 2f, new Color(0.3f, 0.3f, 0.3f, 0.9f), 1.8f, 1f, 6);
             }
@@ -432,7 +451,7 @@ public partial class Kart : MonoBehaviour
         boostTimer = 0;
         drifting = false;
         Fx.Burst(transform.position + Vector3.up, new Color(1f, 0.9f, 0.3f), 20, 7f, 0.5f);
-        if (IsPlayer) { rm.Audio.Hit(); rm.Shake(0.8f); }
+        if (IsPlayer) { rm.Audio.Hit(); rm.Shake(0.8f); GamepadHaptics.Vibrate(PlayerIndex, 0.95f, 0.75f, 0.5f); }
         return true;
     }
 
@@ -469,5 +488,37 @@ public partial class Kart : MonoBehaviour
                 if (IsPlayer) rm.Audio.Shield();
                 break;
         }
+    }
+}
+
+// カート・キャラクター定義の ScriptableObject
+[CreateAssetMenu(fileName = "NewKartData", menuName = "Turbo Circuit/Kart Data")]
+public class KartData : ScriptableObject
+{
+    [Header("Profile")]
+    public string characterName = "TURBO";
+    public string driverName = "Player";
+    public string trait = "Balanced All-Rounder";
+    public Color signatureColor = new Color(1f, 0.22f, 0.22f);
+
+    [Header("Performance (1-8, 5 is standard)")]
+    [Range(1, 8)] public int speed = 5;
+    [Range(1, 8)] public int accel = 5;
+    [Range(1, 8)] public int handling = 5;
+    [Range(1, 8)] public int weight = 5;
+
+    public KartCharacterDef ToDef()
+    {
+        return new KartCharacterDef
+        {
+            name = characterName,
+            driver = driverName,
+            trait = trait,
+            color = signatureColor,
+            speed = speed,
+            accel = accel,
+            handling = handling,
+            weight = weight
+        };
     }
 }

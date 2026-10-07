@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: Course_01_SUNSET_DUNES
+  m_EditorClassIdentifier: Assembly-CSharp::CourseData
+  courseName: SUNSET DUNES
+  description: Rollercoaster desert raceway climbing massive sand dunes and plunging into ancient ruins.
+  controlPoints:
+  - {x: 0, y: 0, z: -150}
+  - {x: 130, y: 4, z: -145}
+  - {x: 210, y: 15, z: -90}
+  - {x: 240, y: 26, z: 20}
+  - {x: 170, y: 22, z: 90}
+  - {x: 80, y: 16, z: 50}
+  - {x: 20, y: 18, z: 110}
+  - {x: 70, y: 14, z: 190}
+  - {x: -20, y: 5, z: 220}
+  - {x: -110, y: 0, z: 180}
+  - {x: -80, y: 6, z: 100}
+  - {x: -150, y: 12, z: 40}
+  - {x: -230, y: 16, z: 20}
+  - {x: -250, y: 10, z: -60}
+  - {x: -180, y: 4, z: -130}
+  - {x: -90, y: 0, z: -140}
+  ramps:
+  - Ratio: 0.48
+    Power: 16
+  tunnels: []
+  skyTint: {r: 1, g: 0.45, b: 0.25, a: 1}
+  groundColor: {r: 0.85, g: 0.65, b: 0.35, a: 1}
+  sunColor: {r: 1, g: 0.65, b: 0.35, a: 1}
+  sunIntensity: 1.4
+  sunRotation: {x: 25, y: -60, z: 0}
+  fogColor: {r: 0.95, g: 0.68, b: 0.45, a: 1}
+  fogDistance: 800
+  roadColor: {r: 0.46, g: 0.36, b: 0.28, a: 1}
+  curbColorA: {r: 0.98, g: 0.85, b: 0.1, a: 1}
+  curbColorB: {r: 0.12, g: 0.12, b: 0.12, a: 1}
+  wallColorA: {r: 0.95, g: 0.42, b: 0.08, a: 1}
+  wallColorB: {r: 1, g: 1, b: 1, a: 1}
+  shoulderColor: {r: 0.92, g: 0.75, b: 0.48, a: 1}
+  sceneryTheme: 1

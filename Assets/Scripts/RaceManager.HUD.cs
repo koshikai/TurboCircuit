@@ -59,12 +59,19 @@ public partial class RaceManager
 
     void DrawHud(Kart pl, float w, float h, bool compact, int pi)
     {
-        // アイテム枠
+        // ──────────────── アイテム枠（角丸ゴールド立体フレーム） ────────────────
         var slot = new Rect(24, 20, 114, 114);
-        GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.8f);
-        GUI.DrawTexture(slot, Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
+        if (itemSlotTex != null)
+        {
+            GUI.DrawTexture(slot, itemSlotTex);
+        }
+        else
+        {
+            GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+            GUI.DrawTexture(slot, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
+        }
 
         ItemType shown = pl.Item;
         if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
@@ -82,60 +89,137 @@ public partial class RaceManager
 
             if (icon != null)
             {
-                // 生成した3Dアイコン画像の描画
-                GUI.DrawTexture(new Rect(slot.x + 8, slot.y + 8, slot.width - 16, slot.height - 16), icon, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(new Rect(slot.x + 10, slot.y + 10, slot.width - 20, slot.height - 20), icon, ScaleMode.ScaleToFit);
             }
             else
             {
-                // フォールバック
                 GUI.color = ic;
-                GUI.DrawTexture(new Rect(slot.x + 12, slot.y + 12, slot.width - 24, 58), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(slot.x + 14, slot.y + 14, slot.width - 28, 54), Texture2D.whiteTexture);
                 GUI.color = Color.white;
-                var ls = St(sSmall, 20);
-                Outlined(new Rect(slot.x, slot.y + 12, slot.width, 58), label, ls, Color.white, 2);
+                var ls = St(sSmall, 18);
+                Outlined(new Rect(slot.x, slot.y + 14, slot.width, 54), label, ls, Color.white, 2);
             }
 
             if (pl.RouletteTimer <= 0)
-                Outlined(new Rect(slot.x, slot.yMax - 22, slot.width, 20), "[E]", St(sSmall, 15), new Color(1f, 1f, 0.3f), 1);
+                Outlined(new Rect(slot.x, slot.yMax - 26, slot.width, 22), "[E] USE", St(sSmall, 15), new Color(1f, 1f, 0.4f), 2);
         }
 
-        // 周回とタイム
-        var right = St(sMid, 0, TextAnchor.UpperRight);
-        int lap = Mathf.Clamp(pl.MaxLap, 1, totalLaps);
-        Outlined(new Rect(w - 324, 18, 300, 50), "LAP " + lap + "/" + totalLaps, right, Color.white);
-        var rs = St(sSmall, 0, TextAnchor.UpperRight);
-        Outlined(new Rect(w - 324, 66, 300, 30), FormatTime(pl.Finished ? pl.FinishTime : raceTime), rs, Color.white);
-        if (pl == HumanKart(pi) && bestLap[pi] > 0) Outlined(new Rect(w - 324, 94, 300, 30), "BEST LAP " + FormatTime(bestLap[pi]), St(sSmall, 16, TextAnchor.UpperRight), new Color(1f, 0.9f, 0.5f));
-        float recT = GetBestTime(SelectedCourse);
-        if (recT > 0) Outlined(new Rect(w - 324, 118, 300, 24), "REC " + FormatTime(recT), St(sSmall, 14, TextAnchor.UpperRight), new Color(0.7f, 0.85f, 1f));
+        // ──────────────── ドリフトミニターボゲージ ────────────────
+        if (pl.Drifting && pl.Speed > 8f)
+        {
+            var dr = new Rect(slot.x, slot.yMax + 8, slot.width, 16);
+            GUI.color = new Color(0.05f, 0.08f, 0.15f, 0.85f);
+            GUI.DrawTexture(dr, Texture2D.whiteTexture);
+            GUI.color = Color.white;
 
-        // 後方確認 / 観戦バナー
+            float chargeNorm = Mathf.Clamp01(pl.DriftCharge / 2.6f);
+            Color turboCol = pl.DriftLevel switch
+            {
+                3 => new Color(0.85f, 0.2f, 1f),   // 紫 (ウルトラ)
+                2 => new Color(1f, 0.55f, 0.05f),  // 橙 (スーパー)
+                1 => new Color(0.1f, 0.8f, 1f),    // 青 (ミニ)
+                _ => new Color(0.4f, 0.6f, 0.8f)   // チャージ中
+            };
+            GUI.color = turboCol;
+            GUI.DrawTexture(new Rect(dr.x + 2, dr.y + 2, (dr.width - 4) * chargeNorm, dr.height - 4), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawFrame(dr, 1, turboCol);
+
+            string turboText = pl.DriftLevel switch
+            {
+                3 => "ULTRA TURBO!",
+                2 => "SUPER TURBO!",
+                1 => "MINI TURBO!",
+                _ => "CHARGING..."
+            };
+            Outlined(new Rect(dr.x, dr.yMax + 2, dr.width, 18), turboText, St(sSmall, 11), turboCol, 1);
+        }
+
+        // ──────────────── 周回とタイム（スタイリッシュスラントカード） ────────────────
+        var tr = new Rect(w - 280, 16, 260, 100);
+        if (rankPlateTex != null)
+        {
+            GUI.color = new Color(0.04f, 0.08f, 0.18f, 0.85f);
+            GUI.DrawTexture(tr, rankPlateTex);
+            GUI.color = Color.white;
+        }
+
+        int lap = Mathf.Clamp(pl.MaxLap, 1, totalLaps);
+        Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 20, 36), "LAP " + lap + " / " + totalLaps, St(sMid, 28, TextAnchor.MiddleRight), Color.white, 2);
+        Outlined(new Rect(tr.x + 10, tr.y + 42, tr.width - 20, 26), FormatTime(pl.Finished ? pl.FinishTime : raceTime), St(sNum, 22, TextAnchor.MiddleRight), new Color(1f, 0.95f, 0.4f), 2);
+        if (pl == HumanKart(pi) && bestLap[pi] > 0)
+            Outlined(new Rect(tr.x + 10, tr.y + 68, tr.width - 20, 20), "BEST " + FormatTime(bestLap[pi]), St(sSmall, 14, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
+
+        // ──────────────── 後方確認 / 観戦バナー ────────────────
         if (isLookingBehind && pi == 0)
         {
-            DrawPopPill(new Rect(w / 2 - 85, 20, 170, 26), "◄ REAR VIEW ►", new Color(0.92f, 0.22f, 0.22f));
+            DrawPopPill(new Rect(w / 2 - 95, 20, 190, 28), "◄ REAR VIEW ►", new Color(0.95f, 0.22f, 0.22f));
         }
         else if (Spectating && pi == 0)
         {
             var sk = Karts[spectateIndex];
-            Outlined(new Rect(0, 16, w, 32), $"► SPECTATING: {sk.Name} ({Ordinal(sk.Place)}) ◄", St(sMid, 22), new Color(1f, 0.85f, 0.2f), 2);
+            Outlined(new Rect(0, 16, w, 32), $"► SPECTATING: {sk.Name} ({Ordinal(sk.Place)}) ◄", St(sMid, 24), new Color(1f, 0.85f, 0.2f), 2);
             GUI.Label(new Rect(0, 48, w, 22), "[A] / [D]  Switch Driver", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
         }
 
-        // 順位
+        // ──────────────── ミサイル接近警告アラート ────────────────
+        if (RaceRunning && !pl.Finished && IsMissileApproaching(pl, out float mDist))
+        {
+            float pulse = Mathf.Repeat(Time.time * 6f, 1f);
+            if (pulse < 0.65f)
+            {
+                var warnRect = new Rect(w / 2 - 160, h * 0.72f, 320, 42);
+                GUI.color = new Color(0.9f, 0.1f, 0.1f, 0.85f);
+                GUI.DrawTexture(warnRect, Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                DrawFrame(warnRect, 3, Color.yellow);
+                Outlined(warnRect, $"⚠️ MISSILE {Mathf.RoundToInt(mDist)}m!", St(sMid, 24, TextAnchor.MiddleCenter), Color.yellow, 3);
+            }
+        }
+
+        // ──────────────── 順位表示（スラントバッジプレート） ────────────────
         string place = Ordinal(pl.Place);
-        var ps = St(sBig, 120, TextAnchor.LowerRight);
-        Color pc = pl.Place == 1 ? new Color(1f, 0.85f, 0.15f) : pl.Place <= 3 ? new Color(0.85f, 0.9f, 1f) : Color.white;
-        Outlined(new Rect(w - 324, h - 170, 300, 150), place, ps, pc, 5);
+        Texture2D pPlate = pl.Place == 1 ? rankPlateGold : pl.Place == 2 ? rankPlateSilver : pl.Place == 3 ? rankPlateBronze : rankPlateTex;
+        var pr = compact ? new Rect(w - 180, h - 110, 170, 95) : new Rect(w - 240, h - 140, 225, 125);
+        if (pPlate != null)
+        {
+            GUI.DrawTexture(pr, pPlate);
+        }
+        var ps = St(sNum, compact ? 70 : 92, TextAnchor.MiddleCenter);
+        Color pc = pl.Place == 1 ? new Color(0.25f, 0.12f, 0f) : pl.Place == 2 ? new Color(0.12f, 0.18f, 0.28f) : pl.Place == 3 ? new Color(0.28f, 0.12f, 0.05f) : Color.white;
+        Outlined(new Rect(pr.x, pr.y - 6, pr.width, pr.height), place, ps, pc, 4);
 
-        // スピード
-        var ss = compact ? St(sMid, 30, TextAnchor.LowerLeft) : St(sMid, 0, TextAnchor.LowerCenter);
-        Outlined(compact ? new Rect(176, h - 70, 230, 50) : new Rect(w / 2 - 150, h - 70, 300, 50), Mathf.RoundToInt(Mathf.Abs(pl.Speed) * 3.6f) + " km/h", ss, Color.white);
+        // ──────────────── スピードメーター & タコメーターバー ────────────────
+        int spdKmh = Mathf.RoundToInt(Mathf.Abs(pl.Speed) * 3.6f);
+        var sr = compact ? new Rect(185, h - 75, 180, 60) : new Rect(w / 2 - 120, h - 78, 240, 65);
 
-        // ミニマップ
-        var mm = compact ? new Rect(10, h - 170, 156, 156) : new Rect(20, h - 250, 230, 230);
-        GUI.color = new Color(0, 0, 0, 0.3f);
-        GUI.DrawTexture(mm, Texture2D.whiteTexture);
+        // 速度数値 (Russo One)
+        Outlined(new Rect(sr.x, sr.y, sr.width, 38), spdKmh + " km/h", St(sNum, 32, TextAnchor.MiddleCenter), Color.white, 2.5f);
+
+        // LEDタコメーターバー
+        var barRect = new Rect(sr.x + 10, sr.y + 40, sr.width - 20, 12);
+        GUI.color = new Color(0.08f, 0.12f, 0.2f, 0.8f);
+        GUI.DrawTexture(barRect, Texture2D.whiteTexture);
         GUI.color = Color.white;
+        float speedRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+        Color barColor = pl.Boosting ? new Color(0.2f, 0.85f, 1f) : speedRatio > 0.85f ? new Color(1f, 0.3f, 0.2f) : speedRatio > 0.6f ? new Color(1f, 0.85f, 0.2f) : new Color(0.2f, 0.9f, 0.4f);
+        GUI.color = barColor;
+        GUI.DrawTexture(new Rect(barRect.x + 1, barRect.y + 1, (barRect.width - 2) * speedRatio, barRect.height - 2), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        DrawFrame(barRect, 1, barColor);
+
+        // ──────────────── ミニマップ（角丸ダークガラス） ────────────────
+        var mm = compact ? new Rect(14, h - 175, 160, 160) : new Rect(20, h - 250, 230, 230);
+        if (minimapGlassTex != null)
+        {
+            GUI.DrawTexture(mm, minimapGlassTex);
+        }
+        else
+        {
+            GUI.color = new Color(0.05f, 0.08f, 0.16f, 0.75f);
+            GUI.DrawTexture(mm, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+        }
         GUI.DrawTexture(mm, minimap);
         int playerIdx = Karts.IndexOf(pl);
         for (int n = 1; n <= Karts.Count; n++) // プレイヤーを最後（最前面）に描く
@@ -151,7 +235,7 @@ public partial class RaceManager
         }
         GUI.color = Color.white;
 
-        // 逆走
+        // ──────────────── 逆走警告 ────────────────
         if (RaceRunning && !pl.Finished && Vector3.Dot(pl.Forward, track.Dirs[pl.Index]) < -0.3f && pl.Speed > 3f && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
             Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", St(sBig, compact ? 44 : 60), new Color(1f, 0.3f, 0.3f));
     }

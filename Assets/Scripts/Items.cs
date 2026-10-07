@@ -115,6 +115,7 @@ public class Banana : MonoBehaviour
 public class Missile : MonoBehaviour
 {
     public Kart Owner;
+    public Kart Target => target;
     Kart target;
     Track track;
     RaceManager rm;
@@ -177,11 +178,14 @@ public class Missile : MonoBehaviour
         foreach (var k in rm.Karts)
         {
             if (k == Owner) continue;
+            if (k.IsRemote) continue; // オンライン時は被弾する側（ローカル操作者またはホストのCPU）が判定する！
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
-                k.Spin();
-                Explode();
-                return;
+                if (k.Shielded || k.Spin())
+                {
+                    Explode();
+                    return;
+                }
             }
         }
         if (rm.MissileHitsBanana(transform.position)) Explode();

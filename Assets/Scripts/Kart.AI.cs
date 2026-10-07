@@ -5,7 +5,7 @@ public partial class Kart
 {
     // ───────────────────────── AI (Tanaka Control / Optimal Racing) ─────────────────────────
 
-    KartInput AIInput(float dt)
+    public KartInput AIInput(float dt)
     {
         var inp = new KartInput();
         if (track == null || track.Count == 0) return inp;
@@ -59,7 +59,6 @@ public partial class Kart
 
         // 2. 動的レーシングライン生成 (Smooth Racing Line)
         // 極端な端への振りを抑え、コース中央寄りの安全なラインを滑らかにトレース
-        float roadMargin = 3.0f; // 目標オフセットの最大幅（安全余裕を十分確保）
         float targetLane = 0f;
 
         if (apexCurvature > 0.015f && Mathf.Abs(apexBend) > 12f)

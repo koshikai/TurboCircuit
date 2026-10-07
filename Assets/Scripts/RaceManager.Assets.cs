@@ -65,6 +65,18 @@ public partial class RaceManager
 
     void LoadUIAssets()
     {
+        // フォントの読み込み：Lilita One (メインポップ) & Russo One (計器・数字)
+        fontMain = Resources.Load<Font>("Fonts/LilitaOne-Regular");
+        if (fontMain == null)
+        {
+            fontMain = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                     ?? Resources.GetBuiltinResource<Font>("Arial.ttf")
+                     ?? Resources.FindObjectsOfTypeAll<Font>().FirstOrDefault();
+        }
+
+        fontNum = Resources.Load<Font>("Fonts/RussoOne-Regular") ?? fontMain;
+        font = fontMain;
+
         string iconDir = Application.dataPath + "/Resources/Icons/";
         iconTurbo = LoadTexture("Icons/item_turbo", iconDir + "item_turbo.jpg");
         iconBanana = LoadTexture("Icons/item_banana", iconDir + "item_banana.jpg");
@@ -82,6 +94,17 @@ public partial class RaceManager
         ribbonTrackTex = LoadTexture("UI/ui_ribbon_track", uiDir + "ui_ribbon_track.png");
         ribbonDriverTex = LoadTexture("UI/ui_ribbon_driver", uiDir + "ui_ribbon_driver.png");
         cardPanelTex = TextureGen.CardPanel(340, 400, new Color(0.04f, 0.08f, 0.18f, 0.88f), new Color(0.02f, 0.04f, 0.10f, 0.94f), new Color(0.2f, 0.7f, 1f, 0.85f), 2);
+
+        // 現代的な角丸ガラスモーダル・フレーム・バッジ
+        modalBgTex = TextureGen.ModernModalPanel(620, 520, new Color(0.08f, 0.12f, 0.24f, 0.93f), new Color(0.04f, 0.06f, 0.14f, 0.97f), new Color(0.0f, 0.85f, 1f, 0.9f), 3, 16f);
+        itemSlotTex = TextureGen.ItemSlotFrame(114);
+        minimapGlassTex = TextureGen.MinimapGlass(180);
+
+        // 順位バッジ用スラントプレート
+        rankPlateGold = TextureGen.SlantedPlate(150, 68, new Color(1f, 0.82f, 0.1f, 0.92f), new Color(1f, 1f, 0.7f, 1f), 3, 0.2f);
+        rankPlateSilver = TextureGen.SlantedPlate(150, 68, new Color(0.75f, 0.80f, 0.88f, 0.92f), Color.white, 3, 0.2f);
+        rankPlateBronze = TextureGen.SlantedPlate(150, 68, new Color(0.85f, 0.52f, 0.25f, 0.92f), new Color(1f, 0.85f, 0.6f, 1f), 3, 0.2f);
+        rankPlateTex = TextureGen.SlantedPlate(150, 68, new Color(0.08f, 0.12f, 0.22f, 0.88f), new Color(0.3f, 0.75f, 1f, 0.8f), 3, 0.2f);
     }
 
     public static Texture2D LoadTexture(string resPath, string diskPath)

@@ -6,10 +6,36 @@ public partial class Track
 {
     // ───────────────────────── メッシュ ─────────────────────────
 
+    readonly List<Mesh> createdMeshes = new List<Mesh>();
+    readonly List<Material> createdMaterials = new List<Material>();
+
+    static void SafeDestroy(Object obj)
+    {
+        if (obj == null) return;
+        if (Application.isPlaying) Destroy(obj);
+        else DestroyImmediate(obj);
+    }
+
     public void ClearVisuals()
     {
         for (int i = transform.childCount - 1; i >= 0; i--)
-            Destroy(transform.GetChild(i).gameObject);
+            SafeDestroy(transform.GetChild(i).gameObject);
+
+        foreach (var m in createdMeshes)
+            if (m != null) SafeDestroy(m);
+        createdMeshes.Clear();
+
+        foreach (var mat in createdMaterials)
+            if (mat != null) SafeDestroy(mat);
+        createdMaterials.Clear();
+
+        if (cityMats != null)
+        {
+            foreach (var cm in cityMats)
+                if (cm != null) SafeDestroy(cm);
+            cityMats = null;
+        }
+
         BoostPads.Clear();
         ItemBoxSpots.Clear();
     }
@@ -23,6 +49,9 @@ public partial class Track
         var roadMat = new Material(rm.roadMaterial) { mainTexture = TextureGen.Asphalt(def.RoadColor) };
         var curbMat = new Material(rm.curbMaterial) { mainTexture = TextureGen.Stripes(def.CurbColorA, def.CurbColorB) };
         var wallMat = new Material(rm.wallMaterial) { mainTexture = TextureGen.Stripes(def.WallColorA, def.WallColorB) };
+        createdMaterials.Add(roadMat);
+        createdMaterials.Add(curbMat);
+        createdMaterials.Add(wallMat);
 
         Texture2D groundTex = def.SceneryTheme == 1 ? TextureGen.Sand()
             : def.SceneryTheme == 2 ? TextureGen.Snow()
@@ -372,6 +401,7 @@ public partial class Track
 
     GameObject MeshObject(string name, Mesh mesh, Material mat)
     {
+        if (mesh != null) createdMeshes.Add(mesh);
         var go = new GameObject(name);
         go.transform.SetParent(transform, false);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;

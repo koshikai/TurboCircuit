@@ -4,6 +4,19 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
+[System.Serializable]
+public struct KartCharacterDef
+{
+    public string name;
+    public string driver;
+    public string trait;
+    public Color color;
+    public int speed;     // 1〜8
+    public int accel;     // 1〜8
+    public int handling;  // 1〜8
+    public int weight;    // 1〜8
+}
+
 // レース全体の進行・順位・アイテム・カメラ・UI
 public partial class RaceManager : MonoBehaviour
 {
@@ -58,8 +71,9 @@ public partial class RaceManager : MonoBehaviour
     readonly List<Banana> bananas = new List<Banana>();
     readonly List<Missile> missiles = new List<Missile>();
     Font font;
+    Font fontMain, fontNum;
 
-    float stateTime, raceTime, shake, titleDist, finishAt;
+    float stateTime, raceTime, shake, finishAt;
     int lastCountdownBeep;
 
     // ローカル対戦（2P 画面分割）。インデックス 0 = P1、1 = P2
@@ -122,7 +136,7 @@ public partial class RaceManager : MonoBehaviour
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
-    GUIStyle sButton, sField;
+    GUIStyle sButton, sField, sNum;
     readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
@@ -135,20 +149,13 @@ public partial class RaceManager : MonoBehaviour
     Texture2D btnRaceTex;
     Texture2D ribbonTrackTex;
     Texture2D ribbonDriverTex;
+    Texture2D modalBgTex;
+    Texture2D itemSlotTex;
+    Texture2D minimapGlassTex;
+    Texture2D rankPlateTex, rankPlateGold, rankPlateSilver, rankPlateBronze;
     System.Func<Vector3, Vector2> toMap;
 
-    public struct KartCharacterDef
-    {
-        public string name;
-        public string driver;
-        public string trait;
-        public Color color;
-        public int speed;     // 1〜8
-        public int accel;     // 1〜8
-        public int handling;  // 1〜8
-        public int weight;    // 1〜8
-    }
-    public static readonly KartCharacterDef[] KartCharacters =
+    public static readonly KartCharacterDef[] DefaultKartCharacters =
     {
         new KartCharacterDef { 
             name = "OOBI", driver = "Alien Ace", trait = "Balanced / All-Rounder", color = new Color(0.95f, 0.25f, 0.25f),
@@ -171,6 +178,28 @@ public partial class RaceManager : MonoBehaviour
             speed = 6, accel = 3, handling = 4, weight = 8 
         },
     };
+
+    static KartCharacterDef[] runtimeKartCharacters;
+    public static KartCharacterDef[] KartCharacters
+    {
+        get
+        {
+            if (runtimeKartCharacters == null)
+            {
+                var loaded = Resources.LoadAll<KartData>("Data/Karts");
+                if (loaded != null && loaded.Length > 0)
+                {
+                    System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
+                    runtimeKartCharacters = loaded.Select(k => k.ToDef()).ToArray();
+                }
+                else
+                {
+                    runtimeKartCharacters = DefaultKartCharacters;
+                }
+            }
+            return runtimeKartCharacters;
+        }
+    }
 
     public int SelectedKart { get; private set; } = 0;
     float stickNavTimer = 0f;
@@ -361,6 +390,7 @@ public partial class RaceManager : MonoBehaviour
         AudioListener.pause = false;
         state = State.Title;
         stateTime = 0;
+        GamepadHaptics.StopAll();
         RestoreRoles();
         LoadCourse(SelectedCourse);
         Audio.SetMusicVolume(0.3f);
@@ -405,7 +435,6 @@ public partial class RaceManager : MonoBehaviour
             Karts[i].ResetTo(idx, lat);
         }
 
-        titleDist = 0;
         if (cam != null) cam.transform.position = track.PointAt(0, 0) + Vector3.up * 20f;
     }
 
@@ -549,6 +578,7 @@ public partial class RaceManager : MonoBehaviour
         }
 
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
+        GamepadHaptics.Update(dt);
         stateTime += dt;
         bannerTimes[0] += dt;
         bannerTimes[1] += dt;
@@ -861,6 +891,24 @@ public partial class RaceManager : MonoBehaviour
         }
     }
 
+    public bool IsMissileApproaching(Kart k, out float distance)
+    {
+        distance = 999f;
+        if (k == null || missiles.Count == 0) return false;
+        foreach (var m in missiles)
+        {
+            if (m != null && m.Target == k)
+            {
+                float d = Vector3.Distance(m.transform.position, k.transform.position);
+                if (d < 45f && d < distance)
+                {
+                    distance = d;
+                }
+            }
+        }
+        return distance < 45f;
+    }
+
     ItemType RollItem(Kart k)
     {
         float p = (k.Place - 1) / (float)(Karts.Count - 1);
@@ -944,4 +992,14 @@ public partial class RaceManager : MonoBehaviour
     }
 
     void QuitAfterScreenshot() => Application.Quit();
+
+    void OnDestroy()
+    {
+        GamepadHaptics.StopAll();
+    }
+
+    void OnApplicationQuit()
+    {
+        GamepadHaptics.StopAll();
+    }
 }

@@ -36,3 +36,6 @@ Thumbs.db
 
 # Build logs
 build.log
+
+# Archives
+*.zip

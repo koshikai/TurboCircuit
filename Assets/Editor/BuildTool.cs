@@ -15,6 +15,7 @@ public static class BuildTool
     [MenuItem("Turbo Circuit/Setup Scene")]
     public static void Setup()
     {
+        DataAssetGenerator.ExportAllData();
         Directory.CreateDirectory(SceneDir);
         Directory.CreateDirectory(MatDir);
 
@@ -156,5 +157,81 @@ public static class BuildTool
             mat.shader = shader;
         }
         return mat;
+    }
+}
+
+// 既存のハードコード定義から ScriptableObject アセットを一括生成するエディタ拡張
+public static class DataAssetGenerator
+{
+    const string KartDataDir = "Assets/Resources/Data/Karts";
+    const string CourseDataDir = "Assets/Resources/Data/Courses";
+
+    [MenuItem("Turbo Circuit/Export Data to ScriptableObjects")]
+    public static void ExportAllData()
+    {
+        Directory.CreateDirectory(KartDataDir);
+        Directory.CreateDirectory(CourseDataDir);
+
+        // 1. カートキャラクターデータの書き出し
+        var karts = RaceManager.DefaultKartCharacters;
+        for (int i = 0; i < karts.Length; i++)
+        {
+            var def = karts[i];
+            string path = $"{KartDataDir}/Kart_{i:D2}_{def.name}.asset";
+            var asset = AssetDatabase.LoadAssetAtPath<KartData>(path);
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<KartData>();
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            asset.characterName = def.name;
+            asset.driverName = def.driver;
+            asset.trait = def.trait;
+            asset.signatureColor = def.color;
+            asset.speed = def.speed;
+            asset.accel = def.accel;
+            asset.handling = def.handling;
+            asset.weight = def.weight;
+            EditorUtility.SetDirty(asset);
+        }
+
+        // 2. コースデータの書き出し
+        var courses = Track.DefaultCourses;
+        for (int i = 0; i < courses.Length; i++)
+        {
+            var def = courses[i];
+            string cleanName = def.Name.Replace(" ", "_");
+            string path = $"{CourseDataDir}/Course_{i:D2}_{cleanName}.asset";
+            var asset = AssetDatabase.LoadAssetAtPath<CourseData>(path);
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<CourseData>();
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            asset.courseName = def.Name;
+            asset.description = def.Description;
+            asset.controlPoints = def.Control;
+            asset.ramps = def.Ramps;
+            asset.tunnels = def.Tunnels;
+            asset.skyTint = def.SkyTint;
+            asset.groundColor = def.GroundColor;
+            asset.sunColor = def.SunColor;
+            asset.sunIntensity = def.SunIntensity;
+            asset.sunRotation = def.SunRotation;
+            asset.fogColor = def.FogColor;
+            asset.fogDistance = def.FogDistance;
+            asset.roadColor = def.RoadColor;
+            asset.curbColorA = def.CurbColorA;
+            asset.curbColorB = def.CurbColorB;
+            asset.wallColorA = def.WallColorA;
+            asset.wallColorB = def.WallColorB;
+            asset.shoulderColor = def.ShoulderColor;
+            asset.sceneryTheme = def.SceneryTheme;
+            EditorUtility.SetDirty(asset);
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("[TurboCircuit] Successfully exported all KartData and CourseData ScriptableObjects to Assets/Resources/Data!");
     }
 }

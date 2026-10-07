@@ -267,16 +267,26 @@ public partial class RaceManager
         cam.fieldOfView = 48f;
     }
 
+    float copyNotifyTimer;
+
     void DrawNetMenu(float w, float h)
     {
-        var r = new Rect(w / 2 - 290, 80, 580, 550);
-        GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.97f);
-        GUI.DrawTexture(r, Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        DrawFrame(r, 3, new Color(1f, 0.85f, 0.25f));
-        Outlined(new Rect(r.x, r.y + 8, r.width, 50), "ONLINE MULTIPLAYER", St(sMid, 34), new Color(1f, 0.85f, 0.25f), 2);
-        float x = r.x + 30, cw = r.width - 60, y = r.y + 60;
-        var info = St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.85f, 0.9f, 1f));
+        var r = new Rect(w / 2 - 290, 75, 580, 560);
+        if (modalBgTex != null)
+        {
+            GUI.DrawTexture(r, modalBgTex);
+        }
+        else
+        {
+            GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.97f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawFrame(r, 3, new Color(1f, 0.85f, 0.25f));
+        }
+
+        Outlined(new Rect(r.x, r.y + 14, r.width, 46), "ONLINE MULTIPLAYER", St(sMid, 32), new Color(0.1f, 0.9f, 1f), 2.5f);
+        float x = r.x + 35, cw = r.width - 70, y = r.y + 64;
+        var info = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.85f, 0.9f, 1f));
 
         if (Net.Busy)
         {
@@ -288,23 +298,23 @@ public partial class RaceManager
         }
 
         // プレイヤー名入力
-        GUI.Label(new Rect(x, y, 130, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(1f, 0.9f, 0.5f)));
-        string enteredName = GUI.TextField(new Rect(x + 130, y, 220, 32), playerName, 12, sField);
+        GUI.Label(new Rect(x, y, 140, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(1f, 0.9f, 0.5f)));
+        string enteredName = GUI.TextField(new Rect(x + 140, y, 220, 32), playerName, 12, sField);
         SetPlayerName(enteredName);
-        y += 44;
+        y += 48;
 
         // インターネット経由（Unity Relay）
-        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
-        if (GUI.Button(new Rect(x, y + 32, 250, 40), "HOST ROOM", sButton)) Net.HostRelay();
-        joinCodeInput = GUI.TextField(new Rect(x + 270, y + 32, 120, 40), joinCodeInput, 8, sField).ToUpperInvariant();
-        if (GUI.Button(new Rect(x + 400, y + 32, cw - 400, 40), "JOIN", sButton)) Net.JoinRelay(joinCodeInput);
+        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.4f, 0.85f, 1f)));
+        if (GUI.Button(new Rect(x, y + 30, 240, 42), "HOST ROOM", sButton)) Net.HostRelay();
+        joinCodeInput = GUI.TextField(new Rect(x + 255, y + 30, 130, 42), joinCodeInput, 8, sField).ToUpperInvariant();
+        if (GUI.Button(new Rect(x + 395, y + 30, cw - 395, 42), "JOIN", sButton)) Net.JoinRelay(joinCodeInput);
 
         // IP 直接接続（LAN / VPN）
         y += 105;
-        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 18, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.5f, 0.85f, 1f)));
-        if (GUI.Button(new Rect(x, y + 32, 250, 40), "HOST (LISTEN)", sButton)) Net.HostDirect();
-        ipInput = GUI.TextField(new Rect(x + 270, y + 32, 150, 40), ipInput, 40, sField);
-        if (GUI.Button(new Rect(x + 430, y + 32, cw - 430, 40), "JOIN", sButton)) Net.JoinDirect(ipInput);
+        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.4f, 0.85f, 1f)));
+        if (GUI.Button(new Rect(x, y + 30, 240, 42), "HOST (LISTEN)", sButton)) Net.HostDirect();
+        ipInput = GUI.TextField(new Rect(x + 255, y + 30, 150, 42), ipInput, 40, sField);
+        if (GUI.Button(new Rect(x + 415, y + 30, cw - 415, 42), "JOIN", sButton)) Net.JoinDirect(ipInput);
 
         if (!string.IsNullOrEmpty(Net.Message))
             GUI.Label(new Rect(x, y + 84, cw, 40), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(1f, 0.5f, 0.4f)));
@@ -315,6 +325,7 @@ public partial class RaceManager
     // オンラインロビー：3D ステージ上に全員のカートを並べ、頭上に名前タグ、下に操作パネルを表示する
     void DrawLobby(float w, float h)
     {
+        if (copyNotifyTimer > 0) copyNotifyTimer -= Time.deltaTime;
         float scale = Screen.height / 720f;
         var gold = new Color(1f, 0.85f, 0.25f);
 
@@ -328,8 +339,14 @@ public partial class RaceManager
 
         if (!string.IsNullOrEmpty(Net.JoinCode))
         {
-            GUI.Label(new Rect(w / 2 - 150, 4, 300, 20), "ROOM CODE", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
-            Outlined(new Rect(w / 2 - 150, 20, 300, 60), Net.JoinCode, St(sBig, 52), new Color(0.4f, 1f, 0.6f), 3);
+            GUI.Label(new Rect(w / 2 - 160, 4, 320, 18), "ROOM CODE (CLICK TO COPY)", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
+            Outlined(new Rect(w / 2 - 160, 20, 200, 56), Net.JoinCode, St(sBig, 48), new Color(0.4f, 1f, 0.6f), 3);
+            string copyBtnText = copyNotifyTimer > 0 ? "✓ COPIED!" : "📋 COPY";
+            if (GUI.Button(new Rect(w / 2 + 50, 28, 100, 38), copyBtnText, sButton))
+            {
+                GUIUtility.systemCopyBuffer = Net.JoinCode;
+                copyNotifyTimer = 2.0f;
+            }
         }
         else
         {

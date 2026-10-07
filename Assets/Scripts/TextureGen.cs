@@ -1,8 +1,20 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-// 実行時にテクスチャを生成する（画像ファイル不要）
+// 実行時にテクスチャを生成する（画像ファイル不要、静的キャッシュで再利用）
 public static class TextureGen
 {
+    static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();
+
+    public static void ClearCache()
+    {
+        foreach (var t in cache.Values)
+        {
+            if (t != null) Object.Destroy(t);
+        }
+        cache.Clear();
+    }
+
     static Texture2D New(int w, int h, Color[] px, bool mip = true)
     {
         var t = new Texture2D(w, h, TextureFormat.RGBA32, mip) { wrapMode = TextureWrapMode.Repeat, anisoLevel = 8 };
@@ -15,6 +27,9 @@ public static class TextureGen
 
     public static Texture2D Asphalt(Color baseTint)
     {
+        string key = $"asphalt_{baseTint.r:F2}_{baseTint.g:F2}_{baseTint.b:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
         const int n = 512;
         var px = new Color[n * n];
         var rng = new System.Random(42);
@@ -41,11 +56,15 @@ public static class TextureGen
             }
             px[y * n + x] = c;
         }
-        return New(n, n, px);
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
     }
 
     public static Texture2D Sand()
     {
+        const string key = "sand";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         var rng = new System.Random(17);
@@ -59,11 +78,15 @@ public static class TextureGen
             c.a = 1;
             px[y * n + x] = c;
         }
-        return New(n, n, px);
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
     }
 
     public static Texture2D Snow()
     {
+        const string key = "snow";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         var rng = new System.Random(23);
@@ -77,21 +100,29 @@ public static class TextureGen
             c.a = 1;
             px[y * n + x] = c;
         }
-        return New(n, n, px);
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
     }
 
     public static Texture2D Stripes(Color a, Color b)
     {
+        string key = $"stripes_{a.r:F2}_{a.g:F2}_{a.b:F2}_{b.r:F2}_{b.g:F2}_{b.b:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int w = 16, h = 64;
         var px = new Color[w * h];
         for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
             px[y * w + x] = y < h / 2 ? a : b;
-        return New(w, h, px);
+        var tex = New(w, h, px);
+        cache[key] = tex;
+        return tex;
     }
 
     public static Texture2D Grass()
     {
+        const string key = "grass";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         var rng = new System.Random(9);
@@ -105,12 +136,16 @@ public static class TextureGen
             c.a = 1;
             px[y * n + x] = c;
         }
-        return New(n, n, px);
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
     }
 
     // 都市の舗装（暗いコンクリート）
     public static Texture2D Concrete()
     {
+        const string key = "concrete";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         var rng = new System.Random(23);
@@ -119,7 +154,7 @@ public static class TextureGen
         {
             float p = Mathf.PerlinNoise(x * 0.06f, y * 0.06f);
             float r = (float)rng.NextDouble();
-            var c = Color.Lerp(new Color(0.30f, 0.31f, 0.34f), new Color(0.40f, 0.41f, 0.44f), p);
+            var c = Color.Lerp(new Color(0.30f, 0.31f, 0.44f), new Color(0.40f, 0.41f, 0.44f), p);
             if (x % 32 == 0 || y % 32 == 0) c *= 0.8f; // 舗装の目地
             c *= 0.94f + r * 0.12f;
             c.a = 1;
@@ -367,5 +402,135 @@ public static class TextureGen
         t.wrapMode = TextureWrapMode.Clamp;
         t.filterMode = FilterMode.Bilinear;
         return t;
+    }
+
+    // 現代的なダイアログパネル（ダークネイビーのグラデーション、上部光沢ハイライト、角丸、ネオン枠）
+    public static Texture2D ModernModalPanel(int w, int h, Color topBg, Color botBg, Color glowBorder, int borderThick = 3, float radius = 14f)
+    {
+        string key = $"modal_{w}_{h}_{topBg.r:F2}_{glowBorder.r:F2}_{borderThick}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - radius) : 0);
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - radius) : 0);
+            float dist = Mathf.Sqrt(cx * cx + cy * cy);
+            if (dist > radius)
+            {
+                px[y * w + x] = Color.clear;
+                continue;
+            }
+
+            float t = y / (float)h;
+            Color bg = Color.Lerp(botBg, topBg, t);
+
+            // 上部の光沢ハイライトライン
+            if (y > h - 4 && dist <= radius - borderThick)
+                bg = Color.Lerp(bg, Color.white, 0.35f);
+
+            bool isBorder = x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick || (dist >= radius - borderThick);
+            px[y * w + x] = isBorder ? glowBorder : bg;
+        }
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // レースゲーム風のスラント（斜め平行四辺形）バッジプレート
+    public static Texture2D SlantedPlate(int w, int h, Color fill, Color border, int borderThick = 3, float slant = 0.22f)
+    {
+        string key = $"slant_{w}_{h}_{fill.r:F2}_{fill.g:F2}_{border.r:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        float shiftWidth = h * slant;
+        for (int y = 0; y < h; y++)
+        {
+            float leftX = (h - 1 - y) * slant;
+            float rightX = leftX + (w - shiftWidth);
+            for (int x = 0; x < w; x++)
+            {
+                if (x < leftX || x > rightX)
+                {
+                    px[y * w + x] = Color.clear;
+                    continue;
+                }
+                bool isBorder = x < leftX + borderThick || x > rightX - borderThick || y < borderThick || y >= h - borderThick;
+                px[y * w + x] = isBorder ? border : fill;
+            }
+        }
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 角丸の立体感あるアイテムスロット枠（ゴールド光沢フレーム＋ダークインナー）
+    public static Texture2D ItemSlotFrame(int size = 114)
+    {
+        string key = $"itemslot_{size}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[size * size];
+        float radius = 16f;
+        Color outerGold = new Color(1f, 0.85f, 0.25f, 1f);
+        Color innerDark = new Color(0.08f, 0.10f, 0.16f, 0.90f);
+        Color glowGold = new Color(1f, 0.65f, 0.1f, 0.7f);
+
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - radius) : 0);
+            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - radius) : 0);
+            float dist = Mathf.Sqrt(cx * cx + cy * cy);
+            if (dist > radius)
+            {
+                px[y * size + x] = Color.clear;
+                continue;
+            }
+
+            bool isBorder = x < 4 || x >= size - 4 || y < 4 || y >= size - 4 || (dist >= radius - 4);
+            bool isInnerGlow = (x >= 4 && x < 8) || (x >= size - 8 && x < size - 4) || (y >= 4 && y < 8) || (y >= size - 8 && y < size - 4);
+
+            px[y * size + x] = isBorder ? outerGold : isInnerGlow ? Color.Lerp(innerDark, glowGold, 0.5f) : innerDark;
+        }
+        var tex = New(size, size, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 半透明ダークガラスミニマップ背景プレート
+    public static Texture2D MinimapGlass(int size = 180)
+    {
+        string key = $"minimap_glass_{size}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[size * size];
+        float radius = 18f;
+        Color glassBg = new Color(0.06f, 0.08f, 0.14f, 0.75f);
+        Color glassBorder = new Color(0.2f, 0.6f, 1f, 0.55f);
+
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - radius) : 0);
+            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - radius) : 0);
+            float dist = Mathf.Sqrt(cx * cx + cy * cy);
+            if (dist > radius)
+            {
+                px[y * size + x] = Color.clear;
+                continue;
+            }
+            bool isBorder = dist >= radius - 2f || x < 2 || x >= size - 2 || y < 2 || y >= size - 2;
+            px[y * size + x] = isBorder ? glassBorder : glassBg;
+        }
+        var tex = New(size, size, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
     }
 }

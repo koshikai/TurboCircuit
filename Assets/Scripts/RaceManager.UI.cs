@@ -27,7 +27,8 @@ public partial class RaceManager
 
     GUIStyle St(GUIStyle b, int size = 0, TextAnchor? anchor = null, FontStyle? fs = null, bool wrap = false, Color? text = null)
     {
-        int bid = b == sBig ? 0 : b == sMid ? 1 : 2;
+        if (b == null) b = sBig ?? GUI.skin.label;
+        int bid = b == sBig ? 0 : b == sMid ? 1 : b == sNum ? 3 : 2;
         int col = -1;
         if (text.HasValue) { Color32 c = text.Value; col = c.r << 16 | c.g << 8 | c.b; }
         var key = (bid, size, anchor.HasValue ? (int)anchor.Value : -1, fs.HasValue ? (int)fs.Value : -1, wrap, col);
@@ -48,12 +49,13 @@ public partial class RaceManager
     {
         if (sBig == null)
         {
-            sBig = new GUIStyle(GUI.skin.label) { fontSize = 90, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
+            sBig = new GUIStyle(GUI.skin.label) { font = fontMain, fontSize = 90, fontStyle = FontStyle.BoldAndItalic, alignment = TextAnchor.MiddleCenter };
             sBig.normal.textColor = Color.white;
             sMid = new GUIStyle(sBig) { fontSize = 38 };
             sSmall = new GUIStyle(sBig) { fontSize = 22, fontStyle = FontStyle.Bold };
-            sButton = new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
-            sField = new GUIStyle(GUI.skin.textField) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
+            sButton = new GUIStyle(GUI.skin.button) { font = fontMain, fontSize = 18, fontStyle = FontStyle.Bold };
+            sField = new GUIStyle(GUI.skin.textField) { font = fontMain, fontSize = 20, alignment = TextAnchor.MiddleCenter };
+            sNum = new GUIStyle(sBig) { font = fontNum, fontSize = 32 };
         }
         float scale = Screen.height / 720f;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
@@ -84,12 +86,14 @@ public partial class RaceManager
 
         if (paused)
         {
-            GUI.color = new Color(0, 0, 0, 0.65f);
+            GUI.color = new Color(0.02f, 0.04f, 0.08f, 0.72f);
             GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            Outlined(new Rect(0, h * 0.30f, w, 100), "PAUSED", sBig, Color.white);
-            Outlined(new Rect(0, h * 0.46f, w, 40), "ESC / START : Resume     R [X] : Restart     O : Settings     T [Y] : Title     Q [BACK] : Quit", sSmall, Color.white);
-            if (GUI.Button(new Rect(w * 0.5f - 110, h * 0.55f, 220, 42), "SETTINGS  [O]", sButton))
+            var pr = new Rect((w - 560) * 0.5f, (h - 260) * 0.5f, 560, 260);
+            if (modalBgTex != null) GUI.DrawTexture(pr, modalBgTex);
+            Outlined(new Rect(pr.x, pr.y + 16, pr.width, 70), "PAUSED", sBig, Color.white, 3);
+            Outlined(new Rect(pr.x + 20, pr.y + 90, pr.width - 40, 50), "ESC / START : Resume     R [X] : Restart\nO : Settings     T [Y] : Title     Q [BACK] : Quit", St(sSmall, 16, TextAnchor.MiddleCenter), new Color(0.85f, 0.92f, 1f), 1.5f);
+            if (GUI.Button(new Rect(pr.x + (pr.width - 220) * 0.5f, pr.y + 175, 220, 42), "SETTINGS  [O]", sButton))
             {
                 showSettings = true;
             }
