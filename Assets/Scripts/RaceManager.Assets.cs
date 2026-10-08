@@ -75,6 +75,7 @@ public partial class RaceManager
         }
 
         fontNum = Resources.Load<Font>("Fonts/RussoOne-Regular") ?? fontMain;
+        fontMono = Resources.Load<Font>("Fonts/ShareTechMono-Regular") ?? fontNum ?? fontMain;
         font = fontMain;
 
         string iconDir = Application.dataPath + "/Resources/Icons/";

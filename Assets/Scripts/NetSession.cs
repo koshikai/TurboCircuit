@@ -46,7 +46,7 @@ public class NetSession : MonoBehaviour
 
     public Phase State { get; private set; }
     public bool IsHost { get; private set; }
-    public string JoinCode { get; private set; } = "";
+    public string JoinCode { get; set; } = "";
     public string Message { get; private set; } = "";
     public bool Connected => IsHost ? (hostConnections.Count > 0) : (State == Phase.Connected);
     public bool Busy => State != Phase.Offline;

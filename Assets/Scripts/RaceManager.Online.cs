@@ -236,7 +236,7 @@ public partial class RaceManager
         int n = lobbySlots.Count;
         int front = n <= 4 ? n : (n + 1) / 2;
         int back = n - front;
-        const float spacing = 3.4f, rowGap = 4.5f;
+        const float spacing = 3.4f, rowGap = 5.2f;
 
         var origin = track.PointAt(0, 0);
         var dir = track.Dirs[0];
@@ -257,10 +257,10 @@ public partial class RaceManager
 
         int rows = back > 0 ? 2 : 1;
         float width = spacing * (front - 1) + 3.5f;
-        float dist = Mathf.Max(6f, width * 0.78f) + (rows - 1) * 2.5f;
+        float dist = Mathf.Max(7.2f, width * 0.72f) + (rows - 1) * 3.0f;
         var center = origin - dir * ((rows - 1) * rowGap * 0.5f);
-        var camPos = center + dir * dist + right * 1.2f + Vector3.up * (1.6f + rows * 0.9f);
-        var look = center + Vector3.up * -0.6f;
+        var camPos = center + dir * dist + right * 0.8f + Vector3.up * (2.4f + (rows - 1) * 2.0f);
+        var look = center + Vector3.up * (rows == 1 ? 0.65f : 0.85f);
         float k2 = 1f - Mathf.Exp(-5f * dt);
         cam.transform.position = Vector3.Lerp(cam.transform.position, camPos, k2);
         cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, Quaternion.LookRotation(look - cam.transform.position), k2);
@@ -271,55 +271,49 @@ public partial class RaceManager
 
     void DrawNetMenu(float w, float h)
     {
-        var r = new Rect(w / 2 - 290, 75, 580, 560);
-        if (modalBgTex != null)
-        {
-            GUI.DrawTexture(r, modalBgTex);
-        }
-        else
-        {
-            GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.97f);
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            DrawFrame(r, 3, new Color(1f, 0.85f, 0.25f));
-        }
+        GUI.color = new Color(0f, 0f, 0f, 0.65f);
+        GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
+        GUI.color = Color.white;
 
-        Outlined(new Rect(r.x, r.y + 14, r.width, 46), "ONLINE MULTIPLAYER", St(sMid, 32), new Color(0.1f, 0.9f, 1f), 2.5f);
+        var r = new Rect(w / 2 - 290, 75, 580, 560);
+        DrawPopCard(r);
+        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 38), ribbonDriverTex, "★ ONLINE MULTIPLAYER ★");
+
         float x = r.x + 35, cw = r.width - 70, y = r.y + 64;
-        var info = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.85f, 0.9f, 1f));
+        var info = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.35f, 0.42f, 0.55f));
 
         if (Net.Busy)
         {
             // ロビー（参加者一覧）に入る前の接続待ち。入室後は DrawLobby に切り替わる
             string msg = string.IsNullOrEmpty(Net.Message) ? "Connecting..." : Net.Message;
-            GUI.Label(new Rect(x, y + 60, cw, 60), msg, St(sSmall, 22, TextAnchor.MiddleCenter, FontStyle.Bold, true, Color.white));
-            if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 56, 200, 38), "CANCEL  [ESC]", sButton)) LeaveOnline();
+            GUI.Label(new Rect(x, y + 60, cw, 60), msg, St(sSmall, 22, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(0.15f, 0.22f, 0.38f)));
+            if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 56, 200, 38), "CANCEL", "[ESC]", new Color(1f, 0.45f, 0.35f))) LeaveOnline();
             return;
         }
 
         // プレイヤー名入力
-        GUI.Label(new Rect(x, y, 140, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(1f, 0.9f, 0.5f)));
+        GUI.Label(new Rect(x, y, 140, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.15f, 0.22f, 0.38f)));
         string enteredName = GUI.TextField(new Rect(x + 140, y, 220, 32), playerName, 12, sField);
         SetPlayerName(enteredName);
         y += 48;
 
         // インターネット経由（Unity Relay）
-        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.4f, 0.85f, 1f)));
-        if (GUI.Button(new Rect(x, y + 30, 240, 42), "HOST ROOM", sButton)) Net.HostRelay();
+        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
+        if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST ROOM", "", new Color(1f, 0.62f, 0.1f), true)) Net.HostRelay();
         joinCodeInput = GUI.TextField(new Rect(x + 255, y + 30, 130, 42), joinCodeInput, 8, sField).ToUpperInvariant();
-        if (GUI.Button(new Rect(x + 395, y + 30, cw - 395, 42), "JOIN", sButton)) Net.JoinRelay(joinCodeInput);
+        if (DrawModernButton(new Rect(x + 395, y + 30, cw - 395, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f))) Net.JoinRelay(joinCodeInput);
 
         // IP 直接接続（LAN / VPN）
         y += 105;
-        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.4f, 0.85f, 1f)));
-        if (GUI.Button(new Rect(x, y + 30, 240, 42), "HOST (LISTEN)", sButton)) Net.HostDirect();
+        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
+        if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST (LISTEN)", "", new Color(0.65f, 0.35f, 0.92f))) Net.HostDirect();
         ipInput = GUI.TextField(new Rect(x + 255, y + 30, 150, 42), ipInput, 40, sField);
-        if (GUI.Button(new Rect(x + 415, y + 30, cw - 415, 42), "JOIN", sButton)) Net.JoinDirect(ipInput);
+        if (DrawModernButton(new Rect(x + 415, y + 30, cw - 415, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f))) Net.JoinDirect(ipInput);
 
         if (!string.IsNullOrEmpty(Net.Message))
-            GUI.Label(new Rect(x, y + 84, cw, 40), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(1f, 0.5f, 0.4f)));
+            GUI.Label(new Rect(x, y + 84, cw, 40), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(0.95f, 0.3f, 0.25f)));
         GUI.Label(new Rect(x, r.yMax - 98, cw, 40), "Host picks the course and starts the race. Up to 8 players, CPU karts fill empty slots.", info);
-        if (GUI.Button(new Rect(x + cw / 2 - 100, r.yMax - 50, 200, 38), "CLOSE  [ESC]", sButton)) netMenu = false;
+        if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 50, 200, 38), "CLOSE", "[ESC]", new Color(0.2f, 0.85f, 0.45f))) netMenu = false;
     }
 
     // オンラインロビー：3D ステージ上に全員のカートを並べ、頭上に名前タグ、下に操作パネルを表示する
@@ -354,20 +348,37 @@ public partial class RaceManager
         }
 
         var curDef = Track.Courses[SelectedCourse];
-        GUI.Label(new Rect(w - 384, 8, 360, 40), $"◄  {curDef.Name.ToUpper()}  ►", St(sSmall, 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
-        GUI.Label(new Rect(w - 384, 50, 360, 26), Net.IsHost ? "[A][D]  you pick the course" : "course is picked by the host", St(sSmall, 14, TextAnchor.MiddleRight, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
+        GUI.Label(new Rect(w - 384, 8, 360, 36), $"◄  {curDef.Name.ToUpper()}  ►", St(sSmall, 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
+        string diffBadge = SelectedCourse == 0 ? "★☆☆ NOVICE" : SelectedCourse == 1 ? "★★☆ ADVANCED" : SelectedCourse == 2 ? "★★★ EXPERT" : "★★☆ URBAN";
+        string courseInfo = Net.IsHost ? $"[A][D] CHANGE  •  {diffBadge}  •  {totalLaps} LAPS" : $"{diffBadge}  •  {totalLaps} LAPS";
+        GUI.Label(new Rect(w - 384, 48, 360, 26), courseInfo, St(sSmall, 13, TextAnchor.MiddleRight, FontStyle.Bold, false, new Color(0.7f, 0.9f, 1f)));
 
-        // 各カート頭上の名前タグ
-        for (int i = 0; i < lobbySlots.Count; i++)
+        float py = h - 190;
+
+        // 各カート頭上の名前タグ（奥から手前へ描画し、手前のタグが手前に重なるようにする）
+        var sortedSlots = new List<int>(lobbySlots);
+        sortedSlots.Sort((a, b) =>
         {
-            int slot = lobbySlots[i];
+            float da = Vector3.Dot(Karts[a].transform.position - cam.transform.position, cam.transform.forward);
+            float db = Vector3.Dot(Karts[b].transform.position - cam.transform.position, cam.transform.forward);
+            return db.CompareTo(da);
+        });
+
+        for (int i = 0; i < sortedSlots.Count; i++)
+        {
+            int slot = sortedSlots[i];
+            int orderIndex = lobbySlots.IndexOf(slot);
             var d = KartCharacters[Mathf.Clamp(playerKarts[slot], 0, KartCharacters.Length - 1)];
-            var sp = cam.WorldToScreenPoint(Karts[slot].transform.position + Vector3.up * 1.9f);
+            var sp = cam.WorldToScreenPoint(Karts[slot].transform.position + Vector3.up * 1.85f);
             if (sp.z <= 0f) continue;
             float gx = sp.x / scale, gy = (Screen.height - sp.y) / scale;
+
+            // 上部バー（ROOM CODE等）や下部操作パネルへの侵入を防止する安全ガード
+            gy = Mathf.Clamp(gy, 136f, py - 30f);
+
             bool me = slot == mySlot;
-            string custom = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : (me ? DisplayName : (slot == 5 ? "HOST" : $"P{i + 1}"));
-            string role = me ? (slot == 5 ? "YOU · HOST" : "YOU") : (slot == 5 ? "HOST" : $"P{i + 1}");
+            string custom = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : (me ? DisplayName : (slot == 5 ? "HOST" : $"P{orderIndex + 1}"));
+            string role = me ? (slot == 5 ? "YOU · HOST" : "YOU") : (slot == 5 ? "HOST" : $"P{orderIndex + 1}");
             float tw = 160f;
             var bg = me ? new Color(0.15f, 0.7f, 0.38f) : new Color(0.16f, 0.2f, 0.4f);
             DrawPopPill(new Rect(gx - tw / 2, gy - 44, tw, 20), $"{role}: {custom}", bg);
@@ -375,7 +386,6 @@ public partial class RaceManager
         }
 
         // 下部パネル
-        float py = h - 190;
         GUI.color = new Color(0.04f, 0.07f, 0.18f, 0.88f);
         GUI.DrawTexture(new Rect(0, py, w, 190), Texture2D.whiteTexture);
         GUI.color = Color.white;

@@ -150,6 +150,22 @@ public class Missile : MonoBehaviour
             fin.transform.localScale = new Vector3(0.8f, 0.06f, 0.3f);
             fin.GetComponent<Renderer>().sharedMaterial = rm.chromeMaterial;
         }
+
+        var audio = gameObject.AddComponent<AudioSource>();
+        audio.spatialBlend = 1.0f;
+        audio.rolloffMode = AudioRolloffMode.Logarithmic;
+        audio.minDistance = 3f;
+        audio.maxDistance = 50f;
+        audio.dopplerLevel = 1.5f;
+        audio.loop = true;
+        var clip = Resources.Load<AudioClip>("Audio/sfx_missile");
+        if (clip != null)
+        {
+            audio.clip = clip;
+            audio.volume = 0.65f * RaceAudio.MasterSfxVolume;
+            audio.pitch = 1.15f;
+            audio.Play();
+        }
     }
 
     void Update()

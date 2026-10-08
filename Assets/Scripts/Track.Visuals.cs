@@ -8,6 +8,9 @@ public partial class Track
 
     readonly List<Mesh> createdMeshes = new List<Mesh>();
     readonly List<Material> createdMaterials = new List<Material>();
+    readonly Renderer[] startSignalBulbs = new Renderer[3];
+    readonly Light[] startSignalLights = new Light[3];
+    MaterialPropertyBlock signalMpb;
 
     static void SafeDestroy(Object obj)
     {
@@ -34,6 +37,12 @@ public partial class Track
             foreach (var cm in cityMats)
                 if (cm != null) SafeDestroy(cm);
             cityMats = null;
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            startSignalBulbs[i] = null;
+            startSignalLights[i] = null;
         }
 
         BoostPads.Clear();
@@ -439,15 +448,27 @@ public partial class Track
         Box("GateBeam", Pts[0] + Vector3.up * 8.5f, new Vector3((HalfWidth + 3.5f) * 2f + 1.2f, 1.6f, 0.6f), rot, beamMat);
 
         // スタートシグナルランプ（赤・黄・青の3連ライト）
-        var signalColors = new[] { new Color(1f, 0.2f, 0.2f), new Color(1f, 0.85f, 0.15f), new Color(0.2f, 0.95f, 0.35f) };
+        signalMpb = new MaterialPropertyBlock();
         for (int i = 0; i < 3; i++)
         {
             float xOffset = (i - 1) * 2.4f;
             var lampPos = Pts[0] + rot * new Vector3(xOffset, 9.6f, 0.35f);
-            var lampMat = new Material(rm.glowMaterial) { color = signalColors[i] };
+            var lampMat = new Material(rm.glowMaterial) { color = Color.white };
+            createdMaterials.Add(lampMat);
             Box("SignalCase_" + i, lampPos, new Vector3(1.5f, 1.5f, 0.3f), rot, rm.tireMaterial);
-            Box("SignalBulb_" + i, lampPos + rot * Vector3.forward * 0.16f, new Vector3(1.1f, 1.1f, 0.1f), rot, lampMat, PrimitiveType.Cylinder).transform.localRotation = rot * Quaternion.Euler(90, 0, 0);
+            var bulb = Box("SignalBulb_" + i, lampPos + rot * Vector3.forward * 0.16f, new Vector3(1.1f, 1.1f, 0.1f), rot, lampMat, PrimitiveType.Cylinder);
+            bulb.transform.localRotation = rot * Quaternion.Euler(90, 0, 0);
+            startSignalBulbs[i] = bulb.GetComponent<Renderer>();
+
+            var lightGo = new GameObject("SignalLight_" + i);
+            lightGo.transform.SetParent(bulb.transform, false);
+            var l = lightGo.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.range = 14f;
+            l.intensity = 0f;
+            startSignalLights[i] = l;
         }
+        UpdateStartSignals(-1); // 初期状態は全消灯
 
         // 観客席（Circuitテーマ時）
         if (def.SceneryTheme == 0)
@@ -743,6 +764,53 @@ public partial class Track
                 var go = Instantiate(checkersFlag, pos, Quaternion.LookRotation(Dirs[0]), transform);
                 go.transform.localScale = Vector3.one * 1.6f;
                 StripColliders(go);
+            }
+        }
+    }
+
+    public void UpdateStartSignals(int beepStep)
+    {
+        if (signalMpb == null) signalMpb = new MaterialPropertyBlock();
+        // beepStep: -1 = 全消灯, 0 = 赤1灯(カウント3), 1 = 赤2灯(カウント2), 2 = 赤3灯(カウント1), 3 = 全青(GO!)
+        Color redOff = new Color(0.18f, 0.04f, 0.04f, 1f);
+        Color redOn = new Color(3.2f, 0.12f, 0.12f, 1f);
+        Color greenOn = new Color(0.2f, 3.4f, 0.8f, 1f);
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (startSignalBulbs[i] == null) continue;
+            Color emit;
+            float lightIntensity = 0f;
+            Color lightCol = Color.red;
+
+            if (beepStep < 0 || beepStep >= 4)
+            {
+                emit = redOff;
+                lightIntensity = 0f;
+            }
+            else if (beepStep == 3)
+            {
+                emit = greenOn;
+                lightIntensity = 3.2f;
+                lightCol = new Color(0.25f, 1f, 0.45f);
+            }
+            else
+            {
+                bool on = i <= beepStep;
+                emit = on ? redOn : redOff;
+                lightIntensity = on ? 2.4f : 0f;
+                lightCol = Color.red;
+            }
+
+            signalMpb.SetColor("_Color", emit);
+            signalMpb.SetColor("_BaseColor", emit);
+            signalMpb.SetColor("_EmissionColor", emit);
+            startSignalBulbs[i].SetPropertyBlock(signalMpb);
+
+            if (startSignalLights[i] != null)
+            {
+                startSignalLights[i].intensity = lightIntensity;
+                startSignalLights[i].color = lightCol;
             }
         }
     }

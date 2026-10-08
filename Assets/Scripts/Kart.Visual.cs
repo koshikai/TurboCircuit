@@ -344,6 +344,17 @@ public partial class Kart
         }
         if (Offroad && Speed > 6f && Random.value < 0.6f)
             Fx.Smoke((rearL + rearR) * 0.5f, back * 2.5f + Vector3.up * 1.5f, new Color(0.65f, 0.55f, 0.35f, 0.45f), 0.8f, 0.6f, 1, 1.2f);
+        // スリップストリーム（ドラフティング）の風切りストリーム演出
+        if (InDraftStream && Speed > 13f)
+        {
+            float sideX = kenneyReady ? 0.72f : 0.88f;
+            var draftPosL = transform.TransformPoint(new Vector3(-sideX, 0.45f, 0.6f));
+            var draftPosR = transform.TransformPoint(new Vector3(sideX, 0.45f, 0.6f));
+            var streamCol = new Color(0.6f, 0.9f, 1f, 0.75f);
+            Fx.Emit(draftPosL, back * 7f + Vector3.up * 0.5f, streamCol, 0.22f, 0.16f, 1, 0.25f);
+            Fx.Emit(draftPosR, back * 7f + Vector3.up * 0.5f, streamCol, 0.22f, 0.16f, 1, 0.25f);
+        }
+
         if (shieldTimer > 0 && Random.value < 0.5f)
             Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
     }

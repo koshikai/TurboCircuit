@@ -73,6 +73,18 @@ public partial class RaceManager
             DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
         }
 
+        // ──────────────── 2P対戦時のプレイヤー識別バッジ (1P / 2P) ────────────────
+        if (compact)
+        {
+            Color pBadgeCol = pi == 0 ? new Color(1f, 0.45f, 0.15f) : new Color(0.15f, 0.72f, 1f);
+            var badgeRect = new Rect(slot.xMax + 12, slot.y + 6, 78, 30);
+            GUI.color = pBadgeCol;
+            GUI.DrawTexture(badgeRect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawFrame(badgeRect, 2, Color.white);
+            Outlined(badgeRect, pi == 0 ? "★ 1P" : "★ 2P", St(sSmall, 18, TextAnchor.MiddleCenter, FontStyle.Bold), Color.white, 1.5f);
+        }
+
         ItemType shown = pl.Item;
         if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
         if (shown != ItemType.None)
@@ -136,7 +148,7 @@ public partial class RaceManager
         }
 
         // ──────────────── 周回とタイム（スタイリッシュスラントカード） ────────────────
-        var tr = new Rect(w - 280, 16, 260, 100);
+        var tr = compact ? new Rect(w - 248, 16, 232, 95) : new Rect(w - 280, 16, 260, 100);
         if (rankPlateTex != null)
         {
             GUI.color = new Color(0.04f, 0.08f, 0.18f, 0.85f);
@@ -145,10 +157,10 @@ public partial class RaceManager
         }
 
         int lap = Mathf.Clamp(pl.MaxLap, 1, totalLaps);
-        Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 20, 36), "LAP " + lap + " / " + totalLaps, St(sMid, 28, TextAnchor.MiddleRight), Color.white, 2);
-        Outlined(new Rect(tr.x + 10, tr.y + 42, tr.width - 20, 26), FormatTime(pl.Finished ? pl.FinishTime : raceTime), St(sNum, 22, TextAnchor.MiddleRight), new Color(1f, 0.95f, 0.4f), 2);
+        Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 20, 36), GetLapString(lap, totalLaps), St(sMid, compact ? 25 : 28, TextAnchor.MiddleRight), Color.white, 2);
+        Outlined(new Rect(tr.x + 10, tr.y + 40, tr.width - 20, 26), FormatTime(pl.Finished ? pl.FinishTime : raceTime), St(sMono, compact ? 22 : 24, TextAnchor.MiddleRight), new Color(1f, 0.95f, 0.4f), 2);
         if (pl == HumanKart(pi) && bestLap[pi] > 0)
-            Outlined(new Rect(tr.x + 10, tr.y + 68, tr.width - 20, 20), "BEST " + FormatTime(bestLap[pi]), St(sSmall, 14, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
+            Outlined(new Rect(tr.x + 10, tr.y + 66, tr.width - 20, 20), "BEST " + FormatTime(bestLap[pi]), St(sMono, compact ? 13 : 15, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
 
         // ──────────────── 後方確認 / 観戦バナー ────────────────
         if (isLookingBehind && pi == 0)
@@ -178,23 +190,36 @@ public partial class RaceManager
         }
 
         // ──────────────── 順位表示（スラントバッジプレート） ────────────────
-        string place = Ordinal(pl.Place);
-        Texture2D pPlate = pl.Place == 1 ? rankPlateGold : pl.Place == 2 ? rankPlateSilver : pl.Place == 3 ? rankPlateBronze : rankPlateTex;
-        var pr = compact ? new Rect(w - 180, h - 110, 170, 95) : new Rect(w - 240, h - 140, 225, 125);
-        if (pPlate != null)
+        if (IsTimeAttack)
         {
-            GUI.DrawTexture(pr, pPlate);
+            var pr = compact ? new Rect(w - 195, h - 90, 180, 75) : new Rect(w - 240, h - 110, 225, 95);
+            if (rankPlateTex != null) GUI.DrawTexture(pr, rankPlateTex);
+            Outlined(new Rect(pr.x, pr.y + 10, pr.width, 30), "TIME ATTACK", St(sSmall, compact ? 16 : 20, TextAnchor.MiddleCenter), new Color(0.3f, 0.9f, 1f), 2);
+            float bestC = GetBestTime(SelectedCourse);
+            string splitStr = bestC > 0 ? (raceTime < bestC ? $"-{FormatTime(bestC - raceTime)}" : $"+{FormatTime(raceTime - bestC)}") : "RECORD RUN";
+            Color splitCol = bestC > 0 && raceTime < bestC ? new Color(0.2f, 1f, 0.4f) : new Color(1f, 0.85f, 0.2f);
+            Outlined(new Rect(pr.x, pr.y + 42, pr.width, 28), splitStr, St(sMono, compact ? 18 : 22, TextAnchor.MiddleCenter), splitCol, 2);
         }
-        var ps = St(sNum, compact ? 70 : 92, TextAnchor.MiddleCenter);
-        Color pc = pl.Place == 1 ? new Color(0.25f, 0.12f, 0f) : pl.Place == 2 ? new Color(0.12f, 0.18f, 0.28f) : pl.Place == 3 ? new Color(0.28f, 0.12f, 0.05f) : Color.white;
-        Outlined(new Rect(pr.x, pr.y - 6, pr.width, pr.height), place, ps, pc, 4);
+        else
+        {
+            string place = Ordinal(pl.Place);
+            Texture2D pPlate = pl.Place == 1 ? rankPlateGold : pl.Place == 2 ? rankPlateSilver : pl.Place == 3 ? rankPlateBronze : rankPlateTex;
+            var pr = compact ? new Rect(w - 192, h - 110, 175, 95) : new Rect(w - 240, h - 140, 225, 125);
+            if (pPlate != null)
+            {
+                GUI.DrawTexture(pr, pPlate);
+            }
+            var ps = St(sNum, compact ? 70 : 92, TextAnchor.MiddleCenter);
+            Color pc = pl.Place == 1 ? new Color(0.25f, 0.12f, 0f) : pl.Place == 2 ? new Color(0.12f, 0.18f, 0.28f) : pl.Place == 3 ? new Color(0.28f, 0.12f, 0.05f) : Color.white;
+            Outlined(new Rect(pr.x, pr.y - 6, pr.width, pr.height), place, ps, pc, 4);
+        }
 
         // ──────────────── スピードメーター & タコメーターバー ────────────────
         int spdKmh = Mathf.RoundToInt(Mathf.Abs(pl.Speed) * 3.6f);
         var sr = compact ? new Rect(185, h - 75, 180, 60) : new Rect(w / 2 - 120, h - 78, 240, 65);
 
         // 速度数値 (Russo One)
-        Outlined(new Rect(sr.x, sr.y, sr.width, 38), spdKmh + " km/h", St(sNum, 32, TextAnchor.MiddleCenter), Color.white, 2.5f);
+        Outlined(new Rect(sr.x, sr.y, sr.width, 38), GetSpeedString(spdKmh), St(sNum, 32, TextAnchor.MiddleCenter), Color.white, 2.5f);
 
         // LEDタコメーターバー
         var barRect = new Rect(sr.x + 10, sr.y + 40, sr.width - 20, 12);
@@ -244,11 +269,11 @@ public partial class RaceManager
     {
         if (vignetteTex == null) return;
         float speed01 = pl != null ? Mathf.Clamp01(pl.Speed / Kart.MaxSpeed) : 0f;
-        bool boost = pl != null && pl.Boosting;
-        float boostBonus = boost ? 0.35f : 0f;
+        bool boost = pl != null && (pl.Boosting || pl.Slipstreaming);
+        float boostBonus = boost ? 0.35f : (pl != null && pl.InDraftStream ? 0.15f : 0f);
         float alpha = Mathf.Clamp01(0.18f + speed01 * 0.25f + boostBonus);
 
-        // ブースト時は周辺にサイバーブルーのエネルギーグローを薄く付加
+        // ブースト・スリップストリーム時は周辺にサイバーブルーのエネルギーグローを付加
         if (boost)
         {
             GUI.color = new Color(0.2f, 0.75f, 1f, alpha * 0.55f);
@@ -265,7 +290,7 @@ public partial class RaceManager
         var vk = ViewKart;
         if (vk == null) return;
         float speedRatio = Mathf.Clamp01(vk.Speed / Kart.MaxSpeed);
-        bool boost = vk.Boosting;
+        bool boost = vk.Boosting || vk.Slipstreaming;
         if (speedRatio < 0.38f && !boost) return;
 
         // 速度比率 0.38〜1.0 を 0〜1 に正規化。ブースト時は 1.4

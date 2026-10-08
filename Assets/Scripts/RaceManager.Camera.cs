@@ -117,7 +117,8 @@ public partial class RaceManager
         if (state == State.Results && Time.time > finishAt + 1.5f && !spectating) camYaws[p] += 25f * dt;
         else camYaws[p] = Mathf.LerpAngle(camYaws[p], pl.Heading, 1f - Mathf.Exp(-5f * dt));
 
-        bool lookBehind = (p == 0 && !pl.Finished && !spectating && (Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.JoystickButton9)));
+        bool lookBehind = (p == 0 && !pl.Finished && !spectating && 
+            (Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.JoystickButton9)));
         isLookingBehind = lookBehind;
 
         float yaw = camYaws[p];
@@ -132,6 +133,15 @@ public partial class RaceManager
             yaw += 180f * (1f - t);
             dist = Mathf.Lerp(5f, 6.8f, t);
         }
+        else if (state == State.Racing)
+        {
+            // 加速・ブーストによるダイナミックなカメラの引き込み（Gフォース感）
+            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+            float gPull = (pl.Boosting || pl.Slipstreaming ? 1.5f : spd01 * 0.9f);
+            dist += gPull;
+            height -= gPull * 0.12f;
+        }
+
         var r = Quaternion.Euler(0, yaw, 0);
         var target = kp + r * new Vector3(0, height, -dist);
         bool snap = state == State.Countdown && stateTime < 0.05f;
@@ -142,9 +152,14 @@ public partial class RaceManager
         c.transform.LookAt(kp + r * new Vector3(0, 1.1f + pitchOffset, 3.2f));
         if (shake > 0) c.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
 
-        // 分割画面は横幅が狭いので視野角を広めに取る
-        float fov = (TwoPlayer ? 70f : 62f) + Mathf.Clamp01(pl.Speed / Kart.MaxSpeed) * 4f + (pl.Boosting ? 10f : 0f);
-        if (pl.IsAirborne) fov += 12f;
-        c.fieldOfView = Mathf.Lerp(c.fieldOfView, fov, 1f - Mathf.Exp(-6f * dt));
+        // ダイナミック FOV ブースト：最高速・ブースト・スリップストリーム・トリック連動
+        float baseFov = TwoPlayer ? 68f : 60f;
+        float spdRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+        float boostFov = (pl.Boosting ? 14f : 0f) + (pl.Slipstreaming ? 11f : 0f) + (pl.InDraftStream ? 3.5f : 0f);
+        if (pl.IsAirborne) boostFov += pl.TrickSuccess ? 16f : 11f;
+        if (lookBehind) boostFov += 8f;
+
+        float targetFov = baseFov + spdRatio * 6f + boostFov;
+        c.fieldOfView = Mathf.Lerp(c.fieldOfView, targetFov, 1f - Mathf.Exp(-7f * dt));
     }
 }

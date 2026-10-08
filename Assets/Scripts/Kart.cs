@@ -50,6 +50,17 @@ public partial class Kart : MonoBehaviour
     public bool IsAirborne => isAirborne;
     public Vector3 Forward => Quaternion.Euler(0, Heading, 0) * Vector3.forward;
 
+    // スリップストリーム & ジャンプトリック
+    public bool InDraftStream { get; private set; }
+    public bool Slipstreaming => slipstreamTimer > 0;
+    public float SlipstreamCharge => slipstreamDraftTimer;
+    public bool TrickSuccess => trickDone;
+
+    float slipstreamDraftTimer, slipstreamTimer;
+    float trickWindowTimer;
+    bool trickDone;
+    AudioSource engine3D;
+
     float boostTimer, shieldTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
     bool drifting;
     int driftDir;
@@ -88,7 +99,31 @@ public partial class Kart : MonoBehaviour
         aiSeed = Random.value * 100f;
         aiLane = lateral * 0.5f;
         BuildModel();
+        Setup3DEngineAudio();
         ResetTo(index, lateral);
+    }
+
+    void Setup3DEngineAudio()
+    {
+        if (IsPlayer) return;
+        if (engine3D == null)
+        {
+            engine3D = gameObject.AddComponent<AudioSource>();
+            engine3D.spatialBlend = 1.0f; // 3D音響
+            engine3D.rolloffMode = AudioRolloffMode.Logarithmic;
+            engine3D.minDistance = 3.5f;
+            engine3D.maxDistance = 38f;
+            engine3D.dopplerLevel = 1.25f;
+            engine3D.loop = true;
+            engine3D.playOnAwake = false;
+            var clip = Resources.Load<AudioClip>("Audio/sfx_engine");
+            if (clip != null)
+            {
+                engine3D.clip = clip;
+                engine3D.volume = 0f;
+                engine3D.Play();
+            }
+        }
     }
 
     public void RebuildModel()
@@ -131,6 +166,10 @@ public partial class Kart : MonoBehaviour
         Item = ItemType.None;
         RouletteTimer = 0;
         boostTimer = shieldTimer = spinTimer = invulnTimer = driftCharge = 0;
+        slipstreamDraftTimer = slipstreamTimer = 0;
+        trickWindowTimer = 0;
+        trickDone = false;
+        InDraftStream = false;
         drifting = false;
         isBraking = false;
         spinAngle = 0;
@@ -193,6 +232,56 @@ public partial class Kart : MonoBehaviour
         {
             if (inp.useItem && Item != ItemType.None && RouletteTimer <= 0) UseItem();
 
+            slipstreamTimer -= dt;
+
+            // スリップストリーム（ドラフティング）判定
+            bool draftingCandidate = false;
+            if (canDrive && Speed > 13f && rm != null && rm.Karts != null)
+            {
+                var myPos = transform.position;
+                var myFwd = Forward;
+                for (int kIdx = 0; kIdx < rm.Karts.Count; kIdx++)
+                {
+                    var other = rm.Karts[kIdx];
+                    if (other == this || other == null) continue;
+                    var toOther = other.transform.position - myPos;
+                    if (Mathf.Abs(toOther.y) > 2.2f) continue;
+                    float fwdDist = Vector3.Dot(toOther, myFwd);
+                    if (fwdDist > 2.5f && fwdDist < 16.0f)
+                    {
+                        float sideDist = Mathf.Abs(Vector3.Dot(toOther, transform.right));
+                        if (sideDist < 1.9f && other.Speed > 10f)
+                        {
+                            draftingCandidate = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            InDraftStream = draftingCandidate;
+            if (draftingCandidate)
+            {
+                slipstreamDraftTimer += dt;
+                if (slipstreamDraftTimer >= 1.15f)
+                {
+                    slipstreamDraftTimer = 0f;
+                    slipstreamTimer = 1.6f;
+                    Boost(1.6f);
+                    if (IsPlayer)
+                    {
+                        rm.Audio.Boost();
+                        rm.Banner("SLIPSTREAM!", new Color(0.3f, 0.9f, 1f), PlayerIndex);
+                        GamepadHaptics.Vibrate(PlayerIndex, 0.35f, 0.85f, 0.35f);
+                    }
+                    Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.9f, 1f), 15, 6f, 0.35f);
+                }
+            }
+            else
+            {
+                slipstreamDraftTimer = Mathf.MoveTowards(slipstreamDraftTimer, 0, dt * 1.5f);
+            }
+
             if (inp.driftDown && !drifting)
             {
                 hopT = 0;
@@ -207,10 +296,11 @@ public partial class Kart : MonoBehaviour
 
             float max = MaxSpeed * topSpeedMul * AISpeedFactor();
             if (shieldTimer > 0) max *= 1.12f;
+            if (slipstreamTimer > 0) max *= 1.18f;
             Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
-            if (Offroad && boostTimer <= 0 && shieldTimer <= 0) max *= 0.45f;
+            if (Offroad && boostTimer <= 0 && shieldTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
-            if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, MaxSpeed * 1.4f, 60f * dt);
+            if (boostTimer > 0 || slipstreamTimer > 0) Speed = Mathf.MoveTowards(Speed, MaxSpeed * 1.4f, 60f * dt);
             else if (Speed > max) Speed = Mathf.MoveTowards(Speed, max, 20f * dt);
             else if (inp.throttle > 0) Speed = Mathf.MoveTowards(Speed, max, 15f * accelMul * (1f - 0.55f * Speed / max) * dt);
             else if (inp.throttle < 0) Speed = Mathf.MoveTowards(Speed, -9f, (Speed > 0 ? 32f : 12f) * dt);
@@ -303,7 +393,39 @@ public partial class Kart : MonoBehaviour
         {
             verticalVel -= 28f * dt; // 重力加速度
             curPos.y += verticalVel * dt;
-            airTrickSpin += 720f * dt; // 空中トリックスピン
+
+            // 空中トリックの入力判定（踏み切り直後）
+            if (trickWindowTimer > 0)
+            {
+                trickWindowTimer -= dt;
+                bool doTrick = false;
+                if (IsPlayer && !rm.Demo)
+                {
+                    doTrick = inp.driftDown || Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(InputSettings.KeyDriftAlt)
+                           || Input.GetKeyDown(KeyCode.JoystickButton4) || Input.GetKeyDown(KeyCode.JoystickButton5);
+                }
+                else if (!IsPlayer)
+                {
+                    doTrick = Random.value < (0.65f * aiSkill);
+                }
+
+                if (doTrick && !trickDone)
+                {
+                    trickDone = true;
+                    trickWindowTimer = 0f;
+                    Fx.Burst(transform.position + Vector3.up * 0.8f, new Color(1f, 0.9f, 0.2f), 18, 7f, 0.45f);
+                    if (IsPlayer)
+                    {
+                        rm.Audio.Boost();
+                        rm.Shake(0.3f);
+                        rm.Banner("PERFECT TRICK!", new Color(1f, 0.85f, 0.1f), PlayerIndex);
+                        GamepadHaptics.Vibrate(PlayerIndex, 0.45f, 0.95f, 0.35f);
+                    }
+                }
+            }
+
+            float spinSpeed = trickDone ? 1080f : 720f;
+            airTrickSpin += spinSpeed * dt; // 空中トリックスピン
 
             if (curPos.y <= roadY)
             {
@@ -312,7 +434,20 @@ public partial class Kart : MonoBehaviour
                 verticalVel = 0;
                 isAirborne = false;
                 airTrickSpin = 0;
-                Boost(0.65f); // 着地ミニターボ！
+
+                if (trickDone)
+                {
+                    Boost(1.3f); // トリック成功スーパー着地ミニターボ！
+                    Fx.Burst(curPos, new Color(0.2f, 0.9f, 1f), 16, 6f, 0.4f);
+                    if (IsPlayer) rm.Banner("TRICK BOOST!", new Color(0.2f, 0.9f, 1f), PlayerIndex);
+                }
+                else
+                {
+                    Boost(0.65f); // 通常着地ミニターボ！
+                }
+                trickDone = false;
+                trickWindowTimer = 0f;
+
                 Fx.Smoke(curPos, -Forward * 3f + Vector3.up * 1.5f, new Color(0.9f, 0.9f, 0.95f, 0.6f), 1.2f, 0.5f, 3);
                 if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.45f); GamepadHaptics.Vibrate(PlayerIndex, 0.55f, 0.2f, 0.15f); }
             }
@@ -325,6 +460,8 @@ public partial class Kart : MonoBehaviour
             {
                 isAirborne = true;
                 verticalVel = 4f;
+                trickWindowTimer = 0.25f;
+                trickDone = false;
             }
             transform.position = curPos;
         }
@@ -337,6 +474,8 @@ public partial class Kart : MonoBehaviour
             verticalVel = 0f;
             isAirborne = false;
             airTrickSpin = 0f;
+            trickDone = false;
+            trickWindowTimer = 0f;
             VelDir = Forward;
             transform.position = curPos;
             if (IsPlayer)
@@ -357,6 +496,14 @@ public partial class Kart : MonoBehaviour
         }
 
         if (IsPlayer) GamepadHaptics.SetDrift(PlayerIndex, drifting ? DriftLevel : 0);
+
+        // ライバルカートの 3D エンジン音更新
+        if (engine3D != null && engine3D.isPlaying)
+        {
+            float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
+            engine3D.pitch = Mathf.Lerp(0.65f, 1.45f, spd01);
+            engine3D.volume = Mathf.Lerp(0.04f, 0.52f, spd01) * RaceAudio.MasterSfxVolume;
+        }
 
         Effects(dt);
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
@@ -394,6 +541,8 @@ public partial class Kart : MonoBehaviour
         isAirborne = true;
         airTrickSpin = 0f;
         jumpCooldown = 2.2f;
+        trickWindowTimer = 0.35f;
+        trickDone = false;
         Speed = Mathf.Max(Speed, MaxSpeed * 1.15f);
         if (IsPlayer)
         {

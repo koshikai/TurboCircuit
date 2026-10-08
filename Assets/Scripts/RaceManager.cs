@@ -62,7 +62,7 @@ public partial class RaceManager : MonoBehaviour
     public float RaceTime => raceTime;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
-    bool screenshotRequested, screenshotTaken, titleShotRequested, testBoostRequested;
+    bool screenshotRequested, screenshotTaken, titleShotRequested, testBoostRequested, autoShotRequested;
     string customShotName;
     float shotDelay = 4.2f;
 
@@ -71,7 +71,7 @@ public partial class RaceManager : MonoBehaviour
     readonly List<Banana> bananas = new List<Banana>();
     readonly List<Missile> missiles = new List<Missile>();
     Font font;
-    Font fontMain, fontNum;
+    Font fontMain, fontNum, fontMono;
 
     float stateTime, raceTime, shake, finishAt;
     int lastCountdownBeep;
@@ -103,8 +103,16 @@ public partial class RaceManager : MonoBehaviour
     bool isLookingBehind;
     int spectateIndex = -1;
     bool showSettings;
+    int settingsTab = 0; // 0 = General, 1 = Key Config
+    string waitingKeyAction = null;
     string playerName = "Player";
     readonly Dictionary<int, string> playerNames = new Dictionary<int, string>();
+
+    // タイムアタック & ゴーストカー
+    public bool IsTimeAttack { get; private set; }
+    GhostReplay ghostReplay;
+    readonly List<GhostFrame> currentRunGhost = new List<GhostFrame>();
+    float nextGhostSampleTime;
 
     // 入力欄が空でも表示・送信には必ず有効な名前を使う
     string DisplayName => string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim();
@@ -125,6 +133,7 @@ public partial class RaceManager : MonoBehaviour
     void CloseSettings()
     {
         showSettings = false;
+        waitingKeyAction = null;
         PlayerPrefs.Save();
     }
 
@@ -136,7 +145,7 @@ public partial class RaceManager : MonoBehaviour
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
-    GUIStyle sButton, sField, sNum;
+    GUIStyle sButton, sField, sNum, sMono;
     readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
@@ -218,6 +227,7 @@ public partial class RaceManager : MonoBehaviour
         screenshotRequested = args.Contains("-screenshot");
         titleShotRequested = args.Contains("-titleshot");
         testBoostRequested = args.Contains("-testboost");
+        autoShotRequested = args.Contains("-autoshot");
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "-shotdelay" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d))
@@ -230,6 +240,7 @@ public partial class RaceManager : MonoBehaviour
         EnsureMaterials();
         LoadUIAssets();
         Audio = gameObject.AddComponent<RaceAudio>();
+        ghostReplay = gameObject.AddComponent<GhostReplay>();
         Fx.Init(glowMaterial);
         vignetteTex = TextureGen.Vignette();
         speedLineTex = TextureGen.SpeedLine();
@@ -321,6 +332,105 @@ public partial class RaceManager : MonoBehaviour
             if (args[i] == "-netjoin") Net.JoinDirect(args[i + 1]);
 
         LoadCourse(cIdx);
+    }
+
+    void Start()
+    {
+        if (autoShotRequested) StartCoroutine(AutoCaptureScreens());
+    }
+
+    System.Collections.IEnumerator AutoCaptureScreens()
+    {
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_01_title.png");
+        yield return new WaitForSeconds(0.4f);
+
+        showSettings = true;
+        settingsTab = 0;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_02_settings_general.png");
+        yield return new WaitForSeconds(0.4f);
+
+        settingsTab = 1;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_03_settings_keys.png");
+        yield return new WaitForSeconds(0.4f);
+        CloseSettings();
+        yield return new WaitForSeconds(0.4f);
+
+        StartRaceFromTitle();
+        yield return new WaitForSeconds(1.8f);
+        ScreenCapture.CaptureScreenshot("shot_04_countdown.png");
+
+        yield return new WaitForSeconds(2.8f);
+        ScreenCapture.CaptureScreenshot("shot_05_racing_1p.png");
+
+        paused = true;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_06_paused.png");
+        yield return new WaitForSeconds(0.4f);
+        paused = false;
+
+        // 7. リザルト画面
+        foreach (var k in Karts) { k.Finished = true; k.Place = Karts.IndexOf(k) + 1; k.FinishTime = 72.5f + k.Place * 1.5f; }
+        placeOrder.Clear();
+        placeOrder.AddRange(Karts);
+        placeOrder.Sort(ComparePlaces);
+        state = State.Results;
+        finishAt = Time.time - 5f;
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_07_results.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 8. 2P レース中 HUD
+        SetTwoPlayer(true);
+        ResetRace();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 15.2f;
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_08_racing_2p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 9. タイムアタック レース中 HUD
+        SetTwoPlayer(false);
+        IsTimeAttack = true;
+        ResetRace();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 28.6f;
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_09_racing_timeattack.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 10. オンライン待機画面 (LOBBY - ROOM CODE 付き 4人)
+        state = State.Title;
+        SetTwoPlayer(false);
+        IsTimeAttack = false;
+        Net.HostDirect();
+        Net.JoinCode = "WFHPQQ";
+        playerKarts[5] = 0; playerNames[5] = "HostPlayer";
+        playerKarts[0] = 1; playerNames[0] = "RivalOne";
+        playerKarts[1] = 2; playerNames[1] = "Speedy";
+        playerKarts[2] = 3; playerNames[2] = "KartMaster";
+        lobbySlots.Clear();
+        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_10_lobby_4p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 11. オンライン待機画面 (LOBBY - ROOM CODE 付き 8人満員)
+        playerKarts[3] = 4; playerNames[3] = "Racer4";
+        playerKarts[4] = 0; playerNames[4] = "Racer5";
+        playerKarts[6] = 1; playerNames[6] = "Racer6";
+        playerKarts[7] = 2; playerNames[7] = "Racer7";
+        lobbySlots.Clear();
+        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_11_lobby_8p.png");
+
+        yield return new WaitForSeconds(0.5f);
+        Application.Quit();
     }
 
     void ApplyKartStats()
@@ -611,8 +721,17 @@ public partial class RaceManager : MonoBehaviour
                     { showSettings = !showSettings; break; }
                 if ((Input.GetKeyDown(KeyCode.O) || Input.GetKeyDown(KeyCode.JoystickButton2)) && !Net.Busy)
                     { netMenu = true; break; }
+                if (Input.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
+                {
+                    IsTimeAttack = !IsTimeAttack;
+                    if (Audio != null) Audio.Select();
+                    break;
+                }
                 if ((Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.JoystickButton3)) && !Net.Busy)
+                {
+                    if (IsTimeAttack) IsTimeAttack = false;
                     SetTwoPlayer(!TwoPlayer);
+                }
                 else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.JoystickButton4))
                     SwitchCourse(-1);
                 else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.JoystickButton5))
@@ -634,6 +753,7 @@ public partial class RaceManager : MonoBehaviour
                 if (beep != lastCountdownBeep && beep >= 0 && beep <= 3)
                 {
                     lastCountdownBeep = beep;
+                    if (track != null) track.UpdateStartSignals(beep);
                     if (beep < 3) Audio.Beep();
                     else
                     {
@@ -646,6 +766,19 @@ public partial class RaceManager : MonoBehaviour
                 break;
             case State.Racing:
                 raceTime += dt;
+                if (stateTime > 2.5f && stateTime - dt <= 2.5f && track != null)
+                {
+                    track.UpdateStartSignals(-1); // GO演出終了後に消灯
+                }
+                if (IsTimeAttack && ghostReplay != null)
+                {
+                    ghostReplay.TickPlayback(raceTime);
+                    if (raceTime >= nextGhostSampleTime && Player != null && !Player.Finished)
+                    {
+                        currentRunGhost.Add(new GhostFrame { t = raceTime, pos = Player.transform.position, heading = Player.Heading });
+                        nextGhostSampleTime = raceTime + 0.05f;
+                    }
+                }
                 if (Online)
                 {
                     if (firstFinishTime < 0f)
@@ -726,8 +859,24 @@ public partial class RaceManager : MonoBehaviour
     void StartCountdown()
     {
         if (!Online) RestoreRoles();
-        ShowAllKarts();
+        if (IsTimeAttack)
+        {
+            currentRunGhost.Clear();
+            nextGhostSampleTime = 0f;
+            if (ghostReplay != null) ghostReplay.InitPlayback(SelectedCourse, glowMaterial, track);
+            for (int i = 0; i < Karts.Count; i++)
+            {
+                if (Karts[i] != Player) Karts[i].gameObject.SetActive(false);
+            }
+            if (Player != null) Player.Item = ItemType.Turbo; // タイムアタック開幕ターボ支給
+        }
+        else
+        {
+            if (ghostReplay != null) ghostReplay.ClearPlayback();
+            ShowAllKarts();
+        }
         ResetRace();
+        if (track != null) track.UpdateStartSignals(-1);
         firstFinishTime = -1f;
         newRecordTime = false;
         newRecordLap = false;
@@ -756,6 +905,12 @@ public partial class RaceManager : MonoBehaviour
                         SetBestTime(SelectedCourse, k.FinishTime);
                         newRecordTime = true;
                         Banner("NEW COURSE RECORD!", new Color(1f, 0.85f, 0.2f), k.PlayerIndex);
+
+                        if (IsTimeAttack && currentRunGhost.Count > 1)
+                        {
+                            var gd = new GhostData { finishTime = k.FinishTime, frames = new List<GhostFrame>(currentRunGhost) };
+                            GhostReplay.SaveGhost(SelectedCourse, gd);
+                        }
                     }
                 }
             }
