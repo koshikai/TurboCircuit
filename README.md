@@ -1,6 +1,6 @@
 # Turbo Circuit
 
-Unity 製の 3D カートレーシングゲームです。4 コース・5 キャラ、アイテム戦、ドリフト、ジャンプ台、**2 人対戦（画面分割）** を備えています。
+Unity 製の 3D カートレーシングゲームです。5 コース・5 キャラ、アイテム戦、ドリフト、ジャンプ台、**2 人対戦（画面分割）** を備えています。
 
 ## ダウンロード (Windows)
 
@@ -14,6 +14,7 @@ Unity 製の 3D カートレーシングゲームです。4 コース・5 キャ
 | 2 | SUNSET DUNES | 砂漠の巨大デューンとジェットコースター |
 | 3 | FROST PEAK | 標高差 35m の雪山クライム |
 | 4 | NEON METROPOLIS | 摩天楼の谷間とビルを貫通するトンネル |
+| 5 | HOKKAIDO CAMPUS | 北海道大学札幌キャンパス：エルムの森、クラーク像、黄金のイチョウ並木、第2農場モデルバーンとポプラ並木 |
 
 ## 操作
 
@@ -55,6 +56,7 @@ Unity.exe -batchmode -nographics -quit -projectPath . -executeMethod BuildTool.B
 
 ## クレジット
 
-カートと小物のモデルは [Kenney](https://kenney.nl/) のアセット（CC0）を使用しています。
+コース内のスタイライズド樹木・植物・岩石モデルおよびテクスチャは [Quaternius](https://quaternius.com/)（CC0 / MIT）の Stylized Nature Kit を使用しています。
+カート、サーキット小物、およびコース内の生き物・動物モデル（ペンギン、ウサギ、シカ、牛、ライオン等）は [Kenney](https://kenney.nl/) のアセット（CC0 / Cube Pets）を使用しています。
 
 効果音は [Kenney](https://kenney.nl/) の Interface / Impact / Sci-fi Sounds（CC0）、BGM は OpenGameArt の CC0 楽曲（cynicmusic、Julie Damsgaard、Centurion_of_war、wipics）を使用しています。曲名とリンクは [Assets/Resources/Audio/CREDITS.md](Assets/Resources/Audio/CREDITS.md) に記載しています。

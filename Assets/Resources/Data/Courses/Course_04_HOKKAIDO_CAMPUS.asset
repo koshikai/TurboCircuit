@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: Course_04_HOKKAIDO_CAMPUS
+  m_EditorClassIdentifier: Assembly-CSharp::CourseData
+  courseName: HOKKAIDO CAMPUS
+  description: 'Authentic tour of Hokkaido University''s Sapporo campus: Main Avenue, golden Ginkgo Avenue, Clark statue, historic Model Barn, and Poplar Avenue.'
+  controlPoints:
+  - {x: -40, y: 0, z: -210}
+  - {x: 20, y: 0, z: -210}
+  - {x: 60, y: 0, z: -180}
+  - {x: 60, y: 1, z: -120}
+  - {x: 60, y: 1, z: -50}
+  - {x: 60, y: 1, z: 20}
+  - {x: 90, y: 1, z: 65}
+  - {x: 150, y: 1, z: 75}
+  - {x: 175, y: 2, z: 105}
+  - {x: 130, y: 2, z: 125}
+  - {x: 70, y: 2, z: 135}
+  - {x: 60, y: 3, z: 185}
+  - {x: 50, y: 6, z: 245}
+  - {x: 0, y: 9, z: 290}
+  - {x: -55, y: 12, z: 285}
+  - {x: -105, y: 14, z: 255}
+  - {x: -115, y: 15, z: 210}
+  - {x: -115, y: 7, z: 145}
+  - {x: -105, y: 3, z: 75}
+  - {x: -105, y: 2, z: -10}
+  - {x: -105, y: 1, z: -90}
+  - {x: -95, y: 0, z: -165}
+  - {x: -65, y: 0, z: -200}
+  ramps:
+  - Ratio: 0.695
+    Power: 16
+  tunnels:
+  - Start: 0.64
+    End: 0.685
+  skyTint: {r: 0.25, g: 0.55, b: 0.95, a: 1}
+  groundColor: {r: 0.26, g: 0.48, b: 0.22, a: 1}
+  sunColor: {r: 1, g: 0.95, b: 0.88, a: 1}
+  sunIntensity: 1.38
+  sunRotation: {x: 48, y: -35, z: 0}
+  fogColor: {r: 0.65, g: 0.82, b: 0.96, a: 1}
+  fogDistance: 1200
+  roadColor: {r: 0.26, g: 0.27, b: 0.28, a: 1}
+  curbColorA: {r: 0.08, g: 0.48, b: 0.22, a: 1}
+  curbColorB: {r: 1, g: 1, b: 1, a: 1}
+  wallColorA: {r: 0.12, g: 0.46, b: 0.26, a: 1}
+  wallColorB: {r: 0.95, g: 0.95, b: 0.92, a: 1}
+  shoulderColor: {r: 0.82, g: 0.74, b: 0.58, a: 1}
+  sceneryTheme: 4

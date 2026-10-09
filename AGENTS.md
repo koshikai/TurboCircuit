@@ -11,7 +11,7 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 * **プラットフォーム**: Windows (64-bit)
 * **ジャンル**: 3D カートレーシングゲーム（1Pソロ / 2P画面分割対戦 / 最大8人オンライン対戦）
 * **特徴**:
-  * 4コース（TURBO CIRCUIT, SUNSET DUNES, FROST PEAK, NEON METROPOLIS）
+  * 5コース（TURBO CIRCUIT, SUNSET DUNES, FROST PEAK, NEON METROPOLIS, HOKKAIDO CAMPUS）
   * 5キャラクター/カート（OOBI, OODI, OOLI, OOPI, OOZI）
   * ドリフトブースト、アイテムバトル、ジャンプ台、ゴースト再生
   * Unity Relay / Direct IP によるオンラインマルチプレイ対応

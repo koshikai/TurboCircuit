@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 5a86c4a266b14182a8152fb7c2afef79
+ModelImporter:
+  serializedVersion: 24600
+  internalIDToNameTable: []
+  externalObjects: {}
+  materials:
+    materialImportMode: 2
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+    searchTexturesGlobally: 0
+  meshes:
+    globalScale: 1
+    useFileScale: 1
+    addColliders: 0

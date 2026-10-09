@@ -12,7 +12,7 @@ public class RaceAudio : MonoBehaviour
     AudioSource engine, driftLoop, music;
     AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, shield, select, explosion;
     AudioClip[] bumps;
-    readonly AudioClip[] bgm = new AudioClip[4];
+    readonly AudioClip[] bgm = new AudioClip[5];
 
     static AudioClip Load(string name, AudioClip fallback)
     {

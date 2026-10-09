@@ -37,7 +37,7 @@ public struct TrackDef
     public Color WallColorA;
     public Color WallColorB;
     public Color ShoulderColor;
-    public int SceneryTheme; // 0 = Circuit, 1 = Desert, 2 = Snow, 3 = City
+    public int SceneryTheme; // 0 = Circuit, 1 = Desert, 2 = Snow, 3 = City, 4 = Campus (Hokkaido)
 }
 
 // コース。制御点からスプラインを作り、等間隔のサンプル点・路面メッシュ・装飾を生成する。
@@ -219,6 +219,55 @@ public partial class Track : MonoBehaviour
             WallColorB = new Color(0.55f, 0.6f, 0.75f),
             ShoulderColor = new Color(0.5f, 0.52f, 0.6f),
             SceneryTheme = 3
+        },
+        // 5. Hokkaido Campus - 北大札幌キャンパスの実際の道路網・形状を再現！
+        // 南端正門からメインストリートを北上、東の北13条イチョウ並木、北西の第2農場モデルバーン（ビッグジャンプ）、西のポプラ並木通りを南下する精密レイアウト
+        new TrackDef
+        {
+            Name = "HOKKAIDO CAMPUS",
+            Description = "Authentic tour of Hokkaido University's Sapporo campus: Main Avenue, golden Ginkgo Avenue, Clark statue, historic Model Barn, and Poplar Avenue.",
+            Control = new[]
+            {
+                new Vector3(-40, 0, -210),      // 0: 【南端・北大正門前】ホームストレート（スタート/フィニッシュ）
+                new Vector3(20, 0, -210),       // 1: 正門前ストレート東（百年記念会館・南門前）
+                new Vector3(60, 0, -180),       // 2: 東へ旋回しメインストリート南端へ
+                new Vector3(60, 1, -120),       // 3: 【メインストリート南セクション】左手に中央ローン・クラーク像・古河講堂
+                new Vector3(60, 1, -50),        // 4: メインストリート直線加速区間
+                new Vector3(60, 1, 20),         // 5: 【北大総合博物館 & 大野池】博物館前（右手）と大野池（左手）
+                new Vector3(90, 1, 65),         // 6: 【北13条交差点】東のイチョウ並木通りへターン！
+                new Vector3(150, 1, 75),        // 7: 【北13条イチョウ並木】東へ真っ直ぐ伸びる黄金色のトンネル！
+                new Vector3(175, 2, 105),       // 8: イチョウ並木東端（北13条門手前のヘアピンターン）
+                new Vector3(130, 2, 125),       // 9: イチョウ並木から北へスイング
+                new Vector3(70, 2, 135),        // 10: メインストリート北セクションへ合流
+                new Vector3(60, 3, 185),        // 11: 【メインストリート北セクション】工学部・総合研究棟前の超ロング直線
+                new Vector3(50, 6, 245),        // 12: 北18条門付近・最北端アプローチ
+                new Vector3(0, 9, 290),         // 13: キャンパス北端（北20条付近）で西へ大きく旋回
+                new Vector3(-55, 12, 285),      // 14: 第2農場へのアプローチ登り坂
+                new Vector3(-105, 14, 255),     // 15: 【札幌農学校第2農場】モデルバーン（赤屋根納屋トンネル）！
+                new Vector3(-115, 15, 210),     // 16: 納屋を突き抜けて牧草地へダイブする【ビッグジャンプ台】！
+                new Vector3(-115, 7, 145),      // 17: 牧草地ダウンヒル（白い木柵と放牧牛）
+                new Vector3(-105, 3, 75),       // 18: 【ポプラ並木通り（Poplar Avenue）】直立ポプラが並ぶ西側高速ストレート
+                new Vector3(-105, 2, -10),      // 19: ポプラ並木ストレート中央
+                new Vector3(-105, 1, -90),      // 20: 花木園・高等教育推進機構西側を南下
+                new Vector3(-95, 0, -165),      // 21: サクシュコトニ川・中央ローン西側へのターン
+                new Vector3(-65, 0, -200)       // 22: クラーク会館前・最終コーナー（ホームストレートへ）
+            },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.695f, Power = 16f } },
+            Tunnels = new[] { new TunnelDef { Start = 0.64f, End = 0.685f } }, // モデルバーン（歴史的牛舎）の屋内を駆け抜ける！
+            SkyTint = new Color(0.25f, 0.55f, 0.95f),
+            GroundColor = new Color(0.26f, 0.48f, 0.22f),
+            SunColor = new Color(1f, 0.95f, 0.88f),
+            SunIntensity = 1.38f,
+            SunRotation = new Vector3(48f, -35f, 0f),
+            FogColor = new Color(0.65f, 0.82f, 0.96f),
+            FogDistance = 1200f,
+            RoadColor = new Color(0.26f, 0.27f, 0.28f),
+            CurbColorA = new Color(0.08f, 0.48f, 0.22f), // 北大エルムグリーン
+            CurbColorB = Color.white,
+            WallColorA = new Color(0.12f, 0.46f, 0.26f),
+            WallColorB = new Color(0.95f, 0.95f, 0.92f),
+            ShoulderColor = new Color(0.82f, 0.74f, 0.58f),
+            SceneryTheme = 4
         }
     };
 
@@ -438,8 +487,8 @@ public class CourseData : ScriptableObject
     public Color wallColorB = Color.white;
     public Color shoulderColor = new Color(0.85f, 0.75f, 0.55f);
 
-    [Header("Theme (0=Circuit, 1=Desert, 2=Snow, 3=City)")]
-    [Range(0, 3)]
+    [Header("Theme (0=Circuit, 1=Desert, 2=Snow, 3=City, 4=Campus)")]
+    [Range(0, 4)]
     public int sceneryTheme = 0;
 
     public TrackDef ToDef()

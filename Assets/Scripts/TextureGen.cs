@@ -217,6 +217,105 @@ public static class TextureGen
         return New(n, n, px, false);
     }
 
+    // タイトル画面用の北大キャンパスコースバッジ（ポプラ並木・エルムの緑・北斗星・イチョウ）
+    public static Texture2D HokkaidoBadge()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        Color skyTop = new Color(0.18f, 0.52f, 0.88f);
+        Color skyBottom = new Color(0.68f, 0.85f, 0.98f);
+        Color lawnColor = new Color(0.16f, 0.52f, 0.22f);
+        Color poplarColor = new Color(0.25f, 0.68f, 0.32f);
+        Color poplarTrunk = new Color(0.38f, 0.28f, 0.18f);
+        Color ginkgoGold = new Color(1f, 0.82f, 0.18f);
+        Color starColor = new Color(1f, 0.95f, 0.6f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float dx = x - n * 0.5f + 0.5f, dy = y - n * 0.5f + 0.5f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            var c = new Color(0, 0, 0, 0);
+            if (d < 60f)
+            {
+                // 空のグラデーション
+                float tSky = Mathf.Clamp01((y - 36f) / 70f);
+                c = Color.Lerp(skyBottom, skyTop, tSky);
+
+                // 遠景の山並み（手稲山風）
+                float mountainY = 40f + Mathf.Sin((x + 15f) * 0.06f) * 8f + Mathf.Cos(x * 0.12f) * 4f;
+                if (y < mountainY && y >= 32f)
+                {
+                    c = Color.Lerp(new Color(0.25f, 0.42f, 0.35f), new Color(0.35f, 0.55f, 0.45f), (mountainY - y) / 10f);
+                }
+
+                // 芝生（下部）
+                if (y < 36)
+                {
+                    float hill = 28f + Mathf.Sin(x * 0.05f) * 4f;
+                    if (y < hill) c = lawnColor;
+                }
+
+                // ポプラの木（中央〜左：細く天に伸びる樹形）
+                // 1本目（主ポプラ）
+                float px1 = 52f;
+                float distP1 = Mathf.Abs(x - px1);
+                if (y >= 26 && y <= 98)
+                {
+                    float pyRel = (y - 26f) / 72f;
+                    float width = Mathf.Sin(pyRel * Mathf.PI) * 7.5f;
+                    if (distP1 <= width) c = poplarColor;
+                    if (distP1 <= 1.2f && y <= 40) c = poplarTrunk;
+                }
+                // 2本目（奥のポプラ）
+                float px2 = 40f;
+                float distP2 = Mathf.Abs(x - px2);
+                if (y >= 28 && y <= 85)
+                {
+                    float pyRel = (y - 28f) / 57f;
+                    float width = Mathf.Sin(pyRel * Mathf.PI) * 5.5f;
+                    if (distP2 <= width && distP1 > 5f) c = Color.Lerp(poplarColor, new Color(0.18f, 0.48f, 0.24f), 0.3f);
+                }
+
+                // クラーク博士のシルエット風レリーフ（右側 x=84, y=36〜76）
+                float cx = x - 84f;
+                float cy = y - 56f;
+                // 頭部と胸像シルエット
+                bool clarkHead = (cx * cx + (cy - 6f) * (cy - 6f)) < 64f; // 頭
+                bool clarkShoulder = (cy >= -12f && cy <= 0f && Mathf.Abs(cx) < (14f - cy * 0.5f)); // 肩
+                bool clarkArm = (cx > 4f && cx < 18f && cy > -4f && cy < 16f && (cy - cx * 0.8f) < 4f && (cy - cx * 0.8f) > -8f); // 掲げた腕
+                if (clarkHead || clarkShoulder || clarkArm)
+                {
+                    c = new Color(0.15f, 0.28f, 0.24f); // 深いブロンズグリーン
+                }
+
+                // 黄金のイチョウの葉の装飾（左下 x=28, y=36）
+                float gx = x - 28f;
+                float gy = y - 36f;
+                if (gx * gx + gy * gy < 36f && gy > -2f)
+                {
+                    c = ginkgoGold;
+                }
+
+                // 上空の北極星（サッポロスター / 北斗）
+                float sx = Mathf.Abs(x - 96f);
+                float sy = Mathf.Abs(y - 100f);
+                if ((sx < 2f && sy < 8f) || (sy < 2f && sx < 8f) || (sx * sx + sy * sy < 9f))
+                {
+                    c = starColor;
+                }
+
+                // 外枠（白い立体リング）
+                if (d > 54f) c = Color.white;
+                else if (d > 52f) c = new Color(0.12f, 0.45f, 0.25f); // エルムグリーンの内枠ライン
+                c.a = 1f;
+            }
+            px[y * n + x] = c;
+        }
+        return New(n, n, px, false);
+    }
+
+
     public static Texture2D Checker()
     {
         var px = new[] { Color.white, new Color(0.08f, 0.08f, 0.08f), new Color(0.08f, 0.08f, 0.08f), Color.white };
@@ -533,4 +632,259 @@ public static class TextureGen
         cache[key] = tex;
         return tex;
     }
+
+    // 北大キャンパス：黄金のイチョウ葉テクスチャ
+    public static Texture2D GinkgoFoliage(Color baseTint)
+    {
+        string key = $"ginkgo_leaf_{baseTint.r:F2}_{baseTint.g:F2}_{baseTint.b:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 128;
+        var px = new Color[n * n];
+        var rng = new System.Random(37);
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float p1 = Mathf.PerlinNoise(x * 0.08f, y * 0.08f);
+            float p2 = Mathf.PerlinNoise((x + 60) * 0.22f, (y + 60) * 0.22f);
+            float fine = (float)(rng.NextDouble() - 0.5) * 0.08f;
+            float g = (p1 * 0.65f + p2 * 0.35f + fine - 0.5f) * 0.35f;
+
+            var gold = Color.Lerp(new Color(1f, 0.85f, 0.10f), new Color(0.95f, 0.65f, 0.05f), p1);
+            var c = Color.Lerp(gold, baseTint, 0.45f) * (1f + g);
+            c.a = 1f;
+            px[y * n + x] = c;
+        }
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 北大キャンパス：白樺の樹皮（白い樹皮に黒い横筋・節）
+    public static Texture2D BirchBark()
+    {
+        const string key = "birch_bark";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int w = 128, h = 256;
+        var px = new Color[w * h];
+        var rng = new System.Random(53);
+        Color baseWhite = new Color(0.94f, 0.93f, 0.89f);
+        Color markDark = new Color(0.18f, 0.16f, 0.15f);
+
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float noise = (float)(rng.NextDouble() - 0.5) * 0.05f;
+            var c = baseWhite * (1f + noise);
+
+            // 水平方向の皮目（黒い横線・斑点）
+            float pY = Mathf.PerlinNoise(0, y * 0.15f);
+            float pX = Mathf.PerlinNoise(x * 0.35f, y * 0.04f);
+            if (pY > 0.68f && pX > 0.42f)
+            {
+                float markIntensity = Mathf.Clamp01((pY - 0.68f) * 4f) * Mathf.Clamp01((pX - 0.42f) * 3f);
+                c = Color.Lerp(c, markDark, markIntensity * 0.85f);
+            }
+
+            // 大きめの節（knot）
+            if (y % 64 < 10 && Mathf.Abs(x - 64) < 16)
+            {
+                float d = Mathf.Sqrt(Mathf.Pow(x - 64, 2) + Mathf.Pow((y % 64) - 5, 2) * 4f);
+                if (d < 12f)
+                {
+                    c = Color.Lerp(c, markDark, (1f - d / 12f) * 0.9f);
+                }
+            }
+
+            c.a = 1f;
+            px[y * w + x] = c;
+        }
+        var tex = New(w, h, px);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 北大キャンパス：地面・路肩の黄金の落ち葉絨毯
+    public static Texture2D GinkgoCarpet()
+    {
+        const string key = "ginkgo_carpet";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 256;
+        var px = new Color[n * n];
+        var rng = new System.Random(71);
+        Color bgSoil = new Color(0.38f, 0.32f, 0.22f);
+
+        for (int i = 0; i < n * n; i++) px[i] = bgSoil;
+
+        // 無数のイチョウの葉（扇形・楕円の重なり）を描画
+        for (int i = 0; i < 900; i++)
+        {
+            int cx = rng.Next(n);
+            int cy = rng.Next(n);
+            int rad = rng.Next(5, 12);
+            float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
+            Color leafCol = Color.Lerp(new Color(1f, 0.84f, 0.12f), new Color(0.96f, 0.62f, 0.08f), (float)rng.NextDouble());
+
+            for (int dy = -rad; dy <= rad; dy++)
+            for (int dx = -rad; dx <= rad; dx++)
+            {
+                if (dx * dx + dy * dy <= rad * rad)
+                {
+                    int pxX = (cx + dx + n) % n;
+                    int pxY = (cy + dy + n) % n;
+                    px[pxY * n + pxX] = leafCol;
+                }
+            }
+        }
+
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 北大キャンパス：第2農場モデルバーンの白い木造下見板張り外壁
+    public static Texture2D BarnWoodWhite()
+    {
+        const string key = "barn_wood_white";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 256;
+        var px = new Color[n * n];
+        var rng = new System.Random(89);
+        Color woodBase = new Color(0.96f, 0.95f, 0.92f);
+        Color plankShadow = new Color(0.68f, 0.65f, 0.60f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float noise = (float)(rng.NextDouble() - 0.5) * 0.03f;
+            var c = woodBase * (1f + noise);
+
+            // 水平の板継ぎ目（16ピクセルごと）
+            int row = y % 16;
+            if (row == 0 || row == 1)
+            {
+                c = plankShadow;
+            }
+            else if (row == 2)
+            {
+                c = Color.Lerp(plankShadow, woodBase, 0.5f);
+            }
+
+            c.a = 1f;
+            px[y * n + x] = c;
+        }
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 北大キャンパス：赤レンガ（総合博物館・正門）
+    public static Texture2D RedBrick()
+    {
+        const string key = "red_brick";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 256;
+        var px = new Color[n * n];
+        var rng = new System.Random(97);
+        Color mortar = new Color(0.85f, 0.83f, 0.80f);
+        Color brickBase = new Color(0.68f, 0.28f, 0.18f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            int row = y / 16;
+            int colOffset = (row % 2 == 0) ? 0 : 20;
+            int col = (x + colOffset) % 40;
+
+            bool isMortar = (y % 16 <= 1) || (col <= 1);
+            if (isMortar)
+            {
+                px[y * n + x] = mortar;
+            }
+            else
+            {
+                float noise = (float)(rng.NextDouble() - 0.5) * 0.12f;
+                px[y * n + x] = brickBase * (1f + noise);
+            }
+        }
+        var tex = New(n, n, px);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 北大キャンパス専用案内看板
+    public static Texture2D CampusBanner(int variant)
+    {
+        string key = $"campus_banner_{variant}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int w = 256, h = 64;
+        var px = new Color[w * h];
+        Color bg, border, textCol;
+
+        switch (variant % 4)
+        {
+            case 0: // HOKKAIDO UNIVERSITY (北大グリーン & ゴールド)
+                bg = new Color(0.10f, 0.44f, 0.24f);
+                border = new Color(1f, 0.84f, 0.20f);
+                textCol = Color.white;
+                break;
+            case 1: // BOYS, BE AMBITIOUS (クラーク博士・ディープネイビー & ゴールド)
+                bg = new Color(0.12f, 0.22f, 0.38f);
+                border = new Color(1f, 0.85f, 0.25f);
+                textCol = new Color(1f, 0.92f, 0.55f);
+                break;
+            case 2: // SAPPORO 1876 (赤レンガ & クラシックアイボリー)
+                bg = new Color(0.58f, 0.22f, 0.16f);
+                border = new Color(0.92f, 0.88f, 0.80f);
+                textCol = new Color(0.98f, 0.96f, 0.92f);
+                break;
+            default: // GINKGO AVENUE (黄金イチョウ & 北大グリーン)
+                bg = new Color(0.96f, 0.76f, 0.12f);
+                border = new Color(0.10f, 0.44f, 0.24f);
+                textCol = new Color(0.10f, 0.36f, 0.18f);
+                break;
+        }
+
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            bool isBorder = x < 4 || x >= w - 4 || y < 4 || y >= h - 4;
+            bool isInnerLine = (x == 6 || x == w - 7 || y == 6 || y == h - 7);
+            if (isBorder)
+                px[y * w + x] = border;
+            else if (isInnerLine)
+                px[y * w + x] = Color.Lerp(bg, border, 0.7f);
+            else
+            {
+                // 中央の飾りストライプ
+                bool isCenterStripe = (y >= 28 && y <= 35) && (x < 30 || x > w - 31);
+                px[y * w + x] = isCenterStripe ? Color.Lerp(bg, border, 0.5f) : bg;
+            }
+        }
+
+        // 看板中央の星印やエンブレムのプロシージャル描画
+        int midX = w / 2, midY = h / 2;
+        for (int dy = -14; dy <= 14; dy++)
+        for (int dx = -14; dx <= 14; dx++)
+        {
+            // 十字＋菱形星印
+            if (Mathf.Abs(dx) + Mathf.Abs(dy) < 8 || (Mathf.Abs(dx) < 2 && Mathf.Abs(dy) < 14) || (Mathf.Abs(dy) < 2 && Mathf.Abs(dx) < 14))
+            {
+                int pxX = midX + dx;
+                int pxY = midY + dy;
+                if (pxX >= 0 && pxX < w && pxY >= 0 && pxY < h)
+                    px[pxY * w + pxX] = border;
+            }
+        }
+
+        var tex = New(w, h, px, false);
+        cache[key] = tex;
+        return tex;
+    }
 }
+

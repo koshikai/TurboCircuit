@@ -152,7 +152,7 @@ public partial class RaceManager : MonoBehaviour
     Texture2D speedLineTex;
     Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
     Texture2D titleLogoTex;
-    Texture2D[] trackBadgeTex = new Texture2D[4];
+    Texture2D[] trackBadgeTex = new Texture2D[8];
     Texture2D cardPanelTex;
     Texture2D cardPopTex;
     Texture2D btnRaceTex;
@@ -428,6 +428,116 @@ public partial class RaceManager : MonoBehaviour
         foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
         yield return new WaitForSeconds(0.8f);
         ScreenCapture.CaptureScreenshot("shot_11_lobby_8p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 12. 北大キャンパス コース表示（タイトル画面）
+        Net.Disconnect();
+        state = State.Title;
+        LoadCourse(4);
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_12_campus_title.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 13. 北大キャンパス レース中（スタート直後・メインストリート）
+        StartRaceFromTitle();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 12.4f;
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_13_campus_race.png");
+        yield return new WaitForSeconds(0.3f);
+
+        void TeleportPlayer(int idx, float lat = 0f, float extraYaw = 0f)
+        {
+            if (track == null || track.Count == 0) return;
+            int i = Mathf.Clamp(idx, 0, track.Count - 1);
+            Player.transform.position = track.PointAt(i, lat) + Vector3.up * 0.4f;
+            Player.Index = i;
+            Player.Progress = track.Dist[i];
+            float heading = Mathf.Atan2(track.Dirs[i].x, track.Dirs[i].z) * Mathf.Rad2Deg + extraYaw;
+            Player.Heading = heading;
+            Player.Speed = 0f;
+            camYaws[0] = heading;
+            var r = Quaternion.Euler(0, heading, 0);
+            cam.transform.position = Player.transform.position + r * new Vector3(0, 2.7f, -6.8f);
+            cam.transform.LookAt(Player.transform.position + r * new Vector3(0, 1.1f, 3.2f));
+        }
+
+        // 14. 北大キャンパス 北13条イチョウ並木（黄金のトンネル＆落ち葉絨毯）
+        if (track != null && track.Count > 0)
+        {
+            TeleportPlayer((int)(0.29f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_14_campus_ginkgo.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 15. 北大キャンパス 第2農場モデルバーン＆放牧ホルスタイン牛＆木柵
+            TeleportPlayer((int)(0.555f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_15_campus_barn.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 16. 北大キャンパス ポプラ並木通り（直立ポプラ列柱）
+            TeleportPlayer((int)(0.82f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_16_campus_poplar.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 17. 北大キャンパス 大野池＆総合博物館（睡蓮・木橋・自然石）
+            TeleportPlayer((int)(0.22f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_17_campus_pond.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 18. 北大キャンパス クラーク博士胸像＆花壇＆中央ローン
+            TeleportPlayer((int)(0.106f * track.Count), 1.8f, -28f);
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_18_campus_clark.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 19. Course 0: TURBO CIRCUIT（スタイライズド大樹・白樺・花壇・サーキット）
+            LoadCourse(0);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            ScreenCapture.CaptureScreenshot("shot_19_circuit_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 20. Course 1: SUNSET DUNES（ヤシの木・砂漠枯れ木・砂漠自然岩）
+            LoadCourse(1);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            ScreenCapture.CaptureScreenshot("shot_20_dunes_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 21. Course 2: FROST PEAK（スノーパイン針葉樹林・雪山・氷晶）
+            LoadCourse(2);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            ScreenCapture.CaptureScreenshot("shot_21_frost_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 22. Course 3: NEON METROPOLIS（ネオン街路灯・サイバーツリー・発光看板・摩天楼）
+            LoadCourse(3);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            ScreenCapture.CaptureScreenshot("shot_22_neon_race.png");
+        }
 
         yield return new WaitForSeconds(0.5f);
         Application.Quit();
