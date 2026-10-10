@@ -38,6 +38,7 @@ public partial class Kart : MonoBehaviour
 
     public float Speed;
     public float Heading;
+    public float CurrentThrottle { get; private set; }
     public Vector3 VelDir;
     public ItemType Item;
     public float RouletteTimer;
@@ -111,9 +112,9 @@ public partial class Kart : MonoBehaviour
             engine3D = gameObject.AddComponent<AudioSource>();
             engine3D.spatialBlend = 1.0f; // 3D音響
             engine3D.rolloffMode = AudioRolloffMode.Logarithmic;
-            engine3D.minDistance = 3.5f;
-            engine3D.maxDistance = 38f;
-            engine3D.dopplerLevel = 1.25f;
+            engine3D.minDistance = 2.0f;
+            engine3D.maxDistance = 22f;
+            engine3D.dopplerLevel = 0.25f;
             engine3D.loop = true;
             engine3D.playOnAwake = false;
             var clip = Resources.Load<AudioClip>("Audio/sfx_engine");
@@ -192,6 +193,7 @@ public partial class Kart : MonoBehaviour
         var inp = InputProvider != null 
             ? InputProvider.GetInput(this, dt) 
             : ((IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt));
+        CurrentThrottle = inp.throttle;
 
         if (IsPlayer && !rm.Demo)
         {
@@ -501,8 +503,11 @@ public partial class Kart : MonoBehaviour
         if (engine3D != null && engine3D.isPlaying)
         {
             float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
-            engine3D.pitch = Mathf.Lerp(0.65f, 1.45f, spd01);
-            engine3D.volume = Mathf.Lerp(0.04f, 0.52f, spd01) * RaceAudio.MasterSfxVolume;
+            float throttle01 = Mathf.Max(0f, inp.throttle);
+            float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01 * 0.7f + throttle01 * 0.3f);
+            engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
+            float targetVol = Mathf.Lerp(0.015f, 0.085f, spd01) * RaceAudio.MasterSfxVolume;
+            engine3D.volume = Mathf.MoveTowards(engine3D.volume, targetVol, dt * 2.0f);
         }
 
         Effects(dt);

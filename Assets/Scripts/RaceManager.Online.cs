@@ -335,8 +335,9 @@ public partial class RaceManager
         {
             GUI.Label(new Rect(w / 2 - 160, 4, 320, 18), "ROOM CODE (CLICK TO COPY)", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
             Outlined(new Rect(w / 2 - 160, 20, 200, 56), Net.JoinCode, St(sBig, 48), new Color(0.4f, 1f, 0.6f), 3);
-            string copyBtnText = copyNotifyTimer > 0 ? "✓ COPIED!" : "📋 COPY";
-            if (GUI.Button(new Rect(w / 2 + 50, 28, 100, 38), copyBtnText, sButton))
+            string copyBtnText = copyNotifyTimer > 0 ? "★ COPIED!" : "► COPY";
+            Color copyBtnCol = copyNotifyTimer > 0 ? new Color(0.2f, 0.82f, 0.45f) : new Color(0.18f, 0.62f, 0.95f);
+            if (DrawModernButton(new Rect(w / 2 + 50, 26, 114, 38), copyBtnText, "", copyBtnCol))
             {
                 GUIUtility.systemCopyBuffer = Net.JoinCode;
                 copyNotifyTimer = 2.0f;
@@ -349,7 +350,7 @@ public partial class RaceManager
 
         var curDef = Track.Courses[SelectedCourse];
         GUI.Label(new Rect(w - 384, 8, 360, 36), $"◄  {curDef.Name.ToUpper()}  ►", St(sSmall, 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
-        string diffBadge = SelectedCourse == 0 ? "★☆☆ NOVICE" : SelectedCourse == 1 ? "★★☆ ADVANCED" : SelectedCourse == 2 ? "★★★ EXPERT" : SelectedCourse == 3 ? "★★☆ URBAN" : "★★☆ CAMPUS";
+        string diffBadge = SelectedCourse == 0 ? "★☆☆ NOVICE" : SelectedCourse == 1 ? "★★☆ ADVANCED" : SelectedCourse == 2 ? "★★★ EXPERT" : SelectedCourse == 3 ? "★★☆ URBAN" : SelectedCourse == 4 ? "★★☆ CAMPUS" : "★★★ OVERPASS";
         string courseInfo = Net.IsHost ? $"[A][D] CHANGE  •  {diffBadge}  •  {totalLaps} LAPS" : $"{diffBadge}  •  {totalLaps} LAPS";
         GUI.Label(new Rect(w - 384, 48, 360, 26), courseInfo, St(sSmall, 13, TextAnchor.MiddleRight, FontStyle.Bold, false, new Color(0.7f, 0.9f, 1f)));
 
@@ -422,6 +423,6 @@ public partial class RaceManager
         }
 
         // 右：退出
-        if (GUI.Button(new Rect(w - 224, py + 126, 200, 44), "LEAVE ROOM  [ESC]", sButton)) LeaveOnline();
+        if (DrawModernButton(new Rect(w - 236, py + 122, 212, 44), "◄ LEAVE ROOM", "[ESC]", new Color(0.92f, 0.32f, 0.32f))) LeaveOnline();
     }
 }

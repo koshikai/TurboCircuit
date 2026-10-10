@@ -176,7 +176,7 @@ public class Missile : MonoBehaviour
         if (age > 9f) { Explode(); return; }
 
         Vector3 aim;
-        bool homing = target != null && (target.transform.position - transform.position).magnitude < 35f;
+        bool homing = target != null && (target.transform.position - transform.position).magnitude < 35f && Mathf.Abs(target.transform.position.y - transform.position.y) < 7f;
         if (homing) aim = target.transform.position + Vector3.up * 0.7f;
         else
         {

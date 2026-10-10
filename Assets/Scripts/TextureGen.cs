@@ -37,22 +37,32 @@ public static class TextureGen
         for (int x = 0; x < n; x++)
         {
             float u = x / (float)n, v = y / (float)n;
-            // 砂利・アスファルトの微細テクスチャ
-            float fineNoise = (float)(rng.NextDouble() - 0.5) * 0.08f;
-            float coarseNoise = (Mathf.PerlinNoise(u * 16f, v * 16f) - 0.5f) * 0.06f;
-            float tireWear = Mathf.Pow(Mathf.Abs(u - 0.5f) * 2f, 2f) * 0.04f;
-            float g = fineNoise + coarseNoise - tireWear;
+            // 砂利・アスファルトの微細テクスチャ＋ストロボ感のある縦方向ストリーク
+            float fineNoise = (float)(rng.NextDouble() - 0.5) * 0.065f;
+            float coarseNoise = (Mathf.PerlinNoise(u * 18f, v * 18f) - 0.5f) * 0.05f;
+            float streak = (Mathf.PerlinNoise(u * 48f, v * 6f) - 0.5f) * 0.035f;
+
+            // 左右2レーンのラバーグリップ痕（レーシングライン）
+            float laneL = Mathf.Exp(-Mathf.Pow((u - 0.28f) / 0.11f, 2f)) * 0.055f;
+            float laneR = Mathf.Exp(-Mathf.Pow((u - 0.72f) / 0.11f, 2f)) * 0.055f;
+            float g = fineNoise + coarseNoise + streak - (laneL + laneR);
             var c = baseTint * (1f + g);
             c.a = 1f;
 
-            // 白線（コース両端とセンター破線）
-            bool edgeL = u > 0.035f && u < 0.055f;
-            bool edgeR = u > 0.945f && u < 0.965f;
-            bool center = u > 0.492f && u < 0.508f && Mathf.Repeat(v * 4f, 1f) < 0.55f;
+            // 白線（コース両端のダブルエッジライン＋センター破線）
+            bool edgeL = u > 0.032f && u < 0.056f;
+            bool edgeR = u > 0.944f && u < 0.968f;
+            bool innerAccentL = u > 0.064f && u < 0.072f;
+            bool innerAccentR = u > 0.928f && u < 0.936f;
+            bool center = u > 0.491f && u < 0.509f && Mathf.Repeat(v * 4f, 1f) < 0.55f;
             if (edgeL || edgeR || center)
             {
-                float lineNoise = (float)(rng.NextDouble() - 0.5) * 0.05f;
-                c = new Color(0.92f + lineNoise, 0.92f + lineNoise, 0.88f, 1f);
+                float lineNoise = (float)(rng.NextDouble() - 0.5) * 0.04f;
+                c = new Color(0.95f + lineNoise, 0.95f + lineNoise, 0.92f, 1f);
+            }
+            else if (innerAccentL || innerAccentR)
+            {
+                c = Color.Lerp(c, new Color(1f, 0.85f, 0.25f, 1f), 0.45f);
             }
             px[y * n + x] = c;
         }
@@ -109,11 +119,30 @@ public static class TextureGen
     {
         string key = $"stripes_{a.r:F2}_{a.g:F2}_{a.b:F2}_{b.r:F2}_{b.g:F2}_{b.b:F2}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
-        const int w = 16, h = 64;
+        const int w = 64, h = 128;
         var px = new Color[w * h];
+        var rng = new System.Random(31);
         for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
-            px[y * w + x] = y < h / 2 ? a : b;
+        {
+            Color baseCol = y < h / 2 ? a : b;
+            int localY = y % (h / 2);
+            float u = x / (float)(w - 1);
+            float noise = ((float)rng.NextDouble() - 0.5f) * 0.04f;
+            Color c = baseCol * (1f + noise);
+
+            // 縁石ブロックの立体ベベル陰影
+            if (localY < 3 || localY >= (h / 2) - 2)
+                c *= 0.72f;
+            else if (localY < 6)
+                c = Color.Lerp(c, Color.white, 0.22f);
+
+            // 横方向の丸みハイライト
+            float edgeShade = Mathf.Sin(u * Mathf.PI);
+            c *= Mathf.Lerp(0.82f, 1.06f, edgeShade);
+            c.a = 1f;
+            px[y * w + x] = c;
+        }
         var tex = New(w, h, px);
         cache[key] = tex;
         return tex;
@@ -315,6 +344,118 @@ public static class TextureGen
         return New(n, n, px, false);
     }
 
+    // タイトル画面用の立体交差コースバッジ（スカイライン・オーバーパス：斜張橋と立体交差ハイウェイ）
+    public static Texture2D OverpassBadge()
+    {
+        const int n = 128;
+        var px = new Color[n * n];
+        Color skyTop = new Color(0.15f, 0.45f, 0.95f);
+        Color skyBottom = new Color(0.98f, 0.65f, 0.35f); // 朝焼け/夕暮れグラデーション
+        Color seaColor = new Color(0.08f, 0.35f, 0.58f);
+        Color sunColor = new Color(1f, 0.92f, 0.45f);
+        Color roadLower = new Color(0.22f, 0.24f, 0.28f);
+        Color roadUpper = new Color(0.12f, 0.14f, 0.18f);
+        Color curbCyan = new Color(0.05f, 0.90f, 1f);
+        Color pylonWhite = Color.white;
+        Color cableGold = new Color(1f, 0.82f, 0.15f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float dx = x - n * 0.5f + 0.5f, dy = y - n * 0.5f + 0.5f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            var c = new Color(0, 0, 0, 0);
+            if (d < 60f)
+            {
+                // 空と海のグラデーション
+                if (y >= 44)
+                {
+                    float tSky = Mathf.Clamp01((y - 44f) / 70f);
+                    c = Color.Lerp(skyBottom, skyTop, tSky);
+                }
+                else
+                {
+                    float tSea = Mathf.Clamp01(y / 44f);
+                    c = Color.Lerp(new Color(0.05f, 0.20f, 0.42f), seaColor, tSea);
+                }
+
+                // 遠景の黄金の太陽（x=74, y=66）
+                float sx = x - 74f, sy = y - 66f;
+                float sunDist = Mathf.Sqrt(sx * sx + sy * sy);
+                if (sunDist < 16f)
+                {
+                    c = Color.Lerp(sunColor, c, sunDist / 16f);
+                }
+
+                // 下層道路（水平ハイウェイ：y=32〜44）
+                if (y >= 32 && y <= 44)
+                {
+                    c = roadLower;
+                    // センター白線
+                    if (y >= 37 && y <= 39 && (x % 10) < 6) c = Color.white;
+                    // 上下縁石
+                    if (y == 32 || y == 44) c = curbCyan;
+                }
+
+                // 上層高架橋の影（立体交差部の落とし影）
+                float bridgeCurveY = 22f + x * 0.72f; // 左下から右上へ登る高架橋
+                if (y >= 32 && y <= 44 && Mathf.Abs(x - 64f) < 14f)
+                {
+                    c = new Color(0.08f, 0.09f, 0.12f); // 下の道路に落ちる橋の影
+                }
+
+                // 上層高架橋（立体交差！：y=bridgeCurveY - 6 〜 +6）
+                float distBridge = y - bridgeCurveY;
+                if (distBridge >= -6f && distBridge <= 6f && x >= 18 && x <= 110)
+                {
+                    c = roadUpper;
+                    // 橋の縁石ライン（鮮やかなネオンシアン＆ピンク）
+                    if (distBridge > 4.5f) c = curbCyan;
+                    else if (distBridge < -4.5f) c = new Color(1f, 0.28f, 0.65f);
+                    // 橋梁の黄色いセンター破線
+                    else if (Mathf.Abs(distBridge) < 1.0f && ((x + y) % 12) < 7) c = cableGold;
+                }
+
+                // 斜張橋の主塔（Pylon：x=64、y=20〜106）
+                float pylonX = Mathf.Abs(x - 64f);
+                if (pylonX < 3.2f && y >= 20 && y <= 104)
+                {
+                    c = pylonWhite;
+                    // 塔頂の赤い航空標識灯
+                    if (y >= 100) c = new Color(1f, 0.2f, 0.25f);
+                }
+
+                // 斜張橋の斜めステイケーブル（塔頂 y=94 から橋桁へ斜めに張る）
+                if (y >= 45 && y <= 95)
+                {
+                    for (int k = -3; k <= 3; k++)
+                    {
+                        if (k == 0) continue;
+                        float targetBridgeX = 64f + k * 14f;
+                        float targetBridgeY = 22f + targetBridgeX * 0.72f;
+                        // 塔頂(64, 94)から(targetBridgeX, targetBridgeY)を結ぶ線との距離
+                        float tCable = (y - 94f) / (targetBridgeY - 94f);
+                        if (tCable >= 0f && tCable <= 1f)
+                        {
+                            float lineX = 64f + tCable * (targetBridgeX - 64f);
+                            if (Mathf.Abs(x - lineX) < 1.0f)
+                            {
+                                c = cableGold;
+                            }
+                        }
+                    }
+                }
+
+                // 外枠（ポップなホワイト立体リング＋マリーナブルーのインナーリム）
+                if (d > 54f) c = Color.white;
+                else if (d > 52f) c = new Color(0.08f, 0.55f, 0.95f);
+                c.a = 1f;
+            }
+            px[y * n + x] = c;
+        }
+        return New(n, n, px, false);
+    }
+
 
     public static Texture2D Checker()
     {
@@ -337,6 +478,186 @@ public static class TextureGen
             px[y * n + x] = border ? new Color(0.15f, 0.15f, 0.15f) : stripe ? new Color(1f, 0.95f, 0.3f) : new Color(1f, 0.45f, 0.05f);
         }
         return New(n, n, px);
+    }
+
+    // ジャンプ台スロープ（カタパルトランプ）用テクスチャ (256x256)
+    public static Texture2D JumpRamp()
+    {
+        string key = "jump_ramp_albedo";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 256;
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float u = x / (float)(n - 1); // 0=左, 1=右
+            float v = y / (float)(n - 1); // 0=手前, 1=奥(離陸点)
+            float distCenter = Mathf.Abs(u - 0.5f);
+
+            Color c;
+
+            // 1. 最外縁のサイドボーダー (distCenter > 0.43: u < 0.07 または u > 0.93)
+            if (distCenter > 0.43f)
+            {
+                // 赤と白の警告レーシングチェッカー・ストライプ
+                bool red = Mathf.Repeat(v * 14f, 1f) < 0.5f;
+                c = red ? new Color(0.92f, 0.15f, 0.15f) : new Color(0.95f, 0.95f, 0.95f);
+            }
+            // 2. サイド内側のネオンブルー/シアンガイドライン (distCenter 0.40〜0.43)
+            else if (distCenter > 0.40f)
+            {
+                c = new Color(0.1f, 0.85f, 1f);
+            }
+            // 3. 先端テイクオフライン (v > 0.91)
+            else if (v > 0.91f)
+            {
+                if (v > 0.97f)
+                {
+                    // 最先端のホワイトリップ
+                    c = Color.white;
+                }
+                else
+                {
+                    // テイクオフのイエロー＆ブラック警告チェッカー
+                    bool chk = (Mathf.Repeat(u * 18f, 1f) < 0.5f) ^ (Mathf.Repeat(v * 16f, 1f) < 0.5f);
+                    c = chk ? new Color(1f, 0.85f, 0.1f) : new Color(0.15f, 0.15f, 0.18f);
+                }
+            }
+            // 4. メイン走行面（多層シェブロン矢印 ∧ とハイテクスチール路面）
+            else
+            {
+                // ∧型のシェブロン矢印計算（中央 u=0.5 が先端）
+                float arrowV = v + (0.40f - distCenter) * 0.95f;
+                float phase = Mathf.Repeat(arrowV * 3.6f, 1f);
+
+                // シェブロン矢印の領域
+                if (phase >= 0.26f && phase <= 0.80f)
+                {
+                    float arrowCore = Mathf.Abs(phase - 0.53f); // 0.0が矢印の真ん中
+                    bool isEdge = phase < 0.30f || phase > 0.76f;
+
+                    if (isEdge)
+                    {
+                        // クッキリとしたホワイトのアウトライン
+                        c = new Color(1f, 1f, 1f);
+                    }
+                    else if (arrowCore < 0.08f)
+                    {
+                        // 矢印中央のハイライトコア（ブライトイエロー〜ホワイト）
+                        c = new Color(1f, 0.98f, 0.55f);
+                    }
+                    else
+                    {
+                        // 鮮やかなネオンオレンジ〜ゴールドイエローのグラデーション
+                        float grad = Mathf.Clamp01((arrowCore - 0.08f) / 0.15f);
+                        c = Color.Lerp(new Color(1f, 0.85f, 0.12f), new Color(1f, 0.42f, 0.04f), grad);
+                    }
+                }
+                else
+                {
+                    // 背景：ダークスチールメッシュ路面
+                    bool grid = Mathf.Repeat(u * 32f, 1f) < 0.07f || Mathf.Repeat(v * 32f, 1f) < 0.07f;
+                    c = grid ? new Color(0.20f, 0.21f, 0.24f) : new Color(0.12f, 0.12f, 0.14f);
+                }
+            }
+
+            c.a = 1f;
+            px[y * n + x] = c;
+        }
+
+        var t = New(n, n, px);
+        cache[key] = t;
+        return t;
+    }
+
+    // ジャンプ台スロープ発光マップ用テクスチャ (256x256)
+    public static Texture2D JumpRampEmission()
+    {
+        string key = "jump_ramp_emission";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 256;
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float u = x / (float)(n - 1);
+            float v = y / (float)(n - 1);
+            float distCenter = Mathf.Abs(u - 0.5f);
+
+            Color c = Color.black; // 背景のダークスチールは発光させない
+
+            // ネオンブルーガイドライン
+            if (distCenter > 0.40f && distCenter <= 0.43f)
+            {
+                c = new Color(0.1f, 0.85f, 1f) * 0.9f;
+            }
+            // 先端テイクオフライン
+            else if (v > 0.91f && distCenter <= 0.40f)
+            {
+                c = new Color(1f, 0.85f, 0.3f) * 0.85f;
+            }
+            // シェブロン矢印
+            else if (distCenter <= 0.40f && v <= 0.91f)
+            {
+                float arrowV = v + (0.40f - distCenter) * 0.95f;
+                float phase = Mathf.Repeat(arrowV * 3.6f, 1f);
+
+                if (phase >= 0.26f && phase <= 0.80f)
+                {
+                    float arrowCore = Mathf.Abs(phase - 0.53f);
+                    bool isEdge = phase < 0.30f || phase > 0.76f;
+                    if (isEdge || arrowCore < 0.08f)
+                    {
+                        c = new Color(1f, 0.95f, 0.7f) * 0.95f;
+                    }
+                    else
+                    {
+                        c = new Color(1f, 0.65f, 0.15f) * 0.85f;
+                    }
+                }
+            }
+
+            c.a = 1f;
+            px[y * n + x] = c;
+        }
+
+        var t = New(n, n, px);
+        cache[key] = t;
+        return t;
+    }
+
+    // ジャンプ台土台・側面用ハザードストライプテクスチャ (128x128)
+    public static Texture2D HazardStripes()
+    {
+        string key = "hazard_stripes";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 128;
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float u = x / (float)(n - 1);
+            float v = y / (float)(n - 1);
+
+            // 上下の金属フレーム枠
+            if (v < 0.08f || v > 0.92f)
+            {
+                px[y * n + x] = new Color(0.35f, 0.37f, 0.40f);
+            }
+            else
+            {
+                // 斜め45度警告ストライプ
+                bool yellow = Mathf.Repeat((u + v) * 6f, 1f) < 0.5f;
+                px[y * n + x] = yellow ? new Color(0.96f, 0.78f, 0.08f) : new Color(0.13f, 0.13f, 0.14f);
+            }
+        }
+
+        var t = New(n, n, px);
+        cache[key] = t;
+        return t;
     }
 
     public static Texture2D SoftDot()
@@ -883,6 +1204,257 @@ public static class TextureGen
         }
 
         var tex = New(w, h, px, false);
+        cache[key] = tex;
+        return tex;
+    }
+
+    // カート足元の接地コンタクトシャドウ用テクスチャ
+    public static Texture2D BlobShadow()
+    {
+        const string key = "blob_shadow";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 64;
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float nx = (x / (float)(n - 1)) * 2f - 1f;
+            float ny = (y / (float)(n - 1)) * 2f - 1f;
+            float d = Mathf.Sqrt(nx * nx * 1.15f + ny * ny * 0.85f);
+            float a = Mathf.Clamp01(1f - d);
+            a = a * a * 0.68f;
+            px[y * n + x] = new Color(0.02f, 0.03f, 0.06f, a);
+        }
+        var tex = New(n, n, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // ミニマップ上の丸型マーカー（白フチ付き円形ドット）
+    public static Texture2D CircleDot(int size = 32)
+    {
+        string key = $"circle_dot_{size}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[size * size];
+        float r = size * 0.5f - 1f;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float dx = x - size * 0.5f + 0.5f;
+            float dy = y - size * 0.5f + 0.5f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            float a = Mathf.Clamp01(r - d + 0.5f);
+            px[y * size + x] = new Color(1f, 1f, 1f, a);
+        }
+        var tex = New(size, size, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // ポップな立体角丸ボタン（3Dキャンディハイライト、下部段差、外枠、アンチエイリアス）
+    public static Texture2D PopButton(int w, int h, float radius, Color baseCol, bool hover = false)
+    {
+        w = Mathf.Max(16, w);
+        h = Mathf.Max(16, h);
+        radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
+
+        string key = $"popbtn_{w}_{h}_{(int)radius}_{baseCol.r:F2}_{baseCol.g:F2}_{baseCol.b:F2}_{hover}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        float borderThick = hover ? 2.5f : 1.8f;
+        Color borderCol = hover ? Color.white : new Color(0.08f, 0.12f, 0.22f, 0.90f);
+
+        Color topCol = hover ? Color.Lerp(baseCol, Color.white, 0.35f) : Color.Lerp(baseCol, Color.white, 0.18f);
+        Color botCol = hover ? Color.Lerp(baseCol, Color.black, 0.05f) : Color.Lerp(baseCol, Color.black, 0.18f);
+
+        for (int y = 0; y < h; y++)
+        {
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
+            float t = y / (float)(h - 1);
+            Color grad = Color.Lerp(botCol, topCol, t);
+
+            for (int x = 0; x < w; x++)
+            {
+                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
+                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+
+                if (dist > radius + 0.5f)
+                {
+                    px[y * w + x] = Color.clear;
+                    continue;
+                }
+
+                float aa = Mathf.Clamp01(radius + 0.5f - dist);
+
+                Color c;
+                if (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick)
+                {
+                    c = borderCol;
+                }
+                else
+                {
+                    c = grad;
+
+                    if (y >= h * 0.52f && y < h - borderThick - 1f && dist < radius - borderThick - 1f)
+                    {
+                        float glossT = (y - h * 0.52f) / (h * 0.48f);
+                        c = Color.Lerp(c, Color.white, 0.28f * glossT);
+                    }
+                    else if (y < borderThick + 3f)
+                    {
+                        c = Color.Lerp(c, Color.black, 0.22f);
+                    }
+                }
+
+                c.a *= aa;
+                px[y * w + x] = c;
+            }
+        }
+
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 角丸ドロップシャドウ
+    public static Texture2D RoundedShadow(int w, int h, float radius)
+    {
+        w = Mathf.Max(16, w);
+        h = Mathf.Max(16, h);
+        radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
+
+        string key = $"popsh_{w}_{h}_{(int)radius}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        float blur = 2.5f;
+
+        for (int y = 0; y < h; y++)
+        {
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
+            for (int x = 0; x < w; x++)
+            {
+                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
+                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+
+                if (dist > radius + blur)
+                {
+                    px[y * w + x] = Color.clear;
+                }
+                else if (dist <= radius - blur)
+                {
+                    px[y * w + x] = new Color(0f, 0f, 0f, 0.32f);
+                }
+                else
+                {
+                    float a = Mathf.Clamp01((radius + blur - dist) / (blur * 2f));
+                    px[y * w + x] = new Color(0f, 0f, 0f, 0.32f * a);
+                }
+            }
+        }
+
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 角丸ピルバッジ（順位バッジ、タグ等）
+    public static Texture2D PopPill(int w, int h, Color fillCol)
+    {
+        w = Mathf.Max(12, w);
+        h = Mathf.Max(12, h);
+        float radius = h * 0.5f;
+
+        string key = $"poppill_{w}_{h}_{fillCol.r:F2}_{fillCol.g:F2}_{fillCol.b:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        float borderThick = 1.6f;
+        Color borderCol = new Color(0.08f, 0.12f, 0.22f, 0.85f);
+        Color topCol = Color.Lerp(fillCol, Color.white, 0.15f);
+        Color botCol = Color.Lerp(fillCol, Color.black, 0.12f);
+
+        for (int y = 0; y < h; y++)
+        {
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
+            float t = y / (float)(h - 1);
+            Color grad = Color.Lerp(botCol, topCol, t);
+
+            for (int x = 0; x < w; x++)
+            {
+                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
+                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+
+                if (dist > radius + 0.5f)
+                {
+                    px[y * w + x] = Color.clear;
+                    continue;
+                }
+
+                float aa = Mathf.Clamp01(radius + 0.5f - dist);
+                Color c = (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick)
+                    ? borderCol
+                    : grad;
+
+                c.a *= aa;
+                px[y * w + x] = c;
+            }
+        }
+
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // 角丸パネル（背景色・外枠・角丸）
+    public static Texture2D RoundedPanel(int w, int h, float radius, Color fillCol, Color borderCol, float borderThick = 1.5f)
+    {
+        w = Mathf.Max(12, w);
+        h = Mathf.Max(12, h);
+        radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
+
+        string key = $"rndpnl_{w}_{h}_{(int)radius}_{fillCol.r:F2}_{fillCol.a:F2}_{borderCol.r:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        var px = new Color[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
+            for (int x = 0; x < w; x++)
+            {
+                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
+                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+
+                if (dist > radius + 0.5f)
+                {
+                    px[y * w + x] = Color.clear;
+                    continue;
+                }
+
+                float aa = Mathf.Clamp01(radius + 0.5f - dist);
+                Color c = (borderThick > 0f && (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick))
+                    ? borderCol
+                    : fillCol;
+
+                c.a *= aa;
+                px[y * w + x] = c;
+            }
+        }
+
+        var tex = New(w, h, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }

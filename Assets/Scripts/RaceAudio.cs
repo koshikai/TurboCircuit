@@ -146,11 +146,59 @@ public class RaceAudio : MonoBehaviour
         return s;
     }
 
+    float currentEngineRpm = 0f;
+    float currentEngineVol = 0f;
+
+    public void SetEngine(float speed01, float throttle, bool active, bool drifting, int driftLevel = 0)
+    {
+        if (engine == null) return;
+        if (!active)
+        {
+            currentEngineVol = Mathf.MoveTowards(currentEngineVol, 0f, Time.unscaledDeltaTime * 4f);
+            engine.volume = currentEngineVol * MasterSfxVolume;
+            if (driftLoop != null) driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, 0f, Time.unscaledDeltaTime * 3f);
+            return;
+        }
+
+        float dt = Time.unscaledDeltaTime;
+        float absSpeed = Mathf.Clamp01(Mathf.Abs(speed01));
+        float fwdThrottle = Mathf.Clamp01(throttle);
+
+        // RPMモデル:
+        // - アクセルON時: エンジン回転数が即座に先行して吹け上がる（レスポンス・加速感）
+        // - アクセルOFF時: 負荷が抜け、回転数が素早く落ち着く（耳障りな唸りを防止）
+        // - ドリフトチャージ時は少し高回転に吹け上がる
+        float boostBonus = (driftLevel > 0) ? (0.05f * driftLevel) : 0f;
+        float targetRpm = Mathf.Clamp01(absSpeed * 0.72f + fwdThrottle * 0.28f + boostBonus);
+
+        // 上昇時はクイック(4.0f)、下降時は滑らかに低下(3.0f)
+        float rpmSpeed = (targetRpm > currentEngineRpm) ? 4.0f : 3.0f;
+        currentEngineRpm = Mathf.MoveTowards(currentEngineRpm, targetRpm, dt * rpmSpeed);
+
+        // ピッチレンジ: 0.78f (アイドリング) 〜 1.32f (全開) の自然で快いレーシング音域
+        float basePitch = useRealEngine ? 0.78f : 0.65f;
+        float pitchRange = useRealEngine ? 0.54f : 0.60f;
+        engine.pitch = basePitch + currentEngineRpm * pitchRange;
+
+        // 音量:
+        // - アイドリング時 (RPM低): 0.05f (静かで落ち着いた低音)
+        // - 巡航・全開時: 最大 0.125f (BGMやSEと調和する適正音量)
+        // - スロットル負荷時 (fwdThrottle > 0): ほんの少し音圧を加える (+0.015f)
+        float targetVol = Mathf.Lerp(0.05f, 0.125f, currentEngineRpm) + (fwdThrottle * 0.015f);
+        currentEngineVol = Mathf.MoveTowards(currentEngineVol, targetVol, dt * 3.0f);
+        engine.volume = currentEngineVol * MasterSfxVolume;
+
+        // ドリフトスキール音
+        if (driftLoop != null)
+        {
+            float targetDriftVol = drifting ? 0.10f * MasterSfxVolume : 0f;
+            driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, targetDriftVol, dt * 2.5f);
+        }
+    }
+
     public void SetEngine(float speed01, bool active, bool drifting)
     {
-        engine.volume = (active ? 0.18f : 0f) * MasterSfxVolume;
-        engine.pitch = useRealEngine ? 0.7f + Mathf.Abs(speed01) * 1.1f : 0.55f + Mathf.Abs(speed01) * 1.25f;
-        driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, drifting ? 0.12f * MasterSfxVolume : 0f, Time.unscaledDeltaTime * 2f);
+        SetEngine(speed01, speed01 > 0.05f ? 1f : 0f, active, drifting, 0);
     }
 
     public void SetMusicTempo(float pitch) => music.pitch = pitch;
@@ -202,15 +250,18 @@ public class RaceAudio : MonoBehaviour
     // 継ぎ目なくループするエンジン音（基本周波数を整数周期にそろえる）
     static AudioClip MakeEngine()
     {
-        const float f = 60f;
-        int n = Rate; // 1秒 = 60周期
+        const float f = 55f;
+        int n = Rate; // 1秒 = 55周期
         var data = new float[n];
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)Rate;
-            float v = Saw(f, t) * 0.4f + Sq(f * 0.5f, t) * 0.3f + Mathf.Sin(2 * Mathf.PI * f * 2f * t) * 0.2f;
-            v *= 0.8f + 0.2f * Mathf.Sin(2 * Mathf.PI * 15f * t);
-            data[i] = v * 0.6f;
+            // 柔らかいエンジン燃焼パルス（低周波主体の倍音構造）
+            float p = Mathf.Sin(2 * Mathf.PI * f * t) * 0.5f 
+                    + Mathf.Sin(2 * Mathf.PI * f * 2f * t) * 0.3f 
+                    + Mathf.Sin(2 * Mathf.PI * f * 3f * t) * 0.15f;
+            p = Mathf.Clamp(p * 1.5f, -0.8f, 0.8f);
+            data[i] = p * 0.45f;
         }
         var clip = AudioClip.Create("engine", n, 1, Rate, false);
         clip.SetData(data, 0);

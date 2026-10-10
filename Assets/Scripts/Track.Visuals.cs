@@ -64,7 +64,7 @@ public partial class Track
 
         Texture2D groundTex = def.SceneryTheme == 1 ? TextureGen.Sand()
             : def.SceneryTheme == 2 ? TextureGen.Snow()
-            : def.SceneryTheme == 3 ? TextureGen.Concrete() : TextureGen.Grass();
+            : (def.SceneryTheme == 3 || def.SceneryTheme == 5) ? TextureGen.Concrete() : TextureGen.Grass();
         var groundMat = new Material(rm.grassMaterial) { mainTexture = groundTex, color = def.GroundColor };
         groundMat.mainTextureScale = new Vector2(160, 160);
 
@@ -198,24 +198,57 @@ public partial class Track
             // 地面から実際に 2.8m 以上浮いている空中区間（都市高架等）のみ橋脚とビームを配置
             if (colH > 2.8f)
             {
-                // 道路底面（-0.35f）に接するように横ビームを配置
-                var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(beam.GetComponent<Collider>());
-                beam.name = "BridgeBeam_" + i;
-                beam.transform.SetParent(transform, false);
-                beam.transform.position = beamPos;
-                beam.transform.rotation = Quaternion.LookRotation(Dirs[i], Normals[i]);
-                beam.transform.localScale = new Vector3(WallOffset * 1.8f, beamH, 3.8f);
-                beam.GetComponent<Renderer>().sharedMaterial = pillarMat;
+                // 下を別の道路が通っているか（立体交差）を判定
+                bool crossesOverTrack = false;
+                for (int j = 0; j < Count; j += 4)
+                {
+                    int indexDiff = Mathf.Abs(i - j);
+                    if (indexDiff > 40 && indexDiff < Count - 40)
+                    {
+                        float hDistSqr = (Pts[j].x - beamPos.x) * (Pts[j].x - beamPos.x) + (Pts[j].z - beamPos.z) * (Pts[j].z - beamPos.z);
+                        if (hDistSqr < (WallOffset + 5f) * (WallOffset + 5f) && Pts[j].y < beamPos.y - 3.0f)
+                        {
+                            crossesOverTrack = true;
+                            break;
+                        }
+                    }
+                }
 
-                // コンクリート橋脚（上端はビーム中心高さに接続し、路面を絶対に貫通しない）
-                var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                Destroy(col.GetComponent<Collider>());
-                col.name = "BridgePillar_" + i;
-                col.transform.SetParent(transform, false);
-                col.transform.position = new Vector3(beamPos.x, groundY + colH * 0.5f, beamPos.z);
-                col.transform.localScale = new Vector3(3.4f, colH * 0.5f, 3.4f);
-                col.GetComponent<Renderer>().sharedMaterial = pillarMat;
+                if (crossesOverTrack)
+                {
+                    // 立体交差部（下の道路を跨ぐ区間）：
+                    // 下の道路の走行路面を完全にクリアに保つため、道路上には柱を一切置かない（オープンスパン構造）
+                    // 道路底面に接する頑丈なスチール横桁ビームのみ配置
+                    var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    Destroy(beam.GetComponent<Collider>());
+                    beam.name = "OverpassSpanBeam_" + i;
+                    beam.transform.SetParent(transform, false);
+                    beam.transform.position = beamPos;
+                    beam.transform.rotation = Quaternion.LookRotation(Dirs[i], Normals[i]);
+                    beam.transform.localScale = new Vector3(WallOffset * 2.2f, beamH, 4.6f);
+                    beam.GetComponent<Renderer>().sharedMaterial = pillarMat;
+                }
+                else
+                {
+                    // 道路底面（-0.35f）に接するように横ビームを配置
+                    var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    Destroy(beam.GetComponent<Collider>());
+                    beam.name = "BridgeBeam_" + i;
+                    beam.transform.SetParent(transform, false);
+                    beam.transform.position = beamPos;
+                    beam.transform.rotation = Quaternion.LookRotation(Dirs[i], Normals[i]);
+                    beam.transform.localScale = new Vector3(WallOffset * 1.8f, beamH, 3.8f);
+                    beam.GetComponent<Renderer>().sharedMaterial = pillarMat;
+
+                    // コンクリート橋脚（上端はビーム中心高さに接続し、路面を絶対に貫通しない）
+                    var col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    Destroy(col.GetComponent<Collider>());
+                    col.name = "BridgePillar_" + i;
+                    col.transform.SetParent(transform, false);
+                    col.transform.position = new Vector3(beamPos.x, groundY + colH * 0.5f, beamPos.z);
+                    col.transform.localScale = new Vector3(3.4f, colH * 0.5f, 3.4f);
+                    col.GetComponent<Renderer>().sharedMaterial = pillarMat;
+                }
             }
         }
     }
@@ -451,10 +484,11 @@ public partial class Track
         var prefabTree1 = Resources.Load<GameObject>("Props/StylizedNature/NormalTree_1");
         var prefabTree2 = Resources.Load<GameObject>("Props/StylizedNature/BirchTree_1");
         var texNormalLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Leaves");
+        var texBirchLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Leaves");
         var texNormalBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Bark");
         var cyberTrunkMat = MakeMat(rm.standMaterial, texNormalBark, new Color(0.20f, 0.22f, 0.30f));
-        var cyberFoliageMat1 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.05f, 0.95f, 1.0f));
-        var cyberFoliageMat2 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(1.0f, 0.22f, 0.88f));
+        var cyberFoliageMat1 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.15f, 0.98f, 1.0f), new Color(0.05f, 0.72f, 0.90f));
+        var cyberFoliageMat2 = MakeMat(rm.leavesMaterial, texBirchLeaves ?? texNormalLeaves, new Color(1.0f, 0.35f, 0.92f), new Color(0.88f, 0.14f, 0.68f));
 
         int placedCyberTrees = 0;
         for (int t = 0; t < 1500 && placedCyberTrees < 95; t++)
@@ -487,7 +521,6 @@ public partial class Track
         }
     }
 
-    // 北海道大学札幌キャンパス：クラーク胸像、古河記念講堂、総合博物館、大野池、イチョウ並木、第2農場モデルバーン＆サイロ＆牧草地、ポプラ並木
     // 北海道大学札幌キャンパス：クラーク胸像、古河記念講堂、総合博物館、大野池、イチョウ並木、第2農場モデルバーン＆サイロ＆牧草地、ポプラ並木
     void BuildCampusScenery(RaceManager rm, TrackDef def, System.Random rng)
     {
@@ -548,28 +581,28 @@ public partial class Track
         var bronzeMat = MakeMat(rm.standMaterial, null, new Color(0.24f, 0.35f, 0.28f));
         var pedestalMat = MakeMat(rm.standMaterial, null, new Color(0.78f, 0.77f, 0.75f));
 
-        // 樹木マテリアル（手描きテクスチャ＋北海道の紅葉・黄葉ティント）
+        // 樹木マテリアル（手描きテクスチャ＋北海道の黄金イチョウ・緑豊かなエルム＆ポプラ）
         var ginkgoTrunkMat = MakeMat(rm.trunkMaterial, texMapleBark, Color.white);
-        var ginkgoLeafMatA = MakeMat(rm.leavesMaterial, texMapleLeaves ?? TextureGen.GinkgoFoliage(Color.yellow), new Color(1.0f, 0.88f, 0.16f));
-        var ginkgoLeafMatB = MakeMat(rm.leavesMaterial, texMapleLeaves ?? TextureGen.GinkgoFoliage(Color.yellow), new Color(0.98f, 0.74f, 0.08f));
-        var ginkgoCarpetMat = MakeMat(rm.leavesMaterial, TextureGen.GinkgoCarpet(), Color.white);
+        var ginkgoLeafMatA = MakeMat(rm.leavesMaterial, texBirchLeaves ?? TextureGen.GinkgoFoliage(Color.yellow), new Color(1.0f, 0.95f, 0.25f), new Color(0.32f, 0.24f, 0.02f));
+        var ginkgoLeafMatB = MakeMat(rm.leavesMaterial, texBirchLeaves ?? TextureGen.GinkgoFoliage(Color.yellow), new Color(1.0f, 0.82f, 0.12f), new Color(0.28f, 0.18f, 0.01f));
+        var ginkgoCarpetMat = MakeMat(rm.leavesMaterial, TextureGen.GinkgoCarpet(), Color.white, new Color(0.18f, 0.14f, 0.02f));
 
         var elmTrunkMat = MakeMat(rm.trunkMaterial, texNormalBark, Color.white);
-        var elmLeafMat = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.85f, 1.0f, 0.75f));
+        var elmLeafMat = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.85f, 1.0f, 0.75f), new Color(0.06f, 0.14f, 0.04f));
 
         var birchTrunkMat = MakeMat(rm.wallMaterial, texBirchBark ?? TextureGen.BirchBark(), Color.white);
-        var birchLeafMat = MakeMat(rm.leavesMaterial, texBirchLeaves, new Color(0.92f, 1.0f, 0.85f));
+        var birchLeafMat = MakeMat(rm.leavesMaterial, texNormalLeaves ?? texBirchLeaves, new Color(0.65f, 0.98f, 0.55f), new Color(0.06f, 0.14f, 0.04f));
 
         var pineTrunkMat = MakeMat(rm.trunkMaterial, texPineBark, Color.white);
-        var pineLeafMat = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.70f, 0.90f, 0.70f));
+        var pineLeafMat = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.75f, 0.95f, 0.75f), new Color(0.04f, 0.10f, 0.05f));
 
         var poplarTrunkMat = MakeMat(rm.trunkMaterial, texBirchBark ?? texNormalBark, Color.white);
-        var poplarLeafMat = MakeMat(rm.leavesMaterial, texBirchLeaves ?? texNormalLeaves, new Color(0.78f, 0.96f, 0.72f));
+        var poplarLeafMat = MakeMat(rm.leavesMaterial, texNormalLeaves ?? texBirchLeaves, new Color(0.58f, 0.94f, 0.48f), new Color(0.06f, 0.14f, 0.04f));
 
         var waterMat = MakeMat(rm.boostPadMaterial, null, new Color(0.12f, 0.48f, 0.55f, 0.88f));
         var hayMat = MakeMat(rm.trunkMaterial, null, new Color(0.85f, 0.75f, 0.35f));
         var flowerMat = MakeMat(rm.leavesMaterial, texFlowers, Color.white);
-        var bushLeafMat = MakeMat(rm.leavesMaterial, texBushLeaves, Color.white);
+        var bushLeafMat = MakeMat(rm.leavesMaterial, texBushLeaves, Color.white, new Color(0.04f, 0.10f, 0.03f));
         var rockMat = MakeMat(rm.standMaterial, texRocks, Color.white);
         var cowWhiteMat = MakeMat(rm.wallMaterial, null, new Color(0.96f, 0.96f, 0.94f));
 
@@ -842,6 +875,37 @@ public partial class Track
     // 立体ジャンプ台（カタパルトランプ）
     void BuildJumpRamps(RaceManager rm)
     {
+        if (JumpRamps.Count == 0) return;
+
+        // ジャンプ台スロープ面用マテリアル（アーケードシェブロン＆発光）
+        var rampSurfaceMat = new Material(rm.boostPadMaterial)
+        {
+            mainTexture = TextureGen.JumpRamp(),
+            color = Color.white
+        };
+        rampSurfaceMat.SetTexture("_BaseMap", TextureGen.JumpRamp());
+        rampSurfaceMat.EnableKeyword("_EMISSION");
+        rampSurfaceMat.SetTexture("_EmissionMap", TextureGen.JumpRampEmission());
+        rampSurfaceMat.SetColor("_EmissionColor", new Color(1.2f, 0.9f, 0.5f));
+        createdMaterials.Add(rampSurfaceMat);
+
+        // ジャンプ台台座・側面用マテリアル（堅牢なハザードストライプ＆スチール）
+        var rampBaseMat = new Material(rm.wallMaterial)
+        {
+            mainTexture = TextureGen.HazardStripes(),
+            color = Color.white
+        };
+        rampBaseMat.SetTexture("_BaseMap", TextureGen.HazardStripes());
+        rampBaseMat.SetFloat("_Smoothness", 0.35f);
+        createdMaterials.Add(rampBaseMat);
+
+        // ポール頂点の発光警告ビーコン用マテリアル
+        var beaconMat = new Material(rm.glowMaterial)
+        {
+            color = new Color(1f, 0.75f, 0.1f)
+        };
+        createdMaterials.Add(beaconMat);
+
         for (int r = 0; r < JumpRamps.Count; r++)
         {
             var ramp = JumpRamps[r];
@@ -859,53 +923,121 @@ public partial class Track
             float len = 8.5f;
             float h = 1.6f;
 
-            var rampMesh = new Mesh();
-            rampMesh.name = "RampMesh_" + r;
-            createdMeshes.Add(rampMesh);
-            rampMesh.vertices = new[]
+            // 1. スロープ面（上部走行面）
+            var slopeMesh = new Mesh();
+            slopeMesh.name = "RampSlopeMesh_" + r;
+            createdMeshes.Add(slopeMesh);
+            slopeMesh.vertices = new[]
             {
-                new Vector3(-w * 0.5f, 0.05f, -len * 0.5f), // 0: 手前左
-                new Vector3(w * 0.5f, 0.05f, -len * 0.5f),  // 1: 手前右
+                new Vector3(-w * 0.5f, 0.06f, -len * 0.5f), // 0: 手前左
+                new Vector3(w * 0.5f, 0.06f, -len * 0.5f),  // 1: 手前右
                 new Vector3(-w * 0.5f, h, len * 0.5f),      // 2: 奥左上
-                new Vector3(w * 0.5f, h, len * 0.5f),       // 3: 奥右上
-                new Vector3(-w * 0.5f, 0f, len * 0.5f),     // 4: 奥左下
-                new Vector3(w * 0.5f, 0f, len * 0.5f)       // 5: 奥右下
+                new Vector3(w * 0.5f, h, len * 0.5f)        // 3: 奥右上
             };
-            rampMesh.uv = new[]
+            slopeMesh.uv = new[]
             {
-                new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0, 4), new Vector2(1, 4),
-                new Vector2(0, 0), new Vector2(1, 0)
+                new Vector2(0f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f)
             };
-            rampMesh.triangles = new[]
+            slopeMesh.triangles = new[]
             {
-                0, 2, 1, 1, 2, 3,  // スロープ面
-                2, 4, 3, 3, 4, 5,  // 背面
-                0, 4, 2,           // 左側面
-                1, 3, 5            // 右側面
+                0, 2, 1,
+                1, 2, 3
             };
-            rampMesh.RecalculateNormals();
-            rampMesh.RecalculateBounds();
+            slopeMesh.RecalculateNormals();
+            slopeMesh.RecalculateBounds();
 
-            rampGo.AddComponent<MeshFilter>().sharedMesh = rampMesh;
-            var mr = rampGo.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = rm.boostPadMaterial; // ネオンオレンジ発光
+            var slopeGo = new GameObject("RampSlope");
+            slopeGo.transform.SetParent(rampGo.transform, false);
+            slopeGo.AddComponent<MeshFilter>().sharedMesh = slopeMesh;
+            slopeGo.AddComponent<MeshRenderer>().sharedMaterial = rampSurfaceMat;
 
-            // ランプ先端の両脇に警告サインポール
+            // 2. 台座・側面・背面フレーム（ハザードストライプ）
+            var baseMesh = new Mesh();
+            baseMesh.name = "RampBaseMesh_" + r;
+            createdMeshes.Add(baseMesh);
+
+            baseMesh.vertices = new[]
+            {
+                // 左側面（三角）
+                new Vector3(-w * 0.5f, 0f, -len * 0.5f),
+                new Vector3(-w * 0.5f, h, len * 0.5f),
+                new Vector3(-w * 0.5f, 0f, len * 0.5f),
+
+                // 右側面（三角）
+                new Vector3(w * 0.5f, 0f, -len * 0.5f),
+                new Vector3(w * 0.5f, 0f, len * 0.5f),
+                new Vector3(w * 0.5f, h, len * 0.5f),
+
+                // 背面（四角）
+                new Vector3(-w * 0.5f, 0f, len * 0.5f),
+                new Vector3(-w * 0.5f, h, len * 0.5f),
+                new Vector3(w * 0.5f, h, len * 0.5f),
+                new Vector3(w * 0.5f, 0f, len * 0.5f)
+            };
+
+            baseMesh.uv = new[]
+            {
+                // 左側面
+                new Vector2(0f, 0f), new Vector2(3f, 1f), new Vector2(3f, 0f),
+                // 右側面
+                new Vector2(0f, 0f), new Vector2(3f, 0f), new Vector2(3f, 1f),
+                // 背面
+                new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(4f, 1f), new Vector2(4f, 0f)
+            };
+
+            baseMesh.triangles = new[]
+            {
+                // 左側面
+                0, 1, 2,
+                // 右側面
+                3, 4, 5,
+                // 背面
+                6, 7, 8,
+                6, 8, 9
+            };
+            baseMesh.RecalculateNormals();
+            baseMesh.RecalculateBounds();
+
+            var baseGo = new GameObject("RampBase");
+            baseGo.transform.SetParent(rampGo.transform, false);
+            baseGo.AddComponent<MeshFilter>().sharedMesh = baseMesh;
+            baseGo.AddComponent<MeshRenderer>().sharedMaterial = rampBaseMat;
+
+            // 3. ランプ先端の両脇に警告サインポール＆発光ビーコン
             var poleMat = rm.chromeMaterial;
-            var poleL = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(poleL.GetComponent<Collider>());
-            poleL.transform.SetParent(rampGo.transform, false);
-            poleL.transform.localPosition = new Vector3(-w * 0.5f, h + 0.9f, len * 0.5f);
-            poleL.transform.localScale = new Vector3(0.24f, 0.9f, 0.24f);
-            poleL.GetComponent<Renderer>().sharedMaterial = poleMat;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Destroy(pole.GetComponent<Collider>());
+                pole.transform.SetParent(rampGo.transform, false);
+                pole.transform.localPosition = new Vector3(side * (w * 0.5f), h + 0.8f, len * 0.5f);
+                pole.transform.localScale = new Vector3(0.24f, 0.8f, 0.24f);
+                pole.GetComponent<Renderer>().sharedMaterial = poleMat;
 
-            var poleR = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(poleR.GetComponent<Collider>());
-            poleR.transform.SetParent(rampGo.transform, false);
-            poleR.transform.localPosition = new Vector3(w * 0.5f, h + 0.9f, len * 0.5f);
-            poleR.transform.localScale = new Vector3(0.24f, 0.9f, 0.24f);
-            poleR.GetComponent<Renderer>().sharedMaterial = poleMat;
+                var beacon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(beacon.GetComponent<Collider>());
+                beacon.transform.SetParent(rampGo.transform, false);
+                beacon.transform.localPosition = new Vector3(side * (w * 0.5f), h + 1.65f, len * 0.5f);
+                beacon.transform.localScale = Vector3.one * 0.55f;
+                beacon.GetComponent<Renderer>().sharedMaterial = beaconMat;
+            }
+
+            // 4. スロープ左右のサイドガードレール（走行安全バー）
+            float slopeAngle = Mathf.Atan2(h - 0.06f, len) * Mathf.Rad2Deg;
+            float slopeLen = Mathf.Sqrt(len * len + (h - 0.06f) * (h - 0.06f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var rail = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Destroy(rail.GetComponent<Collider>());
+                rail.transform.SetParent(rampGo.transform, false);
+                rail.transform.localPosition = new Vector3(side * (w * 0.5f + 0.1f), (h + 0.06f) * 0.5f + 0.15f, 0f);
+                rail.transform.localRotation = Quaternion.Euler(-slopeAngle, 0f, 0f);
+                rail.transform.localScale = new Vector3(0.18f, 0.35f, slopeLen);
+                rail.GetComponent<Renderer>().sharedMaterial = rm.standMaterial;
+            }
         }
     }
 
@@ -932,7 +1064,7 @@ public partial class Track
         return go;
     }
 
-    Material MakeMat(Material baseMat, Texture2D tex, Color tint)
+    Material MakeMat(Material baseMat, Texture2D tex, Color tint, Color? emission = null)
     {
         var m = new Material(baseMat);
         if (tex != null)
@@ -944,6 +1076,19 @@ public partial class Track
         m.color = tint;
         m.SetColor("_BaseColor", tint);
         m.SetColor("_Color", tint);
+        if (m.HasProperty("_AlphaClip") && baseMat != null && baseMat.GetFloat("_AlphaClip") > 0.5f)
+        {
+            m.SetFloat("_AlphaClip", 1f);
+            m.SetFloat("_Cutoff", 0.3f);
+            m.SetFloat("_Cull", 0f);
+            m.EnableKeyword("_ALPHATEST_ON");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+        }
+        if (emission.HasValue)
+        {
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", emission.Value);
+        }
         createdMaterials.Add(m);
         return m;
     }
@@ -1019,9 +1164,19 @@ public partial class Track
                 Box("PillarGlobe", pPos + Vector3.up * 5.4f, Vector3.one * 1.1f, rot, rm.glowMaterial, PrimitiveType.Sphere);
             }
         }
-        Box("GateBeam", Pts[0] + Vector3.up * 8.5f, new Vector3((HalfWidth + 3.5f) * 2f + 1.2f, isCampus ? 2.2f : 1.6f, 0.6f), rot, beamMat);
-
-        // スタートシグナルランプ（赤・黄・青の3連ライト）
+        float gateWidth = (HalfWidth + 3.5f) * 2f + 1.2f;
+        float gateBeamH = isCampus ? 2.2f : 1.6f;
+        Box("GateBeam", Pts[0] + Vector3.up * 8.5f, new Vector3(gateWidth, gateBeamH, 0.6f), rot, isCampus ? pillarMat : beamMat);
+        if (isCampus)
+        {
+            // 北大正門の中央銘板看板（アスペクト比 4:1 に合わせた大学名プレート）
+            float plaqueH = 1.8f;
+            float plaqueW = plaqueH * 4.0f; // 7.2m
+            var plaquePos = Pts[0] + Vector3.up * 8.5f;
+            Box("GatePlaqueFrame", plaquePos, new Vector3(plaqueW + 0.24f, plaqueH + 0.24f, 0.66f), rot, rm.standMaterial);
+            Box("GatePlaqueFront", plaquePos - Dirs[0] * 0.34f, new Vector3(plaqueW, plaqueH, 1f), rot, beamMat, PrimitiveType.Quad);
+            Box("GatePlaqueBack", plaquePos + Dirs[0] * 0.34f, new Vector3(plaqueW, plaqueH, 1f), rot * Quaternion.Euler(0, 180, 0), beamMat, PrimitiveType.Quad);
+        }
         signalMpb = new MaterialPropertyBlock();
         for (int i = 0; i < 3; i++)
         {
@@ -1044,28 +1199,103 @@ public partial class Track
         }
         UpdateStartSignals(-1); // 初期状態は全消灯
 
-        // 観客席（Circuitテーマ時）
-        if (def.SceneryTheme == 0)
+        // 本格グランプリ観客席（Circuit & Overpassテーマ時：屋根キャノピー・支柱・スポンサー帯・カラフル段差シート・立体観客）
+        var spectatorPalette = SpectatorPalette.Create(rm, createdMaterials);
+        if (def.SceneryTheme == 0 || def.SceneryTheme == 5)
         {
+            var standRot = Quaternion.LookRotation(Dirs[12]);
+            var standRight = Rights[12];
+            float standLen = 62f;
+
+            var seatColors = new[]
+            {
+                new Color(0.95f, 0.22f, 0.25f),
+                new Color(1.00f, 0.58f, 0.12f),
+                new Color(1.00f, 0.85f, 0.15f),
+                new Color(0.18f, 0.78f, 0.42f),
+                new Color(0.18f, 0.55f, 0.98f)
+            };
+            var roofMat = MakeMat(rm.wallMaterial, null, new Color(0.95f, 0.96f, 0.98f));
+            var fasciaTex = TextureGen.SponsorBanner(0);
+            fasciaTex.wrapMode = TextureWrapMode.Repeat;
+            var fasciaMat = MakeMat(rm.wallMaterial, fasciaTex, Color.white);
+            float fasciaLen = standLen + 1.6f;
+            float fasciaRepeat = Mathf.Round(fasciaLen / (1.45f * 4f));
+            fasciaMat.mainTextureScale = new Vector2(fasciaRepeat, 1f);
+
             for (int row = 0; row < 5; row++)
             {
-                float h = 1.2f + row * 2.2f;
-                var p = PointAt(12, -(WallOffset + 5f + row * 2f)) + Vector3.up * h * 0.5f;
-                Box("Stand", p, new Vector3(2f, h, 60f), Quaternion.LookRotation(Dirs[12]), rm.standMaterial);
+                float h = 1.4f + row * 2.1f;
+                var p = PointAt(12, -(WallOffset + 5.2f + row * 2.2f)) + Vector3.up * (h * 0.5f);
+                Box("StandTier_" + row, p, new Vector3(2.2f, h, standLen), standRot, rm.standMaterial);
+
+                // カラフルなシートベンチ段
+                var seatMat = MakeMat(rm.wallMaterial, null, seatColors[row]);
+                var seatPos = PointAt(12, -(WallOffset + 4.8f + row * 2.2f)) + Vector3.up * (h + 0.18f);
+                Box("StandSeat_" + row, seatPos, new Vector3(1.1f, 0.36f, standLen - 1.2f), standRot, seatMat);
             }
+
+            // 後方壁＆キャノピー支柱・屋根
+            float backOffset = -(WallOffset + 5.2f + 4 * 2.2f + 1.4f);
+            var backWallPos = PointAt(12, backOffset) + Vector3.up * 7.2f;
+            Box("StandBackWall", backWallPos, new Vector3(0.8f, 14.4f, standLen), standRot, rm.standMaterial);
+
+            for (int c = -2; c <= 2; c++)
+            {
+                float zOff = c * (standLen * 0.22f);
+                var colPos = PointAt(12, backOffset + 0.4f) + Dirs[12] * zOff + Vector3.up * 11.2f;
+                Box("StandRoofCol_" + c, colPos, new Vector3(0.75f, 9.5f, 0.75f), standRot, rm.chromeMaterial);
+            }
+
+            // 傾斜したスタジアムルーフ（キャノピー）と前面スポンサー看板帯
+            var roofCenter = PointAt(12, -(WallOffset + 9.2f)) + Vector3.up * 15.6f;
+            Box("StandRoofCanopy", roofCenter, new Vector3(14.5f, 0.65f, standLen + 2f), standRot * Quaternion.Euler(0, 0, -8f), roofMat);
+            var fasciaPos = PointAt(12, -(WallOffset + 2.4f)) + Vector3.up * 14.6f;
+            Box("StandRoofFascia", fasciaPos, new Vector3(0.35f, 1.45f, standLen + 1.6f), standRot, fasciaMat);
+
+            // ぴょこぴょこ跳ねて応援する3D観客（帽子・表情・服・腕・応援旗・メガホンを装備した可愛いトイキャラクター）
             var rng = new System.Random(3);
-            for (int i = 0; i < 90; i++)
+            for (int i = 0; i < 140; i++)
             {
                 int row = rng.Next(5);
-                float along = (float)rng.NextDouble() * 56f - 28f;
-                var basePos = PointAt(12, -(WallOffset + 5f + row * 2f)) + Dirs[12] * along;
-                basePos.y = 1.2f + row * 2.2f + 0.35f;
-                var fan = Box("Fan", basePos, Vector3.one * 0.6f, Quaternion.identity, rm.kartPaintMaterial, PrimitiveType.Sphere);
-                var mpb = new MaterialPropertyBlock();
-                mpb.SetColor("_Color", Color.HSVToRGB((float)rng.NextDouble(), 0.7f, 1f));
-                mpb.SetColor("_BaseColor", Color.HSVToRGB((float)rng.NextDouble(), 0.7f, 1f));
-                fan.GetComponent<Renderer>().SetPropertyBlock(mpb);
-                fan.AddComponent<Bouncer>().Init((float)rng.NextDouble() * 5f);
+                float along = (float)rng.NextDouble() * (standLen - 4f) - (standLen * 0.5f - 2f);
+                var basePos = PointAt(12, -(WallOffset + 4.8f + row * 2.2f)) + Dirs[12] * along;
+                basePos.y = 1.4f + row * 2.1f + 0.36f; // ベンチシートの上にピッタリ接地
+
+                SpectatorFan.CreateFan(
+                    transform,
+                    basePos,
+                    Quaternion.LookRotation(standRight, Vector3.up),
+                    rng,
+                    rm,
+                    spectatorPalette
+                );
+            }
+        }
+        else
+        {
+            // その他のコース：スタートサイド＆ピット周辺の応援サポーターたち
+            var rng = new System.Random(def.SceneryTheme * 101 + 7);
+            for (int i = 0; i < 28; i++)
+            {
+                int ptIdx = Wrap(i < 14 ? (2 + i) : (Count - 1 - (i - 14)));
+                float side = (i % 2 == 0) ? 1f : -1f;
+                float dist = WallOffset + 2.8f + (float)rng.NextDouble() * 2.0f;
+                var pos = PointAt(ptIdx, side * dist);
+                pos.y = GetTerrainHeight(pos.x, pos.z, def);
+
+                var lookDir = (Pts[ptIdx] - pos);
+                lookDir.y = 0;
+                if (lookDir.sqrMagnitude < 0.01f) lookDir = Vector3.forward;
+
+                SpectatorFan.CreateFan(
+                    transform,
+                    pos,
+                    Quaternion.LookRotation(lookDir.normalized, Vector3.up),
+                    rng,
+                    rm,
+                    spectatorPalette
+                );
             }
         }
     }
@@ -1188,7 +1418,7 @@ public partial class Track
     void BuildThemedMountains(RaceManager rm, TrackDef def, System.Random rng)
     {
         int theme = def.SceneryTheme;
-        if (theme == 3 || theme == 4) return; // Cityは摩天楼、Campusは札幌山系
+        if (theme == 3 || theme == 4 || theme == 5) return; // Cityは摩天楼、Campusは札幌山系、Overpassはシーサイドベイ
 
         int nTheta = 96;
         int nY = 12;
@@ -1460,26 +1690,26 @@ public partial class Track
         // テーマ別マテリアル
         // Theme 0 (Turbo Circuit): 鮮やかで親しみやすいアーケードグリーン
         var circuitTrunkMat = MakeMat(rm.trunkMaterial, texNormalBark, Color.white);
-        var circuitLeavesMat1 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.38f, 0.88f, 0.28f));
-        var circuitLeavesMat2 = MakeMat(rm.leavesMaterial, texBirchLeaves, new Color(0.48f, 0.94f, 0.32f));
-        var circuitLeavesMat3 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.22f, 0.72f, 0.22f));
-        var circuitBushMat = MakeMat(rm.leavesMaterial, texBushLeaves, Color.white);
+        var circuitLeavesMat1 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.45f, 0.94f, 0.35f), new Color(0.05f, 0.14f, 0.03f));
+        var circuitLeavesMat2 = MakeMat(rm.leavesMaterial, texNormalLeaves ?? texBirchLeaves, new Color(0.58f, 0.98f, 0.40f), new Color(0.06f, 0.16f, 0.04f));
+        var circuitLeavesMat3 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.30f, 0.80f, 0.28f), new Color(0.04f, 0.10f, 0.03f));
+        var circuitBushMat = MakeMat(rm.leavesMaterial, texBushLeaves, Color.white, new Color(0.04f, 0.10f, 0.03f));
         var circuitFlowerMat = MakeMat(rm.leavesMaterial, texFlowers, Color.white);
         var circuitRockMat = MakeMat(rm.standMaterial, texRocks, Color.white);
 
         // Theme 1 (Sunset Dunes): 夕焼け砂漠、ヤシの木、枯れ木、砂岩
         var palmTrunkMat = MakeMat(rm.trunkMaterial, texPalmTrunk, Color.white);
-        var palmLeafMat = MakeMat(rm.leavesMaterial, texPalmLeaves, new Color(0.92f, 0.96f, 0.35f));
+        var palmLeafMat = MakeMat(rm.leavesMaterial, texPalmLeaves, new Color(0.95f, 0.98f, 0.42f), new Color(0.14f, 0.12f, 0.02f));
         var deadTreeMat = MakeMat(rm.trunkMaterial, texNormalBark, new Color(0.68f, 0.60f, 0.50f));
         var desertRockMat1 = MakeMat(rm.mountainMaterial, texRocksDesert ?? texRocks, new Color(1.05f, 0.85f, 0.65f));
         var desertRockMat2 = MakeMat(rm.mountainMaterial, texRocksRedDesert ?? texRocksDesert ?? texRocks, new Color(1.15f, 0.72f, 0.50f));
 
         // Theme 2 (Frost Peak): 白銀の雪山、氷河、積雪針葉樹
         var frostTrunkMat = MakeMat(rm.trunkMaterial, texPineBark, new Color(0.55f, 0.60f, 0.68f));
-        var frostLeafMat1 = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.85f, 0.96f, 1.0f));
-        var frostLeafMat2 = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.50f, 0.75f, 0.70f));
+        var frostLeafMat1 = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.88f, 0.97f, 1.0f), new Color(0.06f, 0.12f, 0.16f));
+        var frostLeafMat2 = MakeMat(rm.leavesMaterial, texPineLeaves, new Color(0.58f, 0.82f, 0.78f), new Color(0.04f, 0.10f, 0.12f));
         var frostRockMat = MakeMat(rm.mountainMaterial, texRocks, new Color(0.82f, 0.90f, 0.98f));
-        var frostBushMat = MakeMat(rm.leavesMaterial, texBushLeaves, new Color(0.88f, 0.94f, 1.0f));
+        var frostBushMat = MakeMat(rm.leavesMaterial, texBushLeaves, new Color(0.88f, 0.94f, 1.0f), new Color(0.05f, 0.10f, 0.14f));
         var crystalMat = new Material(rm.glowMaterial) { color = new Color(0.35f, 0.88f, 1.0f, 0.82f) };
         createdMaterials.Add(crystalMat);
 
@@ -1489,8 +1719,11 @@ public partial class Track
         bool campus = def.SceneryTheme == 4;
         if (campus) BuildCampusScenery(rm, def, rng);
 
+        bool overpass = def.SceneryTheme == 5;
+        if (overpass) BuildSkylineOverpassScenery(rm, def, rng);
+
         // 自然物・木・岩の配置ループ（起伏に富んだプロシージャル地表に追従）
-        for (int tries = 0; tries < 3500 && placed < 280 && !city && !campus; tries++)
+        for (int tries = 0; tries < 3500 && placed < 280 && !city && !campus && !overpass; tries++)
         {
             float px = Mathf.Lerp(bounds.min.x - 90, bounds.max.x + 90, (float)rng.NextDouble());
             float pz = Mathf.Lerp(bounds.min.z - 90, bounds.max.z + 90, (float)rng.NextDouble());
@@ -1603,6 +1836,9 @@ public partial class Track
             BuildThemedMountains(rm, def, rng);
         }
 
+        // 大空を彩る立体ローポリ雲クラスター＆ナイターサーチライト
+        BuildSkyClouds(rm, def, rng);
+
         // 所々の旗
         for (int i = 0; i < Count; i += 25)
         {
@@ -1622,6 +1858,70 @@ public partial class Track
         }
     }
 
+    // 空の立体感と奥行きを高める3Dスタイライズド雲＆都市サーチライト
+    void BuildSkyClouds(RaceManager rm, TrackDef def, System.Random rng)
+    {
+        int theme = def.SceneryTheme;
+        if (theme == 3) // Neon Metropolis: 夜空を照らすサイバー・サーチライトビーム
+        {
+            var beamCyan = new Material(rm.glowMaterial) { color = new Color(0.1f, 0.85f, 1.0f, 0.22f) };
+            var beamPink = new Material(rm.glowMaterial) { color = new Color(1.0f, 0.2f, 0.85f, 0.22f) };
+            createdMaterials.Add(beamCyan);
+            createdMaterials.Add(beamPink);
+            for (int i = 0; i < 8; i++)
+            {
+                float ang = i * Mathf.PI * 0.25f + 0.3f;
+                float dist = 260f + (i % 3) * 65f;
+                Vector3 basePos = bounds.center + new Vector3(Mathf.Cos(ang) * dist, 75f, Mathf.Sin(ang) * dist);
+                Quaternion tilt = Quaternion.Euler((i % 2 == 0 ? 18f : -16f), i * 45f, (i % 3 - 1) * 14f);
+                var beam = Box("Searchlight_" + i, basePos, new Vector3(2.8f, 130f, 2.8f), tilt, (i % 2 == 0) ? beamCyan : beamPink, PrimitiveType.Cylinder);
+                beam.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            return;
+        }
+
+        Color cloudTint = (theme == 1)
+            ? new Color(1.0f, 0.90f, 0.78f) // 夕焼け色に染まる雲
+            : new Color(0.98f, 0.99f, 1.0f); // 爽やかな純白の雲
+        Color cloudEmit = (theme == 1)
+            ? new Color(0.28f, 0.18f, 0.10f)
+            : new Color(0.22f, 0.24f, 0.28f);
+
+        var cloudMat = MakeMat(rm.snowMaterial, null, cloudTint, cloudEmit);
+
+        int cloudCount = 22;
+        for (int c = 0; c < cloudCount; c++)
+        {
+            float ang = (c / (float)cloudCount) * Mathf.PI * 2f + (float)rng.NextDouble() * 0.22f;
+            float dist = 280f + (float)rng.NextDouble() * 210f;
+            float alt = 92f + (float)rng.NextDouble() * 55f;
+            Vector3 cPos = bounds.center + new Vector3(Mathf.Cos(ang) * dist, alt, Mathf.Sin(ang) * dist);
+
+            var cloudRoot = new GameObject("SkyCloud_" + c);
+            cloudRoot.transform.SetParent(transform, false);
+            cloudRoot.transform.position = cPos;
+            cloudRoot.transform.rotation = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
+
+            float scale = 1.0f + (float)rng.NextDouble() * 0.65f;
+            // メインの雲塊＋左右のパフ（立体感のあるもくもく雲）
+            var mainPuff = Box("PuffMain", Vector3.zero, new Vector3(36f, 11f, 20f) * scale, Quaternion.identity, cloudMat, PrimitiveType.Sphere);
+            mainPuff.transform.SetParent(cloudRoot.transform, false);
+            mainPuff.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            var leftPuff = Box("PuffL", new Vector3(-14f, -1.5f, 2f) * scale, new Vector3(24f, 8.5f, 15f) * scale, Quaternion.identity, cloudMat, PrimitiveType.Sphere);
+            leftPuff.transform.SetParent(cloudRoot.transform, false);
+            leftPuff.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            var rightPuff = Box("PuffR", new Vector3(15f, -1.2f, -1.5f) * scale, new Vector3(26f, 9f, 16f) * scale, Quaternion.identity, cloudMat, PrimitiveType.Sphere);
+            rightPuff.transform.SetParent(cloudRoot.transform, false);
+            rightPuff.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            var topPuff = Box("PuffTop", new Vector3(3f, 4.2f, 0f) * scale, new Vector3(22f, 9.5f, 15f) * scale, Quaternion.identity, cloudMat, PrimitiveType.Sphere);
+            topPuff.transform.SetParent(cloudRoot.transform, false);
+            topPuff.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+    }
+
     void BuildSponsorBoards(RaceManager rm, TrackDef def)
     {
         bool isCampus = def.SceneryTheme == 4;
@@ -1633,46 +1933,113 @@ public partial class Track
         var bannerMats = new Material[4];
         for (int v = 0; v < 4; v++)
         {
-            var tex = isCampus ? TextureGen.CampusBanner(v) : ((v < 2 && customBanners[v] != null) ? customBanners[v] : TextureGen.SponsorBanner(v));
+            var tex = isCampus ? TextureGen.CampusBanner(v) : ((customBanners[v % 2] != null) ? customBanners[v % 2] : TextureGen.SponsorBanner(v));
             bannerMats[v] = new Material(rm.bannerMaterial ?? rm.wallMaterial)
             {
                 mainTexture = tex
             };
+            bannerMats[v].SetTexture("_BaseMap", tex);
+            bannerMats[v].SetTexture("_MainTex", tex);
+            bannerMats[v].color = Color.white;
+            bannerMats[v].SetColor("_BaseColor", Color.white);
             createdMaterials.Add(bannerMats[v]);
         }
 
         var poleMat = isCampus ? new Material(rm.wallMaterial) { color = new Color(0.12f, 0.38f, 0.22f) } : rm.chromeMaterial;
         if (isCampus) createdMaterials.Add(poleMat);
+        var frameMat = rm.tireMaterial ?? poleMat;
 
-        // コース壁沿いのスポンサー/キャンパス案内看板
+        // 1. コース壁沿いのスポンサー/キャンパス案内看板（画像のアスペクト比に完全一致＆ドライバー視線に合わせて正対）
         for (int i = 18; i < Count - 15; i += 22)
         {
             float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 12)], Vector3.up);
             float side = bend > 2f ? -1f : 1f; // カーブ外側を優先
-            var pos = PointAt(i, side * (WallOffset + 0.6f)) + Vector3.up * 1.6f;
-            var rot = Quaternion.LookRotation(Dirs[i]);
+            var pos = PointAt(i, side * (WallOffset + 0.6f)) + Vector3.up * 1.9f;
             var mat = bannerMats[(i / 22) % 4];
 
-            // 看板の支柱とボード
-            Box("BoardPole1", pos - Dirs[i] * 1.8f - Vector3.up * 0.3f, new Vector3(0.18f, 1.3f, 0.18f), Quaternion.identity, poleMat, PrimitiveType.Cylinder);
-            Box("BoardPole2", pos + Dirs[i] * 1.8f - Vector3.up * 0.3f, new Vector3(0.18f, 1.3f, 0.18f), Quaternion.identity, poleMat, PrimitiveType.Cylinder);
-            Box("SponsorBoard", pos, new Vector3(0.15f, 1.3f, 4.6f), rot, mat);
+            var tex = mat.mainTexture;
+            float aspect = (tex != null && tex.height > 0) ? (float)tex.width / tex.height : 4f;
+
+            // テクスチャのアスペクト比に合わせて看板オブジェクトの縦横比を完全に一致させる
+            // 16:9画像なら高さ1.60m × 幅2.87m、4:1画像なら高さ1.35m × 幅5.40m
+            float boardH = (aspect > 2.5f) ? 1.35f : 1.60f;
+            float boardW = boardH * aspect;
+
+            // コース内側（走行中のドライバー側）を向く法線
+            Vector3 inwardDir = (side > 0) ? -Rights[i] : Rights[i];
+            // 手前から接近してくるドライバーに視認しやすいよう、少し斜め手前（進行逆方向）にアングルをつける（約20度）
+            Vector3 faceNormal = (inwardDir * 0.94f - Dirs[i] * 0.34f).normalized;
+            Quaternion frameRot = Quaternion.LookRotation(faceNormal, Vector3.up);
+
+            // 看板の幅方向（水平方向の接線ベクトル）
+            Vector3 boardTangent = Vector3.Cross(Vector3.up, faceNormal);
+
+            // 支柱（看板の上端とぴったり揃い、裏側から地面へ支える構造）
+            float poleSpan = boardW * 0.38f;
+            float poleH = boardH + 1.2f;
+            Vector3 polePos1 = pos - faceNormal * 0.08f - boardTangent * poleSpan;
+            Vector3 polePos2 = pos - faceNormal * 0.08f + boardTangent * poleSpan;
+            float poleYOffset = -(poleH * 0.5f - boardH * 0.5f);
+            polePos1.y += poleYOffset;
+            polePos2.y += poleYOffset;
+            Box("BoardPole1", polePos1, new Vector3(0.16f, poleH, 0.16f), Quaternion.identity, poleMat, PrimitiveType.Cylinder);
+            Box("BoardPole2", polePos2, new Vector3(0.16f, poleH, 0.16f), Quaternion.identity, poleMat, PrimitiveType.Cylinder);
+
+            // 看板のバックフレーム（額縁・裏板）
+            Box("BoardFrame", pos, new Vector3(boardW + 0.16f, boardH + 0.16f, 0.12f), frameRot, frameMat);
+
+            // 看板の広告面（Quad）:
+            // Quadの法線はローカル -Z なので、LookRotation(-faceNormal, Vector3.up) で表面がドライバーを向き、
+            // 左右反転することなく正しく読める
+            Quaternion quadRot = Quaternion.LookRotation(-faceNormal, Vector3.up);
+            Box("SponsorBoardFace", pos + faceNormal * 0.065f, new Vector3(boardW, boardH, 1f), quadRot, mat, PrimitiveType.Quad);
         }
 
-        // オーバーヘッド・ブリッジ看板（コースをまたぐ大型ゲート 2箇所）
+        // 2. オーバーヘッド・ブリッジ看板（コースをまたぐ大型ゲート 2箇所：横梁全体をカバーする超ワイドバナー）
         Material[] overheadMats = new Material[2];
-        if (!isCampus)
+        var wideTurbo = RaceManager.LoadTexture("Banners/banner_turbo_bridge", dir + "banner_turbo_bridge.png");
+        var wideNitro = RaceManager.LoadTexture("Banners/banner_nitro_bridge", dir + "banner_nitro_bridge.png");
+        var wideCampus = RaceManager.LoadTexture("Banners/banner_campus_bridge", dir + "banner_campus_bridge.png");
+
+        if (isCampus && wideCampus != null)
         {
-            if (bannerTurbo != null) { overheadMats[0] = new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = bannerTurbo }; createdMaterials.Add(overheadMats[0]); }
-            if (bannerNitro != null) { overheadMats[1] = new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = bannerNitro }; createdMaterials.Add(overheadMats[1]); }
+            overheadMats[0] = new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = wideCampus };
+            overheadMats[0].SetTexture("_BaseMap", wideCampus);
+            overheadMats[0].SetTexture("_MainTex", wideCampus);
+            overheadMats[0].color = Color.white;
+            overheadMats[0].SetColor("_BaseColor", Color.white);
+            overheadMats[1] = overheadMats[0];
+            createdMaterials.Add(overheadMats[0]);
         }
+        else
+        {
+            if (wideTurbo != null)
+            {
+                overheadMats[0] = new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = wideTurbo };
+                overheadMats[0].SetTexture("_BaseMap", wideTurbo);
+                overheadMats[0].SetTexture("_MainTex", wideTurbo);
+                overheadMats[0].color = Color.white;
+                overheadMats[0].SetColor("_BaseColor", Color.white);
+                createdMaterials.Add(overheadMats[0]);
+            }
+            if (wideNitro != null)
+            {
+                overheadMats[1] = new Material(rm.bannerMaterial ?? rm.wallMaterial) { mainTexture = wideNitro };
+                overheadMats[1].SetTexture("_BaseMap", wideNitro);
+                overheadMats[1].SetTexture("_MainTex", wideNitro);
+                overheadMats[1].color = Color.white;
+                overheadMats[1].SetColor("_BaseColor", Color.white);
+                createdMaterials.Add(overheadMats[1]);
+            }
+        }
+
         int[] bridgeSpots = { Count * 33 / 100, Count * 72 / 100 };
         for (int b = 0; b < bridgeSpots.Length; b++)
         {
             int idx = bridgeSpots[b];
             var center = Pts[idx] + Vector3.up * 7.5f;
             var rot = Quaternion.LookRotation(Dirs[idx]);
-            var mat = isCampus ? bannerMats[b % 2] : ((b < 2 && overheadMats[b] != null) ? overheadMats[b] : bannerMats[(b + 1) % 4]);
+            var mat = (overheadMats[b % 2] != null) ? overheadMats[b % 2] : bannerMats[(b + 1) % 4];
 
             // 左右の巨大支柱
             foreach (float side in new[] { -1f, 1f })
@@ -1680,8 +2047,18 @@ public partial class Track
                 var pillarPos = PointAt(idx, side * (HalfWidth + 3.0f)) + Vector3.up * 4.0f;
                 Box("BridgePillar", pillarPos, new Vector3(1.2f, 8.0f, 1.2f), rot, poleMat);
             }
-            // 横梁
-            Box("BridgeBeam", center, new Vector3((HalfWidth + 3.0f) * 2f + 1.2f, 2.0f, 0.8f), rot, mat);
+
+            // コースを跨ぐ横梁構造体（トラスビームフレーム）
+            float beamW = (HalfWidth + 3.0f) * 2f + 1.2f;
+            float beamH = 2.4f;
+            float beamD = 0.8f;
+            Box("BridgeBeam", center, new Vector3(beamW, beamH, beamD), rot, poleMat);
+            Box("BridgeBeamRimTop", center + Vector3.up * (beamH * 0.5f + 0.1f), new Vector3(beamW + 0.4f, 0.2f, beamD + 0.2f), rot, rm.chromeMaterial);
+            Box("BridgeBeamRimBot", center - Vector3.up * (beamH * 0.5f + 0.1f), new Vector3(beamW + 0.4f, 0.2f, beamD + 0.2f), rot, rm.chromeMaterial);
+
+            // 横梁の端から端までぴったり覆う超ワイド大型広告看板（アスペクト比 9.25:1 に完全一致）
+            Box("BridgeAdFaceFront", center - Dirs[idx] * (beamD * 0.5f + 0.04f), new Vector3(beamW, beamH, 1f), rot, mat, PrimitiveType.Quad);
+            Box("BridgeAdFaceBack", center + Dirs[idx] * (beamD * 0.5f + 0.04f), new Vector3(beamW, beamH, 1f), rot * Quaternion.Euler(0, 180, 0), mat, PrimitiveType.Quad);
         }
     }
 
@@ -1842,7 +2219,7 @@ public partial class Track
         if (Count == 0 || Pts == null) return baseGroundY;
 
         int theme = def.SceneryTheme;
-        if (theme == 3) // Neon Metropolis: 都市は平坦なアスファルト
+        if (theme == 3 || theme == 5) // Neon Metropolis & Skyline Overpass は平坦なアスファルト/ベイウォーター
         {
             return baseGroundY;
         }
@@ -1940,7 +2317,7 @@ public partial class Track
     void BuildProceduralTerrain(RaceManager rm, TrackDef def, Material groundMat)
     {
         int theme = def.SceneryTheme;
-        if (theme == 3) // Neon Metropolis (都市) は平坦なQuad
+        if (theme == 3 || theme == 5) // Neon Metropolis (都市) & Skyline Overpass (ベイエリア) は平坦なQuad
         {
             var ground = GameObject.CreatePrimitive(PrimitiveType.Quad);
             Destroy(ground.GetComponent<Collider>());
@@ -2361,5 +2738,255 @@ public partial class Track
         bird.altitude = altitude;
         bird.speed = speed;
         return go;
+    }
+
+    // スカイライン・オーバーパス（立体交差・海岸ベイエリア・斜張橋）の景観構築
+    void BuildSkylineOverpassScenery(RaceManager rm, TrackDef def, System.Random rng)
+    {
+        // 1. 海岸ベイウォーター（碧く輝く水面プレーン）
+        var waterMat = new Material(rm.wallMaterial)
+        {
+            color = new Color(0.08f, 0.42f, 0.65f, 0.92f)
+        };
+        createdMaterials.Add(waterMat);
+        var sea = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(sea.GetComponent<Collider>());
+        sea.name = "BayWaterSurface";
+        sea.transform.SetParent(transform, false);
+        sea.transform.position = new Vector3(bounds.center.x, -0.65f, bounds.center.z);
+        sea.transform.rotation = Quaternion.Euler(90, 0, 0);
+        sea.transform.localScale = new Vector3(2200, 2200, 1);
+        sea.GetComponent<Renderer>().sharedMaterial = waterMat;
+
+        // 2. 立体交差・巨大斜張橋（Cable-Stayed Bridge）ツインタワー（North: Z=75, South: Z=5）
+        // 下層道路（Z=40）を跨ぐため、主塔はZ=75とZ=5の2箇所に配置し、中央クリアランスを完全確保
+        int overpassIdx = 604;
+        if (Count > 0)
+        {
+            float bestCrossingDist = float.MaxValue;
+            for (int i = 0; i < Count; i++)
+            {
+                if (Pts[i].y > 10f)
+                {
+                    float d = Mathf.Abs(Pts[i].x) + Mathf.Abs(Pts[i].z - 40f);
+                    if (d < bestCrossingDist) { bestCrossingDist = d; overpassIdx = i; }
+                }
+            }
+        }
+
+        Vector3 bridgeCenter = Pts[overpassIdx];
+        Vector3 bridgeDir = Dirs[overpassIdx];
+        Vector3 bridgeRight = Rights[overpassIdx];
+        var bridgeRot = Quaternion.LookRotation(bridgeDir, Vector3.up);
+
+        var towerWhiteMat = rm.standMaterial;
+        var pylonRedMat = new Material(rm.wallMaterial) { color = new Color(0.95f, 0.25f, 0.2f) };
+        var cableMat = new Material(rm.glowMaterial) { color = new Color(1f, 0.88f, 0.35f) };
+        var beaconMat = new Material(rm.glowMaterial) { color = new Color(1f, 0.15f, 0.15f) };
+        var signMat = new Material(rm.glowMaterial) { color = new Color(0.05f, 0.95f, 1f) };
+        var palmTrunkM = MakeMat(rm.trunkMaterial, null, new Color(0.42f, 0.30f, 0.20f));
+        var palmLeafM = MakeMat(rm.leavesMaterial, null, new Color(0.18f, 0.65f, 0.28f));
+        createdMaterials.Add(pylonRedMat);
+        createdMaterials.Add(cableMat);
+        createdMaterials.Add(beaconMat);
+        createdMaterials.Add(signMat);
+
+        float pylonHeight = 44f;
+        float pylonOffset = WallOffset + 3.8f;
+
+        // ツインタワー主塔（北側タワー: cStep ≈ -18, 南側タワー: cStep ≈ +18）
+        int[] towerOffsets = { -18, 18 };
+        foreach (int tOff in towerOffsets)
+        {
+            int tIdx = Wrap(overpassIdx + tOff);
+            Vector3 tCenter = Pts[tIdx];
+            Vector3 tDir = Dirs[tIdx];
+            Vector3 tRight = Rights[tIdx];
+            var tRot = Quaternion.LookRotation(tDir, Vector3.up);
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector3 pylonBase = tCenter + tRight * (side * pylonOffset);
+                pylonBase.y = -0.35f;
+
+                // コンクリート台座
+                Box("PylonBase_" + tOff + "_" + side, pylonBase + Vector3.up * 2.5f, new Vector3(4.5f, 5f, 7.5f), tRot, towerWhiteMat);
+                // 主塔ピラー（地上から上空44mへ直立）
+                Box("PylonPillar_" + tOff + "_" + side, pylonBase + Vector3.up * (pylonHeight * 0.5f), new Vector3(2.8f, pylonHeight, 3.8f), tRot, towerWhiteMat);
+                // 塔上部の赤白ストライプ装飾帯
+                Box("PylonStripe_" + tOff + "_" + side, pylonBase + Vector3.up * (pylonHeight - 4f), new Vector3(2.9f, 4f, 3.9f), tRot, pylonRedMat);
+
+                // 塔頂の赤い航空障害灯（ビーコン）
+                var beacon = Box("PylonBeacon_" + tOff + "_" + side, pylonBase + Vector3.up * (pylonHeight + 1.2f), Vector3.one * 1.8f, Quaternion.identity, beaconMat, PrimitiveType.Sphere);
+                var bLight = beacon.AddComponent<Light>();
+                bLight.type = LightType.Point;
+                bLight.color = new Color(1f, 0.2f, 0.2f);
+                bLight.range = 35f;
+                bLight.intensity = 3.5f;
+
+                // 斜張ステイケーブル（塔頂付近から前後の橋桁へ放射状に伸びる）
+                Vector3 cableAnchorTop = pylonBase + Vector3.up * (pylonHeight - 6f);
+                int[] cableSpans = { -24, -16, -8, 8, 16, 24 };
+                foreach (int cSpan in cableSpans)
+                {
+                    int cIdx = Wrap(tIdx + cSpan);
+                    Vector3 deckAnchor = Pts[cIdx] + Rights[cIdx] * (side * (WallOffset - 0.2f));
+                    Vector3 cableVec = deckAnchor - cableAnchorTop;
+                    float cLen = cableVec.magnitude;
+                    Vector3 cMid = (cableAnchorTop + deckAnchor) * 0.5f;
+                    var cRot = Quaternion.LookRotation(cableVec.normalized, Vector3.up);
+                    Box("StayCable_" + tOff + "_" + side + "_" + cSpan, cMid, new Vector3(0.22f, 0.22f, cLen), cRot, cableMat);
+                    Box("CableNode_" + tOff + "_" + side + "_" + cSpan, deckAnchor + Vector3.up * 0.4f, Vector3.one * 0.5f, Quaternion.identity, cableMat, PrimitiveType.Sphere);
+                }
+            }
+
+            // 主塔同士を上空で繋ぐトラスビーム（Y=36m）
+            Vector3 topBeamPos = new Vector3(tCenter.x, -0.35f + pylonHeight - 8f, tCenter.z);
+            Box("PylonCrossBeam_" + tOff, topBeamPos, new Vector3((pylonOffset * 2f) + 3f, 2.4f, 3.6f), tRot, towerWhiteMat);
+        }
+
+        // 高架橋アプローチの頭上サインボード（ワイドブリッジバナー）
+        string bDir = Application.dataPath + "/Resources/Banners/";
+        var overpassBannerTex = RaceManager.LoadTexture("Banners/banner_turbo_bridge", bDir + "banner_turbo_bridge.png") ?? TextureGen.SponsorBanner(0);
+        var underpassBannerTex = RaceManager.LoadTexture("Banners/banner_nitro_bridge", bDir + "banner_nitro_bridge.png") ?? overpassBannerTex;
+
+        var bridgeBannerMat = new Material(rm.bannerMaterial ?? rm.wallMaterial)
+        {
+            mainTexture = overpassBannerTex,
+            color = Color.white
+        };
+        bridgeBannerMat.SetTexture("_BaseMap", overpassBannerTex);
+        bridgeBannerMat.SetTexture("_MainTex", overpassBannerTex);
+        bridgeBannerMat.SetColor("_BaseColor", Color.white);
+        createdMaterials.Add(bridgeBannerMat);
+
+        var underPortalBannerMat = new Material(rm.bannerMaterial ?? rm.wallMaterial)
+        {
+            mainTexture = underpassBannerTex,
+            color = Color.white
+        };
+        underPortalBannerMat.SetTexture("_BaseMap", underpassBannerTex);
+        underPortalBannerMat.SetTexture("_MainTex", underpassBannerTex);
+        underPortalBannerMat.SetColor("_BaseColor", Color.white);
+        createdMaterials.Add(underPortalBannerMat);
+
+        Vector3 bridgeSignPos = bridgeCenter + Vector3.up * 6.5f;
+        float trussW = WallOffset * 2f + 1f;
+        Box("OverpassBridgeSignBeamTop", bridgeSignPos + Vector3.up * 1.5f, new Vector3(trussW, 0.45f, 0.45f), bridgeRot, rm.chromeMaterial);
+        Box("OverpassBridgeSignBeamBot", bridgeSignPos - Vector3.up * 1.5f, new Vector3(trussW, 0.45f, 0.45f), bridgeRot, rm.chromeMaterial);
+
+        float signH = 2.6f;
+        float signW = trussW - 1.2f;
+        var signFrameMat = rm.tireMaterial ?? rm.chromeMaterial;
+        Box("OverpassBridgeSignFrame", bridgeSignPos, new Vector3(signW + 0.3f, signH + 0.3f, 0.4f), bridgeRot, signFrameMat);
+        Box("OverpassBridgeSignFront", bridgeSignPos - bridgeDir * 0.22f, new Vector3(signW, signH, 1f), bridgeRot, bridgeBannerMat, PrimitiveType.Quad);
+        Box("OverpassBridgeSignBack", bridgeSignPos + bridgeDir * 0.22f, new Vector3(signW, signH, 1f), bridgeRot * Quaternion.Euler(0, 180, 0), bridgeBannerMat, PrimitiveType.Quad);
+
+        // 3. 下層アンダーパス（下側を走る道路：Z=40付近）のアンダーパス照明＆ポータル
+        int underpassIdx = 289;
+        if (Count > 0)
+        {
+            float bestUnderDist = float.MaxValue;
+            for (int i = 0; i < Count; i++)
+            {
+                if (Pts[i].y < 3f)
+                {
+                    float d = Mathf.Abs(Pts[i].x) + Mathf.Abs(Pts[i].z - 40f);
+                    if (d < bestUnderDist) { bestUnderDist = d; underpassIdx = i; }
+                }
+            }
+        }
+
+        // 高架橋の真下（道路底面）に設置されるアンダーパス照明
+        for (int lampOff = -12; lampOff <= 12; lampOff += 6)
+        {
+            Vector3 underLampPos = bridgeCenter + bridgeDir * lampOff - Vector3.up * 1.8f;
+            var bulb = Box("UnderpassFloodlight", underLampPos, new Vector3(WallOffset * 1.4f, 0.4f, 0.8f), bridgeRot, signMat);
+            var lampLt = bulb.AddComponent<Light>();
+            lampLt.type = LightType.Point;
+            lampLt.color = new Color(1f, 0.95f, 0.75f);
+            lampLt.range = 28f;
+            lampLt.intensity = 2.4f;
+        }
+
+        // アンダーパス入口・出口のクリアランス警告ポータルゲート
+        foreach (int portalOff in new[] { -18, 18 })
+        {
+            int pIdx = Wrap(underpassIdx + portalOff);
+            Vector3 pCenter = Pts[pIdx];
+            Vector3 pDir = Dirs[pIdx];
+            Vector3 pRight = Rights[pIdx];
+            var pRot = Quaternion.LookRotation(pDir, Vector3.up);
+
+            // 門型アーチ支柱
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Vector3 pCol = pCenter + pRight * (side * (WallOffset + 0.8f));
+                Box("UnderPortalCol_" + side, pCol + Vector3.up * 4.5f, new Vector3(1.2f, 9f, 1.2f), pRot, pylonRedMat);
+            }
+            // 横桁とバナーサイン
+            float portalW = WallOffset * 2f + 2.8f;
+            Box("UnderPortalBeam", pCenter + Vector3.up * 8.4f, new Vector3(portalW, 2.5f, 1.0f), pRot, signFrameMat);
+            Box("UnderPortalSignFront", pCenter + Vector3.up * 8.4f - pDir * 0.52f, new Vector3(portalW - 0.6f, 2.2f, 1f), pRot, underPortalBannerMat, PrimitiveType.Quad);
+            Box("UnderPortalSignBack", pCenter + Vector3.up * 8.4f + pDir * 0.52f, new Vector3(portalW - 0.6f, 2.2f, 1f), pRot * Quaternion.Euler(0, 180, 0), underPortalBannerMat, PrimitiveType.Quad);
+        }
+
+        // 4. ベイエリアのシーサイド灯台（Lighthouse：X=245, Z=-110）
+        Vector3 lhPos = new Vector3(245f, -0.3f, -110f);
+        float lhHeight = 28f;
+        Box("LighthouseBase", lhPos + Vector3.up * 2f, new Vector3(9f, 4f, 9f), Quaternion.identity, towerWhiteMat, PrimitiveType.Cylinder);
+        Box("LighthouseBody", lhPos + Vector3.up * (lhHeight * 0.5f + 2f), new Vector3(6.5f, lhHeight, 6.5f), Quaternion.identity, towerWhiteMat, PrimitiveType.Cylinder);
+        Box("LighthouseStripe", lhPos + Vector3.up * (lhHeight * 0.65f), new Vector3(6.7f, 5f, 6.7f), Quaternion.identity, pylonRedMat, PrimitiveType.Cylinder);
+        Box("LighthouseCrown", lhPos + Vector3.up * (lhHeight + 2.5f), new Vector3(7.5f, 1.5f, 7.5f), Quaternion.identity, towerWhiteMat, PrimitiveType.Cylinder);
+        var lantern = Box("LighthouseLantern", lhPos + Vector3.up * (lhHeight + 4.2f), new Vector3(4.2f, 3f, 4.2f), Quaternion.identity, signMat, PrimitiveType.Cylinder);
+        var lhLt = lantern.AddComponent<Light>();
+        lhLt.type = LightType.Spot;
+        lhLt.spotAngle = 45f;
+        lhLt.color = new Color(1f, 0.98f, 0.75f);
+        lhLt.range = 140f;
+        lhLt.intensity = 4.5f;
+        lhLt.transform.rotation = Quaternion.Euler(12f, 225f, 0);
+
+        // 5. ベイエリアのセーリングヨット（マリーナ沖合に浮かぶ船）
+        Vector3[] boatSpots =
+        {
+            new Vector3(120f, -0.65f, -90f),
+            new Vector3(160f, -0.65f, -40f),
+            new Vector3(80f, -0.65f, 120f)
+        };
+        for (int b = 0; b < boatSpots.Length; b++)
+        {
+            Vector3 bPos = boatSpots[b];
+            var bRot = Quaternion.Euler(0, 35f + b * 60f, 0);
+            // 船体（ハル）
+            Box("YachtHull_" + b, bPos + Vector3.up * 0.6f, new Vector3(4.5f, 1.4f, 14f), bRot, towerWhiteMat);
+            // マスト
+            Box("YachtMast_" + b, bPos + Vector3.up * 7f, new Vector3(0.4f, 12f, 0.4f), bRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+            // 三角セール（帆）
+            Box("YachtSail_" + b, bPos + Vector3.up * 8f - bRot * Vector3.forward * 2.2f, new Vector3(0.15f, 9f, 6.5f), bRot, towerWhiteMat);
+        }
+
+        // 6. コース沿いのヤシの木＆シーサイドプロムナード装飾
+        var prefabPalm1 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_1");
+        var prefabPalm2 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_2");
+        var prefabPalm3 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_3");
+        for (int i = 8; i < Count; i += 16)
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var p = PointAt(i, side * (WallOffset + 5.5f));
+                p.y = GetTerrainHeight(p.x, p.z, def);
+                if (p.y < 5f && DistanceToTrack(p, true) >= WallOffset + 4.2f)
+                {
+                    var palmPrefab = (rng.Next(3) == 0) ? prefabPalm1 : ((rng.Next(2) == 0) ? prefabPalm2 : prefabPalm3);
+                    if (palmPrefab != null)
+                    {
+                        var rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
+                        float s = 2.6f + (float)rng.NextDouble() * 1.2f;
+                        SpawnNatureProp(palmPrefab, p, rot, Vector3.one * s, palmTrunkM, palmLeafM);
+                    }
+                }
+            }
+        }
     }
 }

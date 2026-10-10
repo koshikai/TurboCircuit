@@ -3,7 +3,8 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
-[Kenney](https://kenney.nl/) - Interface Sounds, Impact Sounds, Sci-fi Sounds (CC0). Trimmed / normalized / looped for this game.
+* [Kenney](https://kenney.nl/) - Interface Sounds, Impact Sounds, Sci-fi Sounds (CC0). Trimmed / normalized / looped for this game.
+* [domasx2](https://opengameart.org/content/racing-car-engine-sound-loops) - Racing car engine loop (CC0 / Public domain). Remastered and seamless loop tailored for Turbo Circuit.
 
 ## Music (`bgm_*.ogg`, normalized and cross-faded for looping)
 | File | Course | Track | Author | Source |

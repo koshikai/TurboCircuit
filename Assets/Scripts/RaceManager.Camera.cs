@@ -41,12 +41,14 @@ public partial class RaceManager
 
     void LateUpdate()
     {
+        if (previewSpectatorsRequested) return;
         float dt = Time.unscaledDeltaTime;
         if (paused) return;
 
         // 対戦中は左右 2 分割（P1 = 左、P2 = 右）
         bool split = TwoPlayer && state != State.Title;
         cam.rect = split ? new Rect(0f, 0f, 0.5f, 1f) : new Rect(0f, 0f, 1f, 1f);
+        cam2.rect = new Rect(0.5f, 0f, 0.5f, 1f);
         if (cam2.enabled != split) cam2.enabled = split;
 
         if (state == State.Title)
@@ -110,6 +112,8 @@ public partial class RaceManager
         if (Audio != null) Audio.Tick();
     }
 
+    readonly float[] camRolls = new float[2];
+
     void UpdateChaseCamera(Camera c, Kart pl, int p, float dt)
     {
         var kp = pl.transform.position;
@@ -117,9 +121,15 @@ public partial class RaceManager
         if (state == State.Results && Time.time > finishAt + 1.5f && !spectating) camYaws[p] += 25f * dt;
         else camYaws[p] = Mathf.LerpAngle(camYaws[p], pl.Heading, 1f - Mathf.Exp(-5f * dt));
 
-        bool lookBehind = (p == 0 && !pl.Finished && !spectating && 
-            (Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.JoystickButton9)));
-        isLookingBehind = lookBehind;
+        bool lookBehind = false;
+        if (!pl.Finished && !spectating)
+        {
+            if (p == 0)
+                lookBehind = Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.B) || Input.GetKey(KeyCode.JoystickButton9);
+            else if (p == 1)
+                lookBehind = Input.GetKey(KeyCode.Comma) || Input.GetKey(KeyCode.Backslash) || Input.GetKey(KeyCode.End);
+        }
+        isLookingBehind[p] = lookBehind;
 
         float yaw = camYaws[p];
         if (lookBehind) yaw += 180f;
@@ -150,6 +160,18 @@ public partial class RaceManager
         if (pitchAng > 180f) pitchAng -= 360f;
         float pitchOffset = Mathf.Clamp(pitchAng * -0.06f, -2.5f, 2.5f);
         c.transform.LookAt(kp + r * new Vector3(0, 1.1f + pitchOffset, 3.2f));
+
+        // コーナリング＆ドリフト連動のダイナミックなカメラバンク（Dutch Roll）
+        float targetRoll = 0f;
+        if (state == State.Racing && !lookBehind)
+        {
+            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+            targetRoll = -pl.SteerVisual * 1.6f * spd01 - (pl.Drifting ? pl.DriftDirection * 2.2f : 0f);
+        }
+        camRolls[p] = Mathf.Lerp(camRolls[p], targetRoll, 1f - Mathf.Exp(-8f * dt));
+        if (Mathf.Abs(camRolls[p]) > 0.01f)
+            c.transform.Rotate(0f, 0f, camRolls[p], Space.Self);
+
         if (shake > 0) c.transform.position += Random.insideUnitSphere * shake * shake * 0.5f;
 
         // ダイナミック FOV ブースト：最高速・ブースト・スリップストリーム・トリック連動

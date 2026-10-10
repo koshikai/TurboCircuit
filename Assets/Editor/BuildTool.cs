@@ -70,6 +70,7 @@ public static class BuildTool
 
         PlayerSettings.productName = "Turbo Circuit";
         PlayerSettings.companyName = "kaito";
+        PlayerSettings.bundleVersion = "1.8.0";
         PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
         PlayerSettings.defaultScreenWidth = 1280;
         PlayerSettings.defaultScreenHeight = 720;

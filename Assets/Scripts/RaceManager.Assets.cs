@@ -61,6 +61,15 @@ public partial class RaceManager
                 bannerMaterial.SetFloat("_Glossiness", 0.4f);
             }
         }
+        if (leavesMaterial != null)
+        {
+            leavesMaterial.SetFloat("_AlphaClip", 1f);
+            leavesMaterial.SetFloat("_Cutoff", 0.3f);
+            leavesMaterial.SetFloat("_Cull", 0f);
+            leavesMaterial.SetFloat("_Mode", 1f);
+            leavesMaterial.EnableKeyword("_ALPHATEST_ON");
+            leavesMaterial.renderQueue = (int)RenderQueue.AlphaTest;
+        }
     }
 
     void LoadUIAssets()
@@ -86,13 +95,14 @@ public partial class RaceManager
 
         string uiDir = Application.dataPath + "/Resources/UI/";
         titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");
-        int numCourses = Mathf.Max(Track.Courses.Length, 5);
+        int numCourses = Mathf.Max(Track.Courses.Length, 6);
         if (trackBadgeTex == null || trackBadgeTex.Length < numCourses)
             trackBadgeTex = new Texture2D[numCourses];
         for (int i = 0; i < trackBadgeTex.Length; i++)
             trackBadgeTex[i] = LoadTexture($"UI/badge_track_{i}_pop", uiDir + $"badge_track_{i}_pop.png") ?? LoadTexture($"UI/badge_track_{i}", uiDir + $"badge_track_{i}.png");
         if (trackBadgeTex.Length > 3 && trackBadgeTex[3] == null) trackBadgeTex[3] = TextureGen.CityBadge();
         if (trackBadgeTex.Length > 4 && trackBadgeTex[4] == null) trackBadgeTex[4] = TextureGen.HokkaidoBadge();
+        if (trackBadgeTex.Length > 5 && trackBadgeTex[5] == null) trackBadgeTex[5] = TextureGen.OverpassBadge();
 
         cardPopTex = LoadTexture("UI/ui_card_pop", uiDir + "ui_card_pop.png");
         btnRaceTex = LoadTexture("UI/ui_btn_race", uiDir + "ui_btn_race.png");
@@ -104,6 +114,8 @@ public partial class RaceManager
         modalBgTex = TextureGen.ModernModalPanel(620, 520, new Color(0.08f, 0.12f, 0.24f, 0.93f), new Color(0.04f, 0.06f, 0.14f, 0.97f), new Color(0.0f, 0.85f, 1f, 0.9f), 3, 16f);
         itemSlotTex = TextureGen.ItemSlotFrame(114);
         minimapGlassTex = TextureGen.MinimapGlass(180);
+        circleDotTex = TextureGen.CircleDot(32);
+        speedoPlateTex = TextureGen.SlantedPlate(280, 74, new Color(0.05f, 0.08f, 0.16f, 0.88f), new Color(0.25f, 0.75f, 1f, 0.85f), 3, 0.18f);
 
         // 順位バッジ用スラントプレート
         rankPlateGold = TextureGen.SlantedPlate(150, 68, new Color(1f, 0.82f, 0.1f, 0.92f), new Color(1f, 1f, 0.7f, 1f), 3, 0.2f);

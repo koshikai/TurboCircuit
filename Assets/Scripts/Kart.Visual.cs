@@ -7,6 +7,16 @@ public partial class Kart
 
     static readonly string[] KenneyKarts = { "kart-oobi", "kart-oodi", "kart-ooli", "kart-oopi", "kart-oozi" };
 
+    public int DriftDirection => driftDir;
+    public float SteerVisual => steerVis;
+
+    Transform[] boostFlames = new Transform[2];
+    Renderer[] boostFlameRends = new Renderer[2];
+    MaterialPropertyBlock flameMpb;
+    Transform blobShadow;
+    float visPitch;
+    static Material sharedBlobShadowMat;
+
     void BuildModel()
     {
         model = new GameObject("Model").transform;
@@ -55,13 +65,41 @@ public partial class Kart
             }
         }
 
+        // 車体直下の接地ブロブシャドウ（路面の密着感と立体感を大幅に強化）
+        if (sharedBlobShadowMat == null && rm.skidmarkMaterial != null)
+        {
+            sharedBlobShadowMat = new Material(rm.skidmarkMaterial);
+            var blobTex = TextureGen.BlobShadow();
+            sharedBlobShadowMat.mainTexture = blobTex;
+            sharedBlobShadowMat.SetTexture("_BaseMap", blobTex);
+            sharedBlobShadowMat.SetTexture("_MainTex", blobTex);
+            sharedBlobShadowMat.color = Color.white;
+            sharedBlobShadowMat.SetColor("_BaseColor", Color.white);
+            sharedBlobShadowMat.SetColor("_Color", Color.white);
+        }
+        if (sharedBlobShadowMat != null)
+        {
+            var shadowGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(shadowGo.GetComponent<Collider>());
+            shadowGo.name = "BlobShadow";
+            shadowGo.transform.SetParent(transform, false);
+            shadowGo.transform.localPosition = new Vector3(0f, 0.035f, -0.05f);
+            shadowGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            shadowGo.transform.localScale = new Vector3(2.15f, 2.55f, 1f);
+            var sr = shadowGo.GetComponent<Renderer>();
+            sr.sharedMaterial = sharedBlobShadowMat;
+            sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            sr.receiveShadows = false;
+            blobShadow = shadowGo.transform;
+        }
+
         // ヘッドライト（左右フロント）
         var hlMat = rm.headlightMaterial;
-        float hlZ = kenneyReady ? 1.05f : 1.46f;
+        float hlZ = kenneyReady ? 1.02f : 1.46f;
         float hlY = kenneyReady ? 0.30f : 0.44f;
-        float hlX = kenneyReady ? 0.38f : 0.46f;
-        Part(PrimitiveType.Cube, new Vector3(-hlX, hlY, hlZ), new Vector3(0.18f, 0.12f, 0.08f), hlMat);
-        Part(PrimitiveType.Cube, new Vector3(hlX, hlY, hlZ), new Vector3(0.18f, 0.12f, 0.08f), hlMat);
+        float hlX = kenneyReady ? 0.36f : 0.46f;
+        Part(PrimitiveType.Cube, new Vector3(-hlX, hlY, hlZ), new Vector3(0.16f, 0.07f, 0.05f), hlMat);
+        Part(PrimitiveType.Cube, new Vector3(hlX, hlY, hlZ), new Vector3(0.16f, 0.07f, 0.05f), hlMat);
         if (IsPlayer)
         {
             var spotGo = new GameObject("HeadlightBeam");
@@ -76,16 +114,33 @@ public partial class Kart
             spot.color = new Color(1f, 0.98f, 0.92f);
         }
 
-        // テールランプ（左右リア・ブレーキ連動）
+        // テールランプ（スリムなLEDバー・ブレーキ連動）
         tailMpb = new MaterialPropertyBlock();
         var tlMat = rm.taillightMaterial;
-        float tlZ = kenneyReady ? -0.74f : -1.24f;
-        float tlY = kenneyReady ? 0.36f : 0.52f;
-        float tlX = kenneyReady ? 0.34f : 0.46f;
-        var tl1 = Part(PrimitiveType.Cube, new Vector3(-tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
-        var tl2 = Part(PrimitiveType.Cube, new Vector3(tlX, tlY, tlZ), new Vector3(0.18f, 0.12f, 0.08f), tlMat);
+        float tlZ = kenneyReady ? -0.66f : -1.22f;
+        float tlY = kenneyReady ? 0.34f : 0.50f;
+        float tlX = kenneyReady ? 0.32f : 0.44f;
+        var tl1 = Part(PrimitiveType.Cube, new Vector3(-tlX, tlY, tlZ), new Vector3(0.20f, 0.06f, 0.04f), tlMat);
+        var tl2 = Part(PrimitiveType.Cube, new Vector3(tlX, tlY, tlZ), new Vector3(0.20f, 0.06f, 0.04f), tlMat);
         tailLightRend[0] = tl1.GetComponent<Renderer>();
         tailLightRend[1] = tl2.GetComponent<Renderer>();
+
+        // 3D ブースト・アフターバーナージェット炎コーン（左右マフラー先端）
+        flameMpb = new MaterialPropertyBlock();
+        float flZ = kenneyReady ? -0.84f : -1.42f;
+        float flY = kenneyReady ? 0.44f : 0.28f;
+        float flX = kenneyReady ? 0.27f : 0.32f;
+        for (int i = 0; i < 2; i++)
+        {
+            var flGo = Part(PrimitiveType.Capsule, new Vector3(i == 0 ? -flX : flX, flY, flZ), new Vector3(0.18f, 0.38f, 0.18f), rm.glowMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+            flGo.name = "BoostFlame_" + i;
+            var flRend = flGo.GetComponent<Renderer>();
+            flRend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            flRend.receiveShadows = false;
+            boostFlames[i] = flGo.transform;
+            boostFlameRends[i] = flRend;
+            flGo.SetActive(false);
+        }
 
         if (!kenneyReady)
         {
@@ -236,11 +291,20 @@ public partial class Kart
 
         steerVis = Mathf.Lerp(steerVis, steer, 1f - Mathf.Exp(-12f * dt));
         float roll = -steerVis * 4f * Mathf.Clamp01(Speed / MaxSpeed) - (drifting ? driftDir * 5f : 0f);
+        float targetPitch = (boostTimer > 0 || slipstreamTimer > 0) ? -3.4f : (isBraking && Speed > 4f ? 2.4f : 0f);
+        visPitch = Mathf.Lerp(visPitch, targetPitch, 1f - Mathf.Exp(-10f * dt));
         float bob = Offroad && Speed > 5f ? Mathf.Sin(Time.time * 40f) * 0.04f : 0f;
         model.localPosition = new Vector3(0, hop + bob, 0);
 
         float trickAngle = isAirborne ? airTrickSpin : 0f;
-        model.localRotation = Quaternion.Euler(0, visYaw + spinAngle + trickAngle, roll);
+        model.localRotation = Quaternion.Euler(visPitch, visYaw + spinAngle + trickAngle, roll);
+
+        if (blobShadow != null)
+        {
+            float shadowScale = isAirborne ? 0.65f : (1f - hop * 0.3f);
+            blobShadow.localScale = new Vector3(2.15f * shadowScale, 2.55f * shadowScale, 1f);
+            blobShadow.localRotation = Quaternion.Euler(90f, visYaw + spinAngle, 0f);
+        }
 
         wheelAngle += Speed * dt / 0.37f * Mathf.Rad2Deg;
         for (int i = 0; i < 4; i++) wheelSpin[i].localRotation = Quaternion.Euler(wheelAngle, 0, 0);
@@ -262,6 +326,30 @@ public partial class Kart
             tailMpb.SetColor("_EmissionColor", emitCol);
             tailLightRend[0].SetPropertyBlock(tailMpb);
             tailLightRend[1].SetPropertyBlock(tailMpb);
+        }
+
+        // 3D ブースト・アフターバーナージェット炎コーン（ブースト・スリップストリーム時に激しく脈動発光）
+        bool showFlame = boostTimer > 0 || slipstreamTimer > 0;
+        for (int i = 0; i < 2; i++)
+        {
+            if (boostFlames[i] == null) continue;
+            if (boostFlames[i].gameObject.activeSelf != showFlame)
+                boostFlames[i].gameObject.SetActive(showFlame);
+            if (showFlame && flameMpb != null)
+            {
+                float pulse = 0.85f + Mathf.Sin(Time.time * 48f + i * 1.5f) * 0.25f;
+                float lenY = (boostTimer > 0 ? 0.42f : 0.32f) * pulse;
+                float radXZ = (boostTimer > 0 ? 0.18f : 0.14f) * (0.9f + pulse * 0.15f);
+                boostFlames[i].localScale = new Vector3(radXZ, lenY, radXZ);
+                Color fCol = boostTimer > 0
+                    ? Color.Lerp(new Color(1.0f, 0.48f, 0.08f, 0.92f), new Color(0.35f, 0.88f, 1.0f, 0.95f), Mathf.PingPong(Time.time * 18f, 1f))
+                    : new Color(0.35f, 0.88f, 1.0f, 0.88f);
+                flameMpb.SetColor("_TintColor", fCol);
+                flameMpb.SetColor("_Color", fCol);
+                flameMpb.SetColor("_BaseColor", fCol);
+                flameMpb.SetColor("_EmissionColor", fCol * 2.2f);
+                boostFlameRends[i].SetPropertyBlock(flameMpb);
+            }
         }
 
         bool sh = shieldTimer > 0;
@@ -357,5 +445,13 @@ public partial class Kart
 
         if (shieldTimer > 0 && Random.value < 0.5f)
             Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
+    }
+
+    public void SetPreviewSpeedAndBoost(float previewSpeed, float boostDur = 0f, ItemType previewItem = ItemType.None)
+    {
+        Speed = previewSpeed;
+        boostTimer = boostDur;
+        if (previewItem != ItemType.None) Item = previewItem;
+        UpdateVisual(0.05f, 0f);
     }
 }

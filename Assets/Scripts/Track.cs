@@ -268,6 +268,53 @@ public partial class Track : MonoBehaviour
             WallColorB = new Color(0.95f, 0.95f, 0.92f),
             ShoulderColor = new Color(0.82f, 0.74f, 0.58f),
             SceneryTheme = 4
+        },
+        // 6. Skyline Overpass - 海岸ベイエリアを舞台にした立体交差（8の字）ハイウェイサーキット！
+        // 序盤のシーサイド大通りからアンダーパスへ潜り、巨大高架橋の直下を通過。
+        // 西側ヒルクライムスパイラルで標高15mへ駆け上がり、下界を見下ろす斜張橋（立体交差）を横断！
+        // 橋上のビッグジャンプ台から一気に急降下してホームストレートへ戻るスリリングなコース
+        new TrackDef
+        {
+            Name = "SKYLINE OVERPASS",
+            Description = "Spectacular figure-8 coastal raceway featuring a high-altitude flyover bridge crossing 15m over the lower boulevard, helix climb, and bridge jump.",
+            Control = new[]
+            {
+                new Vector3(0, 0, -160),        // 0: スタート/フィニッシュ（シーサイドメインストレート）
+                new Vector3(90, 0, -160),       // 1: ストレート加速区間
+                new Vector3(170, 2, -135),      // 2: 第1コーナー（高速イーストスイーパー）
+                new Vector3(220, 3, -60),       // 3: ベイサイドカーブ
+                new Vector3(210, 2, 25),        // 4: マリーナ沿岸アプローチ
+                new Vector3(150, 1, 60),        // 5: S字カーブからアンダーパス入口へ
+                new Vector3(75, 0, 40),         // 6: アンダーパス手前直線
+                new Vector3(0, 0, 40),          // 7: 【下層・立体交差ポイント】頭上15mを高架橋が横断！
+                new Vector3(-75, 0, 40),        // 8: アンダーパス西側出口
+                new Vector3(-155, 2, 60),       // 9: ウエストループ入口
+                new Vector3(-210, 5, 115),      // 10: ヒルクライムスパイラル
+                new Vector3(-185, 9, 185),      // 11: 登り勾配中速コーナー
+                new Vector3(-110, 12, 215),     // 12: 高台リッジターン
+                new Vector3(-35, 14.5f, 175),   // 13: 高架橋アプローチ（標高14.5m）
+                new Vector3(0, 15, 110),        // 14: 斜張橋ゲートウェイ（標高15mピーク！）
+                new Vector3(0, 15, 40),         // 15: 【上層・立体交差ポイント】下の道路を真上から見下ろす！
+                new Vector3(0, 14.5f, -30),     // 16: 高架橋終端【ビッグジャンプ台設置】！
+                new Vector3(-20, 10, -90),      // 17: スリリングな急降下スイーパー
+                new Vector3(-65, 5, -130),      // 18: ダウンヒルS字シケイン
+                new Vector3(-80, 1, -160)       // 19: 最終コーナー（ホームストレートへ合流）
+            },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.81f, Power = 16f } },
+            SkyTint = new Color(0.35f, 0.62f, 0.98f),
+            GroundColor = new Color(0.16f, 0.44f, 0.60f),
+            SunColor = new Color(1f, 0.98f, 0.90f),
+            SunIntensity = 1.36f,
+            SunRotation = new Vector3(45f, -40f, 0f),
+            FogColor = new Color(0.70f, 0.85f, 0.98f),
+            FogDistance = 1100f,
+            RoadColor = new Color(0.24f, 0.25f, 0.27f),
+            CurbColorA = new Color(0.05f, 0.85f, 0.95f),
+            CurbColorB = Color.white,
+            WallColorA = new Color(0.12f, 0.45f, 0.95f),
+            WallColorB = new Color(1f, 0.35f, 0.55f),
+            ShoulderColor = new Color(0.88f, 0.82f, 0.68f),
+            SceneryTheme = 5
         }
     };
 
@@ -487,8 +534,8 @@ public class CourseData : ScriptableObject
     public Color wallColorB = Color.white;
     public Color shoulderColor = new Color(0.85f, 0.75f, 0.55f);
 
-    [Header("Theme (0=Circuit, 1=Desert, 2=Snow, 3=City, 4=Campus)")]
-    [Range(0, 4)]
+    [Header("Theme (0=Circuit, 1=Desert, 2=Snow, 3=City, 4=Campus, 5=Overpass)")]
+    [Range(0, 5)]
     public int sceneryTheme = 0;
 
     public TrackDef ToDef()
