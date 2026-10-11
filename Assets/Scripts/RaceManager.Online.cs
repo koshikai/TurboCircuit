@@ -432,8 +432,10 @@ public partial class RaceManager
         {
             float pulse = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
             var br = new Rect(cx - 190, py + 40, 380, 64 + pulse * 4f);
-            if (btnRaceTex != null) GUI.DrawTexture(br, btnRaceTex, ScaleMode.StretchToFill);
-            else { GUI.color = new Color(1f, 0.7f, 0.1f); GUI.DrawTexture(br, Texture2D.whiteTexture); GUI.color = Color.white; DrawFrame(br, 3, new Color(0.1f, 0.15f, 0.3f)); }
+            var raceSh = TextureGen.RoundedShadow(380, 64, 32f);
+            GUI.DrawTexture(new Rect(br.x, br.y + 4f, br.width, br.height), raceSh);
+            var raceBtn = TextureGen.RaceStartButton(380, 64);
+            GUI.DrawTexture(br, raceBtn);
             Outlined(br, "►► START RACE ◄◄", St(sMid, 26, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), Color.white, 2.5f);
             if (GUI.Button(br, GUIContent.none, GUIStyle.none)) StartRaceFromTitle();
             GUI.Label(new Rect(cx - 190, py + 118, 380, 24), "[ENTER] to start for everyone", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));

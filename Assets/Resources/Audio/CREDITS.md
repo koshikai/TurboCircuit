@@ -3,8 +3,8 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
-* [Kenney](https://kenney.nl/) - Interface Sounds, Impact Sounds, Sci-fi Sounds (CC0). Trimmed / normalized / looped for this game.
-* [domasx2](https://opengameart.org/content/racing-car-engine-sound-loops) - Racing car engine loop (CC0 / Public domain). Remastered and seamless loop tailored for Turbo Circuit.
+* [Kenney](https://kenney.nl/) - Music Jingles (Sax, Steel Drum, Pizzicato), Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
+* [qubodup / Scribe](https://opengameart.org/content/supertuxkart-sound-effects) - Kart engine & tire skid sound effects (CC0 / Public domain).
 
 ## Music (`bgm_*.ogg`, normalized and cross-faded for looping)
 | File | Course | Track | Author | Source |
@@ -13,3 +13,5 @@ All audio in this folder is released under CC0 (public domain). Credit is not re
 | bgm_1 | Sunset Dunes | Some sorta kinda 80's sounding theme but not really | Julie Damsgaard | https://opengameart.org/content/some-sorta-kinda-80s-sounding-theme-but-not-really |
 | bgm_2 | Frost Peak | Dance field | Centurion_of_war | https://opengameart.org/content/dance-field |
 | bgm_3 | Neon Metropolis | City Loop | wipics | https://opengameart.org/content/city-loop-0 |
+| bgm_4 | Hokkaido Campus | Blossom Mountain Remake | MedicineStorm | https://opengameart.org/content/blossom-mountainremake |
+| bgm_5 | Skyline Overpass | Cool Highway Remake | MedicineStorm | https://opengameart.org/content/cool-highway-remake |

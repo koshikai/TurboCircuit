@@ -91,6 +91,7 @@ public partial class Kart : MonoBehaviour
     bool isAirborne;
     float airTrickSpin;
     float jumpCooldown;
+    float bumpCooldown;
 
     public void Init(RaceManager rm, Track track, string name, Color color, bool isPlayer, int index, float lateral, float aiSkill)
     {
@@ -186,6 +187,7 @@ public partial class Kart : MonoBehaviour
         isAirborne = false;
         airTrickSpin = 0;
         jumpCooldown = 0;
+        bumpCooldown = 0;
         aiSteer = 0;
         hasNet = false;
         aiItemTimer = Random.Range(1f, 3f);
@@ -227,6 +229,7 @@ public partial class Kart : MonoBehaviour
         boostTimer -= dt;
         if (boostTimer <= 0) boostColorLevel = 0;
         driftFlarePopTimer = Mathf.Max(0f, driftFlarePopTimer - dt);
+        bumpCooldown = Mathf.Max(0f, bumpCooldown - dt);
         shieldTimer -= dt;
         invulnTimer -= dt;
 
@@ -380,10 +383,17 @@ public partial class Kart : MonoBehaviour
             {
                 VelDir = (VelDir - outward * impact * 1.4f).normalized;
                 Speed *= 1f - 0.45f * impact;
-                if (impact > 0.25f && Speed > 8f)
+                if (impact > 0.25f && Speed > 8f && bumpCooldown <= 0f)
                 {
+                    bumpCooldown = 0.25f;
                     Fx.Burst(transform.position + outward * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
-                    if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.3f); GamepadHaptics.Vibrate(PlayerIndex, 0.75f, 0.25f, 0.2f); }
+                    if (IsPlayer)
+                    {
+                        float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
+                        rm.Audio.Bump(bumpInt);
+                        rm.Shake(0.25f * bumpInt);
+                        GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
+                    }
                 }
             }
         }
@@ -480,7 +490,7 @@ public partial class Kart : MonoBehaviour
                 trickWindowTimer = 0f;
 
                 Fx.Smoke(curPos, -Forward * 3f + Vector3.up * 1.5f, new Color(0.9f, 0.9f, 0.95f, 0.6f), 1.2f, 0.5f, 3);
-                if (IsPlayer) { rm.Audio.Bump(); rm.Shake(0.45f); GamepadHaptics.Vibrate(PlayerIndex, 0.55f, 0.2f, 0.15f); }
+                if (IsPlayer) { rm.Audio.Bump(0.42f); rm.Shake(0.35f); GamepadHaptics.Vibrate(PlayerIndex, 0.50f, 0.2f, 0.15f); }
             }
             transform.position = curPos;
         }

@@ -1443,7 +1443,7 @@ public partial class RaceManager : MonoBehaviour
                     }
                 }
             }
-            if (AllHumansFinished())
+            if (state != State.Results && AllHumansFinished())
             {
                 state = State.Results;
                 finishAt = Time.time;
@@ -1522,12 +1522,15 @@ public partial class RaceManager : MonoBehaviour
             if (a.Shielded && !b.Shielded) { b.Spin(); continue; }
             if (b.Shielded && !a.Shielded) { a.Spin(); continue; }
 
+            // 相対接近速度を計算し、擦れ続けではなく実際に衝突した瞬間のみ強さに応じたバンプ音を鳴らす
+            float relVel = Vector3.Dot(b.VelDir * b.Speed - a.VelDir * a.Speed, n);
             // 押し合い：横方向に少し弾く
             a.VelDir = (a.VelDir + n * 0.5f * wa).normalized;
             b.VelDir = (b.VelDir - n * 0.5f * wb).normalized;
             a.Speed *= 0.985f;
             b.Speed *= 0.985f;
-            if ((a.IsPlayer || b.IsPlayer) && Random.value < 0.15f) Audio.Bump();
+            if ((a.IsPlayer || b.IsPlayer) && relVel > 2.8f)
+                Audio.Bump(Mathf.Clamp01(relVel / 18f));
         }
     }
 

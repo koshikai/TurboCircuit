@@ -130,10 +130,10 @@ public partial class RaceManager
             Outlined(new Rect(slot.x, slot.yMax - 28, slot.width, 18), "ITEM", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 0.95f, 0.55f, 0.85f), 1.5f);
         }
 
-        // ──────────────── ドリフトミニターボゲージ ────────────────
+        // ──────────────── ドリフトミニターボゲージ（文字なし・カラーバーのみ） ────────────────
         if (pl.Drifting && pl.Speed > 8f)
         {
-            var dr = new Rect(slot.x, slot.yMax + 8, slot.width, 16);
+            var dr = new Rect(slot.x, slot.yMax + 8, slot.width, 14);
             GUI.color = new Color(0.05f, 0.08f, 0.15f, 0.85f);
             GUI.DrawTexture(dr, Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -150,15 +150,6 @@ public partial class RaceManager
             GUI.DrawTexture(new Rect(dr.x + 2, dr.y + 2, (dr.width - 4) * chargeNorm, dr.height - 4), Texture2D.whiteTexture);
             GUI.color = Color.white;
             DrawFrame(dr, 1, turboCol);
-
-            string turboText = pl.DriftLevel switch
-            {
-                3 => "ULTRA TURBO!",
-                2 => "SUPER TURBO!",
-                1 => "MINI TURBO!",
-                _ => "CHARGING..."
-            };
-            Outlined(new Rect(dr.x, dr.yMax + 2, dr.width, 18), turboText, St(sSmall, 11), turboCol, 1);
         }
 
         // ──────────────── 周回とタイム（スタイリッシュスラントカード） ────────────────
@@ -232,27 +223,25 @@ public partial class RaceManager
         int spdKmh = Mathf.RoundToInt(Mathf.Abs(pl.Speed) * 3.6f);
         var sr = compact ? new Rect(182, h - 84, 198, 70) : new Rect(w / 2 - 135, h - 90, 270, 76);
 
+        bool boostOrSlip = pl.Boosting || pl.Slipstreaming;
         if (speedoPlateTex != null)
         {
-            GUI.color = pl.Boosting ? new Color(0.12f, 0.32f, 0.55f, 0.92f) : new Color(0.05f, 0.09f, 0.20f, 0.88f);
+            GUI.color = boostOrSlip
+                ? new Color(0.12f, 0.32f, 0.55f, 0.92f)
+                : pl.InDraftStream
+                    ? new Color(0.08f, 0.20f, 0.38f, 0.90f)
+                    : new Color(0.05f, 0.09f, 0.20f, 0.88f);
             GUI.DrawTexture(sr, speedoPlateTex);
             GUI.color = Color.white;
         }
 
-        // 状態インジケータ（BOOST / SLIPSTREAM / DRIFT / RPM）
-        string statusTag = pl.Boosting ? "★ TURBO BOOST ★"
-            : pl.Slipstreaming ? "★ SLIPSTREAM ★"
-            : pl.Drifting ? (pl.DriftLevel > 0 ? $"DRIFT LV.{pl.DriftLevel}" : "DRIFTING")
-            : "SPEEDOMETER";
-        Color statusCol = pl.Boosting ? new Color(0.3f, 0.95f, 1f)
-            : pl.Slipstreaming ? new Color(0.5f, 1f, 0.7f)
-            : pl.Drifting ? new Color(1f, 0.75f, 0.2f)
-            : new Color(0.65f, 0.80f, 0.98f);
-        GUI.Label(new Rect(sr.x + 16, sr.y + 4, sr.width - 32, 16), statusTag, St(sSmall, compact ? 10 : 11, TextAnchor.MiddleLeft, FontStyle.Bold, false, statusCol));
-
         // 速度数値 (Russo One)
-        Color spdCol = pl.Boosting ? new Color(0.45f, 0.96f, 1f) : (spdKmh >= 105 ? new Color(1f, 0.92f, 0.35f) : Color.white);
-        Outlined(new Rect(sr.x + 12, sr.y + 14, sr.width - 24, 38), GetSpeedString(spdKmh), St(sNum, compact ? 28 : 34, TextAnchor.MiddleRight), spdCol, 2.5f);
+        Color spdCol = boostOrSlip
+            ? new Color(0.45f, 0.96f, 1f)
+            : pl.InDraftStream
+                ? new Color(0.72f, 0.96f, 1f)
+                : (spdKmh >= 105 ? new Color(1f, 0.92f, 0.35f) : Color.white);
+        Outlined(new Rect(sr.x + 12, sr.y + 8, sr.width - 24, 42), GetSpeedString(spdKmh), St(sNum, compact ? 28 : 34, TextAnchor.MiddleCenter), spdCol, 2.5f);
 
         // 16セグメント LED タコメーターバー
         var barArea = new Rect(sr.x + 18, sr.yMax - 18, sr.width - 36, 10);
@@ -261,14 +250,14 @@ public partial class RaceManager
         float segGap = 2f;
         float segW = (barArea.width - segGap * (segCount - 1)) / segCount;
         int litSegs = Mathf.RoundToInt(speedRatio * segCount);
-        if (pl.Boosting) litSegs = segCount;
+        if (boostOrSlip) litSegs = segCount;
         for (int s = 0; s < segCount; s++)
         {
             var segRect = new Rect(barArea.x + s * (segW + segGap), barArea.y, segW, barArea.height);
             float tSeg = s / (float)(segCount - 1);
             if (s < litSegs)
             {
-                Color segCol = pl.Boosting
+                Color segCol = boostOrSlip
                     ? Color.Lerp(new Color(0.15f, 0.75f, 1f), new Color(0.75f, 0.98f, 1f), tSeg)
                     : tSeg > 0.80f ? new Color(1f, 0.28f, 0.22f)
                     : tSeg > 0.55f ? new Color(1f, 0.82f, 0.18f)

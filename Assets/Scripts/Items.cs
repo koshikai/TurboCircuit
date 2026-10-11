@@ -835,16 +835,16 @@ public class Missile : MonoBehaviour
         var audio = gameObject.AddComponent<AudioSource>();
         audio.spatialBlend = 1.0f;
         audio.rolloffMode = AudioRolloffMode.Logarithmic;
-        audio.minDistance = 3f;
-        audio.maxDistance = 50f;
-        audio.dopplerLevel = 1.5f;
+        audio.minDistance = 2.5f;
+        audio.maxDistance = 36f;
+        audio.dopplerLevel = 1.0f;
         audio.loop = true;
         var clip = Resources.Load<AudioClip>("Audio/sfx_missile");
         if (clip != null)
         {
             audio.clip = clip;
-            audio.volume = 0.65f * RaceAudio.MasterSfxVolume;
-            audio.pitch = 1.15f;
+            audio.volume = 0.30f * RaceAudio.MasterSfxVolume;
+            audio.pitch = 1.05f;
             audio.Play();
         }
     }
@@ -892,7 +892,14 @@ public class Missile : MonoBehaviour
     {
         Fx.Burst(transform.position, new Color(1f, 0.45f, 0.1f), 30, 9f, 0.8f);
         Fx.Burst(transform.position, new Color(1f, 0.9f, 0.4f), 15, 5f, 0.6f);
-        rm.Audio.Explode();
+        float atten = 1f;
+        var mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            float dist = Vector3.Distance(mainCam.transform.position, transform.position);
+            atten = Mathf.Clamp01(1f - dist / 65f);
+        }
+        if (atten > 0.05f) rm.Audio.Explode(atten);
         rm.RemoveMissile(this);
         Destroy(gameObject);
     }

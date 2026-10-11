@@ -128,13 +128,17 @@ public partial class RaceManager
             if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESUME RACE", "[ESC / START]", new Color(0.18f, 0.78f, 0.42f), true))
             {
                 paused = false;
+                Time.timeScale = 1f;
+                AudioListener.pause = false;
             }
             by += bh + bGap;
 
             if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESTART RACE", "[R / X]", new Color(1f, 0.62f, 0.15f)))
             {
                 paused = false;
-                ResetRace();
+                Time.timeScale = 1f;
+                AudioListener.pause = false;
+                StartCountdown();
             }
             by += bh + bGap;
 
@@ -343,10 +347,8 @@ public partial class RaceManager
             y += 36;
             // ガイドボックス
             var cBox = new Rect(r.x + 30, y, r.width - 60, 92);
-            GUI.color = new Color(0.12f, 0.16f, 0.28f, 0.08f);
-            GUI.DrawTexture(cBox, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            DrawFrame(cBox, 1, new Color(0.7f, 0.75f, 0.85f));
+            int cbw = Mathf.RoundToInt(cBox.width), cbh = Mathf.RoundToInt(cBox.height);
+            GUI.DrawTexture(cBox, TextureGen.RoundedPanel(cbw, cbh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1.2f));
             var cStyle = St(sSmall, 11, TextAnchor.UpperLeft, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f));
             string cHelp = "QUICK CONTROLS OVERVIEW:\n" +
                            "• Gas/Brake: Custom Keys or Pad Triggers (RT/LT) / A / B  |  Drift: Space / Shift / Pad Bumpers (RB/LB)\n" +
@@ -385,7 +387,7 @@ public partial class RaceManager
 
             var kBox = new Rect(r.x + 40, ky + 8, r.width - 80, 44);
             int kbw = Mathf.RoundToInt(kBox.width), kbh = Mathf.RoundToInt(kBox.height);
-            GUI.DrawTexture(kBox, TextureGen.RoundedPanel(kbw, kbh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1f));
+            GUI.DrawTexture(kBox, TextureGen.RoundedPanel(kbw, kbh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1.2f));
             string kHelp = "Click any button above then press any key to rebind.\nPress ESC to cancel rebind. Settings save automatically.";
             GUI.Label(new Rect(kBox.x + 10, kBox.y + 4, kBox.width - 20, kBox.height - 8), kHelp, St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
 
@@ -405,9 +407,8 @@ public partial class RaceManager
 
             // 情報ボックス
             var uBox = new Rect(ux, uy, uw, 160);
-            GUI.color = new Color(0.12f, 0.16f, 0.28f, 0.08f);
-            GUI.DrawTexture(uBox, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.7f, 0.75f, 0.85f), 1f, 8f);
-            GUI.color = Color.white;
+            int ubw = Mathf.RoundToInt(uBox.width), ubh = Mathf.RoundToInt(uBox.height);
+            GUI.DrawTexture(uBox, TextureGen.RoundedPanel(ubw, ubh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1.2f));
 
             float iy = uy + 14f;
             GUI.Label(new Rect(ux + 20, iy, 160, 24), "CURRENT VERSION:", St(sSmall, 14, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
@@ -686,22 +687,19 @@ public partial class RaceManager
         // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
         float pulse = (Mathf.Sin(t * 6f) + 1f) * 0.5f;
         float maxAvailableBtnW = Mathf.Max(260f, w - (cardW + 35f) * 2f - 20f);
-        float btnW = Mathf.Min(440f + pulse * 10f, maxAvailableBtnW);
-        float btnH = 50f + pulse * 4f;
+        float baseBtnW = Mathf.Min(440f, maxAvailableBtnW);
+        float baseBtnH = 50f;
+        float btnW = Mathf.Min(baseBtnW + pulse * 10f, maxAvailableBtnW);
+        float btnH = baseBtnH + pulse * 4f;
         float btnX = (w - btnW) * 0.5f;
         float btnY = 598f - pulse * 2f;
 
-        if (btnRaceTex != null)
-        {
-            GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), btnRaceTex, ScaleMode.StretchToFill);
-        }
-        else
-        {
-            GUI.color = new Color(1f, 0.7f, 0.1f);
-            GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            DrawFrame(new Rect(btnX, btnY, btnW, btnH), 3, new Color(0.1f, 0.15f, 0.3f));
-        }
+        int rbw = Mathf.RoundToInt(baseBtnW);
+        int rbh = Mathf.RoundToInt(baseBtnH);
+        var raceShTex = TextureGen.RoundedShadow(rbw, rbh, baseBtnH * 0.5f);
+        GUI.DrawTexture(new Rect(btnX, btnY + 4f, btnW, btnH), raceShTex);
+        var raceBtnTex = TextureGen.RaceStartButton(rbw, rbh);
+        GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), raceBtnTex);
 
         var startStyle = St(sMid, (int)(24 + pulse * 2), TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
         Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
@@ -722,31 +720,31 @@ public partial class RaceManager
 
     void DrawPopCard(Rect r)
     {
-        if (cardPopTex != null)
-        {
-            GUI.DrawTexture(r, cardPopTex, ScaleMode.StretchToFill);
-        }
-        else
-        {
-            GUI.color = Color.white;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            DrawFrame(r, 3, new Color(0.1f, 0.15f, 0.25f));
-        }
+        int iw = Mathf.RoundToInt(r.width);
+        int ih = Mathf.RoundToInt(r.height);
+        float radius = 18f;
+
+        var shTex = TextureGen.RoundedShadow(iw, ih, radius);
+        GUI.DrawTexture(new Rect(r.x, r.y + 4.5f, r.width, r.height), shTex);
+
+        var cardTex = TextureGen.PopCard(iw, ih, radius);
+        GUI.DrawTexture(r, cardTex);
     }
 
     void DrawPopRibbon(Rect r, Texture2D tex, string text)
     {
-        if (tex != null)
-        {
-            GUI.DrawTexture(r, tex, ScaleMode.StretchToFill);
-        }
-        else
-        {
-            GUI.color = new Color(0.15f, 0.65f, 1f);
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            DrawFrame(r, 2, new Color(0.1f, 0.15f, 0.25f));
-        }
+        int iw = Mathf.RoundToInt(r.width);
+        int ih = Mathf.RoundToInt(r.height);
+        Color ribbonCol = (tex != null && tex == ribbonTrackTex)
+            ? new Color(0.12f, 0.64f, 0.98f)
+            : new Color(1.00f, 0.56f, 0.12f);
+
+        var shTex = TextureGen.RoundedShadow(iw, ih, ih * 0.5f);
+        GUI.DrawTexture(new Rect(r.x, r.y + 2.5f, r.width, r.height), shTex);
+
+        var ribTex = TextureGen.PopRibbon(iw, ih, ribbonCol);
+        GUI.DrawTexture(r, ribTex);
+
         var st = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold);
         Outlined(r, text, st, Color.white, 1.5f);
     }
@@ -951,8 +949,7 @@ public partial class RaceManager
 
         if (DrawModernButton(new Rect(hx, btnY, halfW, 44), "►  RACE AGAIN", "[ENTER / A]", new Color(1f, 0.62f, 0.1f), true))
         {
-            ResetRace();
-            state = State.Racing;
+            StartRaceFromTitle();
         }
 
         if (DrawModernButton(new Rect(hx + halfW + 16f, btnY, halfW, 44), "◄  BACK TO TITLE", "[ESC / B]", new Color(0.18f, 0.62f, 0.95f)))

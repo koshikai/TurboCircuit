@@ -12,7 +12,12 @@ public class RaceAudio : MonoBehaviour
     AudioSource engine, driftLoop, music;
     AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, shield, select, explosion;
     AudioClip[] bumps;
-    readonly AudioClip[] bgm = new AudioClip[5];
+    readonly AudioClip[] bgm = new AudioClip[6];
+
+    float lastBumpTime = -10f;
+    float lastHitTime = -10f;
+    float lastExplodeTime = -10f;
+    float lastTickTime = -10f;
 
     static AudioClip Load(string name, AudioClip fallback)
     {
@@ -54,24 +59,24 @@ public class RaceAudio : MonoBehaviour
             pool[i].playOnAwake = false;
         }
 
-        beep = Make(0.3f, (t, d) => Sq(440, t) * 0.4f * Env(t, d));
-        go = Make(0.7f, (t, d) => (Sq(880, t) * 0.3f + Sq(1320, t) * 0.15f) * Env(t, d));
-        pickup = Make(0.25f, (t, d) => Sq(Arp(t, 0.05f, 523, 659, 784, 1047, 1319), t) * 0.3f * Env(t, d));
-        tick = Make(0.04f, (t, d) => Sq(1200, t) * 0.2f * Env(t, d));
-        gotItem = Make(0.3f, (t, d) => (Mathf.Sin(2 * Mathf.PI * 1568 * t) + Mathf.Sin(2 * Mathf.PI * 2093 * t)) * 0.25f * Env(t, d));
-        boost = Make(0.8f, (t, d) => (Noise() * 0.5f + Saw(Mathf.Lerp(120, 400, t / d), t) * 0.3f) * Mathf.Sin(Mathf.PI * t / d) * 0.6f);
-        hit = Make(0.6f, (t, d) => (Sq(Mathf.Lerp(600, 80, t / d), t) * 0.4f + Noise() * 0.3f) * Env(t, d));
-        bump = Make(0.15f, (t, d) => (Noise() * 0.4f + Mathf.Sin(2 * Mathf.PI * 90 * t) * 0.6f) * Env(t, d));
-        missile = Make(0.5f, (t, d) => (Noise() * 0.4f + Saw(Mathf.Lerp(300, 900, t / d), t) * 0.2f) * Env(t, d));
-        drop = Make(0.2f, (t, d) => Mathf.Sin(2 * Mathf.PI * Mathf.Lerp(500, 200, t / d) * t) * 0.5f * Env(t, d));
-        lap = Make(0.5f, (t, d) => Sq(Arp(t, 0.12f, 784, 988, 1175, 1568), t) * 0.25f * Env(t, d));
-        finalLap = Make(1.2f, (t, d) => Sq(Arp(t, 0.15f, 523, 523, 784, 784, 1047, 1047, 1319, 1568), t) * 0.25f * Env(t, d));
-        finish = Make(2.2f, (t, d) => (Sq(Arp(t, 0.14f, 523, 659, 784, 1047, 784, 1047, 1319, 1568, 1568, 1568, 1568, 1568, 1568, 1568, 1568), t) * 0.22f
-                                     + Saw(Arp(t, 0.56f, 131, 175, 196, 262), t) * 0.15f) * Env(t, d));
-        pop = Make(0.3f, (t, d) => (Noise() * 0.5f + Sq(Mathf.Lerp(200, 800, t / d), t) * 0.3f) * Env(t, d));
-        shield = Make(1.0f, (t, d) => Sq(Arp(t, 0.06f, 523, 659, 784, 1047, 1319, 1568, 2093), t) * 0.2f * Env(t, d));
+        // フォールバック用の柔らかい倍音合成音（通常はすべて Resources/Audio の実素材がロードされる）
+        beep = Make(0.28f, (t, d) => WarmTone(523.25f, t) * 0.35f * Env(t, d));
+        go = Make(0.60f, (t, d) => (WarmTone(783.99f, t) * 0.28f + WarmTone(1046.5f, t) * 0.22f) * Env(t, d));
+        pickup = Make(0.30f, (t, d) => WarmTone(Arp(t, 0.06f, 523, 659, 784, 1047), t) * 0.3f * Env(t, d));
+        tick = Make(0.06f, (t, d) => WarmTone(740, t) * 0.25f * Env(t, d));
+        gotItem = Make(0.35f, (t, d) => (WarmTone(659.25f, t) + WarmTone(987.77f, t)) * 0.22f * Env(t, d));
+        boost = Make(0.8f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(140, 320, t / d), t) * 0.35f) * Mathf.Sin(Mathf.PI * t / d) * 0.5f);
+        hit = Make(0.45f, (t, d) => (WarmTone(Mathf.Lerp(260, 95, t / d), t) * 0.35f + Noise() * 0.15f) * Env(t, d));
+        bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d));
+        missile = Make(0.5f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(220, 520, t / d), t) * 0.25f) * Env(t, d));
+        drop = Make(0.2f, (t, d) => WarmTone(Mathf.Lerp(420, 190, t / d), t) * 0.4f * Env(t, d));
+        lap = Make(0.6f, (t, d) => WarmTone(Arp(t, 0.14f, 587, 659, 784, 988), t) * 0.28f * Env(t, d));
+        finalLap = Make(1.0f, (t, d) => WarmTone(Arp(t, 0.14f, 523, 659, 784, 988, 1047, 1319), t) * 0.28f * Env(t, d));
+        finish = Make(1.8f, (t, d) => WarmTone(Arp(t, 0.16f, 523, 659, 784, 1047, 784, 1047, 1319, 1568), t) * 0.3f * Env(t, d));
+        pop = Make(0.28f, (t, d) => (Noise() * 0.2f + WarmTone(Mathf.Lerp(260, 620, t / d), t) * 0.3f) * Env(t, d));
+        shield = Make(0.85f, (t, d) => WarmTone(Arp(t, 0.12f, 440, 554, 659, 880), t) * 0.25f * Env(t, d));
 
-        // 実素材があるものは差し替える（lap / finalLap / finish のジングルと drift ループは合成のまま）
+        // Resources/Audio の実素材（CC0 楽器ジングル・物理フォーリー効果音）を読み込む
         beep = Load("sfx_beep", beep);
         go = Load("sfx_go", go);
         pickup = Load("sfx_pickup", pickup);
@@ -81,6 +86,9 @@ public class RaceAudio : MonoBehaviour
         hit = Load("sfx_hit", hit);
         missile = Load("sfx_missile", missile);
         drop = Load("sfx_drop", drop);
+        lap = Load("sfx_lap", lap);
+        finalLap = Load("sfx_finallap", finalLap);
+        finish = Load("sfx_finish", finish);
         pop = Load("sfx_pop", pop);
         shield = Load("sfx_shield", shield);
         select = Load("sfx_select", beep);
@@ -90,9 +98,11 @@ public class RaceAudio : MonoBehaviour
         var engineClip = Resources.Load<AudioClip>("Audio/sfx_engine");
         useRealEngine = engineClip != null;
         engine = Loop(engineClip != null ? engineClip : MakeEngine(), 0f);
-        driftLoop = Loop(Make(1f, (t, d) => Noise() * 0.5f + Mathf.Sin(2 * Mathf.PI * 1800 * t) * 0.15f), 0f);
 
-        // コースごとの BGM。1 曲でも欠けていたら合成 BGM で補う
+        var driftClip = Resources.Load<AudioClip>("Audio/sfx_drift");
+        driftLoop = Loop(driftClip != null ? driftClip : Make(1f, (t, d) => Noise() * 0.25f), 0f);
+
+        // 全6コースの BGM を読み込む（万一欠けていた場合のみフォールバック）
         bool missing = false;
         for (int i = 0; i < bgm.Length; i++)
         {
@@ -101,8 +111,8 @@ public class RaceAudio : MonoBehaviour
         }
         if (missing)
         {
-            var synth = MakeMusic();
-            for (int i = 0; i < bgm.Length; i++) if (bgm[i] == null) bgm[i] = synth;
+            var fallbackBgm = bgm[0] != null ? bgm[0] : MakeMusic();
+            for (int i = 0; i < bgm.Length; i++) if (bgm[i] == null) bgm[i] = fallbackBgm;
         }
         music = Loop(bgm[0], currentMusicLevel * MusicGain * MasterBgmVolume);
     }
@@ -181,18 +191,20 @@ public class RaceAudio : MonoBehaviour
         engine.pitch = basePitch + currentEngineRpm * pitchRange;
 
         // 音量:
-        // - アイドリング時 (RPM低): 0.05f (静かで落ち着いた低音)
-        // - 巡航・全開時: 最大 0.125f (BGMやSEと調和する適正音量)
+        // - アイドリング時 (RPM低): 0.055f (静かで落ち着いた低音)
+        // - 巡航・全開時: 最大 0.135f (BGMやSEと調和する適正音量)
         // - スロットル負荷時 (fwdThrottle > 0): ほんの少し音圧を加える (+0.015f)
-        float targetVol = Mathf.Lerp(0.05f, 0.125f, currentEngineRpm) + (fwdThrottle * 0.015f);
+        float targetVol = Mathf.Lerp(0.055f, 0.135f, currentEngineRpm) + (fwdThrottle * 0.015f);
         currentEngineVol = Mathf.MoveTowards(currentEngineVol, targetVol, dt * 3.0f);
         engine.volume = currentEngineVol * MasterSfxVolume;
 
-        // ドリフトスキール音
+        // ドリフトタイヤスキッド音（速度とドリフト段階に応じてピッチと音量を自然に変化させる）
         if (driftLoop != null)
         {
-            float targetDriftVol = drifting ? 0.10f * MasterSfxVolume : 0f;
-            driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, targetDriftVol, dt * 2.5f);
+            float targetDriftVol = drifting ? Mathf.Lerp(0.045f, 0.080f, absSpeed) * MasterSfxVolume : 0f;
+            driftLoop.volume = Mathf.MoveTowards(driftLoop.volume, targetDriftVol, dt * 3.0f);
+            float targetDriftPitch = 0.92f + absSpeed * 0.14f + driftLevel * 0.03f;
+            driftLoop.pitch = Mathf.MoveTowards(driftLoop.pitch, targetDriftPitch, dt * 2.5f);
         }
     }
 
@@ -208,23 +220,57 @@ public class RaceAudio : MonoBehaviour
         RefreshMusicVolume();
     }
 
-    public void Select() => Play(select, 0.5f);
-    public void Explode() => Play(explosion, 0.8f);
-    public void Beep() => Play(beep, 0.6f);
-    public void Go() => Play(go, 0.6f);
-    public void Pickup() => Play(pickup, 0.5f);
-    public void Tick() => Play(tick, 0.4f);
-    public void GotItem() => Play(gotItem, 0.5f);
-    public void Boost() => Play(boost, 0.5f);
-    public void Hit() => Play(hit, 0.7f);
-    public void Bump() => Play(bumps[Random.Range(0, bumps.Length)], 0.5f, Random.Range(0.9f, 1.15f));
-    public void Missile() => Play(missile, 0.6f);
-    public void Drop() => Play(drop, 0.6f);
-    public void Lap() => Play(lap, 0.6f);
-    public void FinalLap() => Play(finalLap, 0.6f);
-    public void Finish() => Play(finish, 0.7f);
-    public void Pop(int level) => Play(pop, 0.5f, 0.8f + level * 0.2f);
-    public void Shield() => Play(shield, 0.5f);
+    public void Select() => Play(select, 0.30f, Random.Range(0.97f, 1.03f));
+
+    public void Explode(float volumeScale = 1f)
+    {
+        float now = Time.unscaledTime;
+        if (now - lastExplodeTime < 0.14f) return;
+        lastExplodeTime = now;
+        float v = 0.22f * Mathf.Clamp01(volumeScale);
+        if (v > 0.01f) Play(explosion, v, Random.Range(0.95f, 1.05f));
+    }
+
+    public void Beep() => Play(beep, 0.36f);
+    public void Go() => Play(go, 0.42f);
+    public void Pickup() => Play(pickup, 0.35f, Random.Range(0.97f, 1.04f));
+
+    public void Tick()
+    {
+        float now = Time.unscaledTime;
+        if (now - lastTickTime < 0.045f) return;
+        lastTickTime = now;
+        Play(tick, 0.24f, Random.Range(0.96f, 1.05f));
+    }
+
+    public void GotItem() => Play(gotItem, 0.36f);
+    public void Boost() => Play(boost, 0.34f, Random.Range(0.96f, 1.05f));
+
+    public void Hit()
+    {
+        float now = Time.unscaledTime;
+        if (now - lastHitTime < 0.20f) return;
+        lastHitTime = now;
+        Play(hit, 0.22f, Random.Range(0.95f, 1.05f));
+    }
+
+    public void Bump(float intensity = 1f)
+    {
+        float now = Time.unscaledTime;
+        if (now - lastBumpTime < 0.18f) return;
+        lastBumpTime = now;
+        float v = 0.18f * Mathf.Clamp(intensity, 0.35f, 1.0f);
+        Play(bumps[Random.Range(0, bumps.Length)], v, Random.Range(0.92f, 1.10f));
+    }
+
+    public void Missile() => Play(missile, 0.32f, Random.Range(0.96f, 1.05f));
+    public void Drop() => Play(drop, 0.32f, Random.Range(0.95f, 1.05f));
+    public void Lap() => Play(lap, 0.40f);
+    public void FinalLap() => Play(finalLap, 0.44f);
+    public void Finish() => Play(finish, 0.46f);
+    public void Pop(int level) => Play(pop, 0.32f, 0.88f + level * 0.12f);
+    public void DriftSpark(int level) => Play(pop, 0.20f, 0.95f + level * 0.14f);
+    public void Shield() => Play(shield, 0.35f);
 
     void Play(AudioClip clip, float vol, float pitch = 1f)
     {
@@ -234,6 +280,9 @@ public class RaceAudio : MonoBehaviour
         s.pitch = pitch;
         s.PlayOneShot(clip, vol * MasterSfxVolume);
     }
+
+    static float WarmTone(float f, float t) =>
+        Mathf.Sin(2 * Mathf.PI * f * t) * 0.7f + Mathf.Sin(2 * Mathf.PI * f * 2f * t) * 0.2f + Mathf.Sin(2 * Mathf.PI * f * 3f * t) * 0.1f;
 
     delegate float Gen(float t, float dur);
 

@@ -767,31 +767,59 @@ public static class TextureGen
         return t;
     }
 
+    // UI 2x スーパーサンプリング倍率（1080p/1440p/4K でも角丸や枠線がジャギーにならないよう2倍解像度で生成）
+    const int UiScale = 2;
+
+    // 角丸矩形の符号付き距離関数 (SDF): 中心からの距離（負＝内側、0＝境界、正＝外側）
+    static float SdfRoundedBox(float px, float py, float w, float h, float r)
+    {
+        float hx = w * 0.5f;
+        float hy = h * 0.5f;
+        float qx = Mathf.Abs(px - hx) - (hx - r);
+        float qy = Mathf.Abs(py - hy) - (hy - r);
+        float outDist = Mathf.Sqrt(Mathf.Max(qx, 0f) * Mathf.Max(qx, 0f) + Mathf.Max(qy, 0f) * Mathf.Max(qy, 0f));
+        float inDist = Mathf.Min(Mathf.Max(qx, qy), 0f);
+        return outDist + inDist - r;
+    }
+
+    static float SmoothStepAA(float edge0, float edge1, float x)
+    {
+        float t = Mathf.Clamp01((x - edge0) / (edge1 - edge0));
+        return t * t * (3f - 2f * t);
+    }
+
     // UIカード用の半透明グラデーション＆角丸パネル
     public static Texture2D CardPanel(int w, int h, Color topBg, Color botBg, Color borderColor, int borderThick)
     {
-        var px = new Color[w * h];
-        float radius = 10f;
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
+        int sw = Mathf.Max(16, w * UiScale);
+        int sh = Mathf.Max(16, h * UiScale);
+        float sr = 10f * UiScale;
+        float sb = borderThick * UiScale;
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
         {
-            float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - radius) : 0);
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - radius) : 0);
-            float dist = Mathf.Sqrt(cx * cx + cy * cy);
-            if (dist > radius)
-            {
-                px[y * w + x] = Color.clear;
-                continue;
-            }
-
-            float t = y / (float)h;
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
             Color bg = Color.Lerp(botBg, topBg, t);
-
-            bool isBorder = x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick || (dist >= radius - borderThick);
-            px[y * w + x] = isBorder ? borderColor : bg;
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
+                {
+                    px[y * sw + x] = Color.clear;
+                    continue;
+                }
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float borderMix = SmoothStepAA(-sb - 0.65f, -sb + 0.65f, sdf);
+                Color c = Color.Lerp(bg, borderColor, borderMix);
+                c.a *= outerAA;
+                px[y * sw + x] = c;
+            }
         }
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         return tex;
     }
 
@@ -827,63 +855,91 @@ public static class TextureGen
     // 現代的なダイアログパネル（ダークネイビーのグラデーション、上部光沢ハイライト、角丸、ネオン枠）
     public static Texture2D ModernModalPanel(int w, int h, Color topBg, Color botBg, Color glowBorder, int borderThick = 3, float radius = 14f)
     {
-        string key = $"modal_{w}_{h}_{topBg.r:F2}_{glowBorder.r:F2}_{borderThick}";
+        string key = $"modal_{w}_{h}_{topBg.r:F2}_{glowBorder.r:F2}_{borderThick}_{radius:F1}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
+        int sw = Mathf.Max(16, w * UiScale);
+        int sh = Mathf.Max(16, h * UiScale);
+        float sr = radius * UiScale;
+        float sb = borderThick * UiScale;
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
         {
-            float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - radius) : 0);
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - radius) : 0);
-            float dist = Mathf.Sqrt(cx * cx + cy * cy);
-            if (dist > radius)
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
+            Color baseBg = Color.Lerp(botBg, topBg, t);
+
+            for (int x = 0; x < sw; x++)
             {
-                px[y * w + x] = Color.clear;
-                continue;
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
+                {
+                    px[y * sw + x] = Color.clear;
+                    continue;
+                }
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                Color bg = baseBg;
+                if (y > sh - 4 * UiScale && sdf <= -sb)
+                    bg = Color.Lerp(bg, Color.white, 0.35f);
+
+                float borderMix = SmoothStepAA(-sb - 0.65f, -sb + 0.65f, sdf);
+                Color c = Color.Lerp(bg, glowBorder, borderMix);
+                c.a *= outerAA;
+                px[y * sw + x] = c;
             }
-
-            float t = y / (float)h;
-            Color bg = Color.Lerp(botBg, topBg, t);
-
-            // 上部の光沢ハイライトライン
-            if (y > h - 4 && dist <= radius - borderThick)
-                bg = Color.Lerp(bg, Color.white, 0.35f);
-
-            bool isBorder = x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick || (dist >= radius - borderThick);
-            px[y * w + x] = isBorder ? glowBorder : bg;
         }
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // レースゲーム風のスラント（斜め平行四辺形）バッジプレート
+    // レースゲーム風のスラント（斜め平行四辺形）バッジプレート（2x HiDPI & サブピクセルAA対応）
     public static Texture2D SlantedPlate(int w, int h, Color fill, Color border, int borderThick = 3, float slant = 0.22f)
     {
-        string key = $"slant_{w}_{h}_{fill.r:F2}_{fill.g:F2}_{border.r:F2}";
+        string key = $"slant_{w}_{h}_{fill.r:F2}_{fill.g:F2}_{border.r:F2}_{borderThick}_{slant:F2}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        float shiftWidth = h * slant;
-        for (int y = 0; y < h; y++)
+        int sw = Mathf.Max(16, w * UiScale);
+        int sh = Mathf.Max(16, h * UiScale);
+        float sb = borderThick * UiScale;
+        float shiftWidth = sh * slant;
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
         {
-            float leftX = (h - 1 - y) * slant;
-            float rightX = leftX + (w - shiftWidth);
-            for (int x = 0; x < w; x++)
+            float py = y + 0.5f;
+            float leftX = (sh - py) * slant;
+            float rightX = leftX + (sw - shiftWidth);
+            float distY = Mathf.Min(py, sh - py);
+
+            for (int x = 0; x < sw; x++)
             {
-                if (x < leftX || x > rightX)
+                float pxX = x + 0.5f;
+                // 斜辺方向の垂直距離補正
+                float invSlope = 1f / Mathf.Sqrt(1f + slant * slant);
+                float distLeft = (pxX - leftX) * invSlope;
+                float distRight = (rightX - pxX) * invSlope;
+                float edgeDist = Mathf.Min(Mathf.Min(distLeft, distRight), distY);
+
+                if (edgeDist < -0.75f)
                 {
-                    px[y * w + x] = Color.clear;
+                    px[y * sw + x] = Color.clear;
                     continue;
                 }
-                bool isBorder = x < leftX + borderThick || x > rightX - borderThick || y < borderThick || y >= h - borderThick;
-                px[y * w + x] = isBorder ? border : fill;
+
+                float outerAA = SmoothStepAA(-0.65f, 0.65f, edgeDist);
+                float borderMix = 1f - SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist);
+                Color c = Color.Lerp(fill, border, borderMix);
+                c.a *= outerAA;
+                px[y * sw + x] = c;
             }
         }
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
@@ -894,100 +950,100 @@ public static class TextureGen
         string key = $"itemslot_pop_{size}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[size * size];
-        float radius = 20f;
+        int ss = size * UiScale;
+        var px = new Color[ss * ss];
+        float radius = 20f * UiScale;
         Color navyOutline = new Color(0.06f, 0.10f, 0.20f, 0.96f);
         Color goldTop     = new Color(1.00f, 0.92f, 0.32f, 1.00f);
         Color goldBot     = new Color(0.96f, 0.66f, 0.08f, 1.00f);
         Color innerCenter = new Color(0.55f, 0.88f, 1.00f, 0.94f);
         Color innerEdge   = new Color(0.18f, 0.56f, 0.95f, 0.92f);
 
-        float half = (size - 1) * 0.5f;
-        for (int y = 0; y < size; y++)
+        float half = ss * 0.5f;
+        float b1 = 2.5f * UiScale;
+        float b2 = 8.5f * UiScale;
+        float b3 = 10.5f * UiScale;
+
+        for (int y = 0; y < ss; y++)
         {
-            float ty = y / (float)(size - 1);
+            float py = y + 0.5f;
+            float ty = y / (float)(ss - 1);
             Color goldGrad = Color.Lerp(goldBot, goldTop, ty);
             if (ty > 0.68f) goldGrad = Color.Lerp(goldGrad, Color.white, (ty - 0.68f) * 1.1f);
 
-            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - 1 - radius) : 0f);
-            for (int x = 0; x < size; x++)
+            for (int x = 0; x < ss; x++)
             {
-                float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - 1 - radius) : 0f);
-                float cornerDist = Mathf.Sqrt(cx * cx + cy * cy);
-                if (cornerDist > radius + 0.5f)
+                float pxX = x + 0.5f;
+                float sdf = SdfRoundedBox(pxX, py, ss, ss, radius);
+                if (sdf > 0.75f)
                 {
-                    px[y * size + x] = Color.clear;
+                    px[y * ss + x] = Color.clear;
                     continue;
                 }
 
-                float aa = Mathf.Clamp01(radius + 0.5f - cornerDist);
-                float edgeDist = Mathf.Min(Mathf.Min(x, size - 1 - x), Mathf.Min(y, size - 1 - y));
-                if (cx > 0f && cy > 0f) edgeDist = Mathf.Min(edgeDist, radius - cornerDist);
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf; // 0 = 外周境界, 正 = 内側深さ
 
-                Color c;
-                if (edgeDist < 2.5f)
+                float rx = (pxX - half) / half;
+                float ry = (py - half * 1.08f) / half;
+                float rad01 = Mathf.Clamp01(Mathf.Sqrt(rx * rx + ry * ry));
+                Color innerCol = Color.Lerp(innerCenter, innerEdge, rad01 * rad01);
+                if (ty > 0.55f && edgeDist > 12f * UiScale)
                 {
-                    c = navyOutline;
-                }
-                else if (edgeDist < 8.5f)
-                {
-                    c = goldGrad;
-                }
-                else if (edgeDist < 10.5f)
-                {
-                    c = Color.white;
-                }
-                else
-                {
-                    float rx = (x - half) / half;
-                    float ry = (y - half * 1.08f) / half;
-                    float rad01 = Mathf.Clamp01(Mathf.Sqrt(rx * rx + ry * ry));
-                    c = Color.Lerp(innerCenter, innerEdge, rad01 * rad01);
-                    // 上部キャンディハイライト
-                    if (ty > 0.55f && edgeDist > 12f)
-                    {
-                        c = Color.Lerp(c, Color.white, (ty - 0.55f) * 0.42f);
-                    }
+                    innerCol = Color.Lerp(innerCol, Color.white, (ty - 0.55f) * 0.42f);
                 }
 
-                c.a *= aa;
-                px[y * size + x] = c;
+                // 内側→白リム→ゴールド枠→ネイビー外枠 を滑らかに補間
+                Color c = innerCol;
+                c = Color.Lerp(Color.white, c, SmoothStepAA(b3 - 0.65f, b3 + 0.65f, edgeDist));
+                c = Color.Lerp(goldGrad, c, SmoothStepAA(b2 - 0.65f, b2 + 0.65f, edgeDist));
+                c = Color.Lerp(navyOutline, c, SmoothStepAA(b1 - 0.65f, b1 + 0.65f, edgeDist));
+
+                c.a *= outerAA;
+                px[y * ss + x] = c;
             }
         }
-        var tex = New(size, size, px, false);
+        var tex = New(ss, ss, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // 半透明ダークガラスミニマップ背景プレート
+    // 半透明ダークガラスミニマップ背景プレート（2x HiDPI & SDF アンチエイリアス）
     public static Texture2D MinimapGlass(int size = 180)
     {
         string key = $"minimap_glass_{size}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[size * size];
-        float radius = 18f;
-        Color glassBg = new Color(0.06f, 0.08f, 0.14f, 0.75f);
-        Color glassBorder = new Color(0.2f, 0.6f, 1f, 0.55f);
+        int ss = size * UiScale;
+        var px = new Color[ss * ss];
+        float radius = 18f * UiScale;
+        float sb = 2.2f * UiScale;
+        Color glassBg = new Color(0.06f, 0.08f, 0.14f, 0.78f);
+        Color glassBorder = new Color(0.25f, 0.68f, 1f, 0.72f);
 
-        for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
+        for (int y = 0; y < ss; y++)
         {
-            float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - radius) : 0);
-            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - radius) : 0);
-            float dist = Mathf.Sqrt(cx * cx + cy * cy);
-            if (dist > radius)
+            float py = y + 0.5f;
+            for (int x = 0; x < ss; x++)
             {
-                px[y * size + x] = Color.clear;
-                continue;
+                float sdf = SdfRoundedBox(x + 0.5f, py, ss, ss, radius);
+                if (sdf > 0.75f)
+                {
+                    px[y * ss + x] = Color.clear;
+                    continue;
+                }
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float borderMix = SmoothStepAA(-sb - 0.65f, -sb + 0.65f, sdf);
+                Color c = Color.Lerp(glassBg, glassBorder, borderMix);
+                c.a *= outerAA;
+                px[y * ss + x] = c;
             }
-            bool isBorder = dist >= radius - 2f || x < 2 || x >= size - 2 || y < 2 || y >= size - 2;
-            px[y * size + x] = isBorder ? glassBorder : glassBg;
         }
-        var tex = New(size, size, px, false);
+        var tex = New(ss, ss, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
@@ -1270,227 +1326,438 @@ public static class TextureGen
         return tex;
     }
 
-    // ミニマップ上の丸型マーカー（白フチ付き円形ドット）
+    // ミニマップ上の丸型マーカー（白フチ付き円形ドット、2x HiDPI 対応）
     public static Texture2D CircleDot(int size = 32)
     {
         string key = $"circle_dot_{size}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[size * size];
-        float r = size * 0.5f - 1f;
-        for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
+        int ss = size * UiScale;
+        var px = new Color[ss * ss];
+        float r = ss * 0.5f - 1.5f;
+        for (int y = 0; y < ss; y++)
+        for (int x = 0; x < ss; x++)
         {
-            float dx = x - size * 0.5f + 0.5f;
-            float dy = y - size * 0.5f + 0.5f;
+            float dx = x + 0.5f - ss * 0.5f;
+            float dy = y + 0.5f - ss * 0.5f;
             float d = Mathf.Sqrt(dx * dx + dy * dy);
-            float a = Mathf.Clamp01(r - d + 0.5f);
-            px[y * size + x] = new Color(1f, 1f, 1f, a);
+            float a = 1f - SmoothStepAA(r - 0.65f, r + 0.65f, d);
+            px[y * ss + x] = new Color(1f, 1f, 1f, a);
         }
-        var tex = New(size, size, px, false);
+        var tex = New(ss, ss, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // ポップな立体角丸ボタン（3Dキャンディハイライト、下部段差、外枠、アンチエイリアス）
+    // ポップな立体角丸ボタン（2x HiDPI、SDF サブピクセルAA、3Dキャンディハイライト、下部段差、外枠）
     public static Texture2D PopButton(int w, int h, float radius, Color baseCol, bool hover = false)
     {
         w = Mathf.Max(16, w);
         h = Mathf.Max(16, h);
         radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
 
-        string key = $"popbtn_{w}_{h}_{(int)radius}_{baseCol.r:F2}_{baseCol.g:F2}_{baseCol.b:F2}_{hover}";
+        string key = $"popbtn_{w}_{h}_{radius:F1}_{baseCol.r:F2}_{baseCol.g:F2}_{baseCol.b:F2}_{hover}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        float borderThick = hover ? 2.5f : 1.8f;
-        Color borderCol = hover ? Color.white : new Color(0.08f, 0.12f, 0.22f, 0.90f);
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = radius * UiScale;
+        float sb = (hover ? 2.4f : 1.8f) * UiScale;
+
+        var px = new Color[sw * sh];
+        Color borderCol = hover ? Color.white : new Color(0.08f, 0.12f, 0.22f, 0.94f);
+        Color innerRimCol = hover ? new Color(1f, 1f, 1f, 0.55f) : new Color(1f, 1f, 1f, 0.25f);
 
         Color topCol = hover ? Color.Lerp(baseCol, Color.white, 0.35f) : Color.Lerp(baseCol, Color.white, 0.18f);
         Color botCol = hover ? Color.Lerp(baseCol, Color.black, 0.05f) : Color.Lerp(baseCol, Color.black, 0.18f);
+        Color bevelDark = Color.Lerp(baseCol, Color.black, 0.34f);
 
-        for (int y = 0; y < h; y++)
+        float bevelH = 3.2f * UiScale;
+        float rimW = 1.2f * UiScale;
+
+        for (int y = 0; y < sh; y++)
         {
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
-            float t = y / (float)(h - 1);
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
             Color grad = Color.Lerp(botCol, topCol, t);
 
-            for (int x = 0; x < w; x++)
+            // 上半分の光沢キャンディハイライト（滑らかなフェード）
+            if (t > 0.50f)
             {
-                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
-                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+                float glossT = SmoothStepAA(0.50f, 0.58f, t) * Mathf.Lerp(0.15f, 0.34f, (t - 0.50f) / 0.50f);
+                grad = Color.Lerp(grad, Color.white, glossT);
+            }
 
-                if (dist > radius + 0.5f)
+            // 下部の立体ベベル段差（滑らかな遷移）
+            float bevelMix = 1f - SmoothStepAA(sb + bevelH - 0.8f, sb + bevelH + 0.8f, py);
+            Color bodyCol = Color.Lerp(grad, bevelDark, bevelMix * 0.75f);
+
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
                 {
-                    px[y * w + x] = Color.clear;
+                    px[y * sw + x] = Color.clear;
                     continue;
                 }
 
-                float aa = Mathf.Clamp01(radius + 0.5f - dist);
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf; // 0 = 外周, 正 = 内側
 
-                Color c;
-                if (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick)
-                {
-                    c = borderCol;
-                }
-                else
-                {
-                    c = grad;
+                // 内側ハイライトリム（枠線のすぐ内側）
+                float rimFactor = (1f - SmoothStepAA(sb + rimW - 0.6f, sb + rimW + 0.6f, edgeDist)) * SmoothStepAA(0.3f, 0.8f, t);
+                Color inner = Color.Lerp(bodyCol, Color.white, rimFactor * innerRimCol.a);
 
-                    if (y >= h * 0.52f && y < h - borderThick - 1f && dist < radius - borderThick - 1f)
-                    {
-                        float glossT = (y - h * 0.52f) / (h * 0.48f);
-                        c = Color.Lerp(c, Color.white, 0.28f * glossT);
-                    }
-                    else if (y < borderThick + 3f)
-                    {
-                        c = Color.Lerp(c, Color.black, 0.22f);
-                    }
-                }
+                // 外枠と内側の滑らかなアンチエイリアス境界
+                float borderMix = 1f - SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist);
+                Color c = Color.Lerp(inner, borderCol, borderMix);
 
-                c.a *= aa;
-                px[y * w + x] = c;
+                c.a *= outerAA;
+                px[y * sw + x] = c;
             }
         }
 
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // 角丸ドロップシャドウ
+    // 角丸ドロップシャドウ（2x HiDPI & SDF ソフトブラー）
     public static Texture2D RoundedShadow(int w, int h, float radius)
     {
         w = Mathf.Max(16, w);
         h = Mathf.Max(16, h);
         radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
 
-        string key = $"popsh_{w}_{h}_{(int)radius}";
+        string key = $"popsh_{w}_{h}_{radius:F1}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        float blur = 2.5f;
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = radius * UiScale;
+        float blur = 2.5f * UiScale;
 
-        for (int y = 0; y < h; y++)
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
         {
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
-            for (int x = 0; x < w; x++)
+            float py = y + 0.5f;
+            for (int x = 0; x < sw; x++)
             {
-                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
-                float dist = Mathf.Sqrt(cx * cx + cy * cy);
-
-                if (dist > radius + blur)
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
                 {
-                    px[y * w + x] = Color.clear;
+                    px[y * sw + x] = Color.clear;
+                    continue;
                 }
-                else if (dist <= radius - blur)
-                {
-                    px[y * w + x] = new Color(0f, 0f, 0f, 0.32f);
-                }
-                else
-                {
-                    float a = Mathf.Clamp01((radius + blur - dist) / (blur * 2f));
-                    px[y * w + x] = new Color(0f, 0f, 0f, 0.32f * a);
-                }
+                float a = 1f - SmoothStepAA(-blur, 0.5f, sdf);
+                px[y * sw + x] = new Color(0f, 0f, 0f, 0.30f * a);
             }
         }
 
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // 角丸ピルバッジ（順位バッジ、タグ等）
+    // 角丸ピルバッジ（順位バッジ、タグ等、2x HiDPI & SDF サブピクセルAA）
     public static Texture2D PopPill(int w, int h, Color fillCol)
     {
         w = Mathf.Max(12, w);
         h = Mathf.Max(12, h);
-        float radius = h * 0.5f;
 
         string key = $"poppill_{w}_{h}_{fillCol.r:F2}_{fillCol.g:F2}_{fillCol.b:F2}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        float borderThick = 1.6f;
-        Color borderCol = new Color(0.08f, 0.12f, 0.22f, 0.85f);
-        Color topCol = Color.Lerp(fillCol, Color.white, 0.15f);
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = sh * 0.5f;
+        float sb = 1.6f * UiScale;
+
+        var px = new Color[sw * sh];
+        Color borderCol = new Color(0.08f, 0.12f, 0.22f, 0.90f);
+        Color topCol = Color.Lerp(fillCol, Color.white, 0.20f);
         Color botCol = Color.Lerp(fillCol, Color.black, 0.12f);
 
-        for (int y = 0; y < h; y++)
+        for (int y = 0; y < sh; y++)
         {
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
-            float t = y / (float)(h - 1);
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
             Color grad = Color.Lerp(botCol, topCol, t);
-
-            for (int x = 0; x < w; x++)
+            if (t > 0.55f)
             {
-                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
-                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+                grad = Color.Lerp(grad, Color.white, SmoothStepAA(0.55f, 0.70f, t) * 0.16f);
+            }
 
-                if (dist > radius + 0.5f)
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
                 {
-                    px[y * w + x] = Color.clear;
+                    px[y * sw + x] = Color.clear;
                     continue;
                 }
 
-                float aa = Mathf.Clamp01(radius + 0.5f - dist);
-                Color c = (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick)
-                    ? borderCol
-                    : grad;
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf;
+                float borderMix = 1f - SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist);
+                Color c = Color.Lerp(grad, borderCol, borderMix);
 
-                c.a *= aa;
-                px[y * w + x] = c;
+                c.a *= outerAA;
+                px[y * sw + x] = c;
             }
         }
 
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
 
-    // 角丸パネル（背景色・外枠・角丸）
+    // 角丸パネル（背景色・外枠・角丸、2x HiDPI & SDF サブピクセルAA）
     public static Texture2D RoundedPanel(int w, int h, float radius, Color fillCol, Color borderCol, float borderThick = 1.5f)
     {
         w = Mathf.Max(12, w);
         h = Mathf.Max(12, h);
         radius = Mathf.Clamp(radius, 2f, Mathf.Min(w, h) * 0.5f);
 
-        string key = $"rndpnl_{w}_{h}_{(int)radius}_{fillCol.r:F2}_{fillCol.a:F2}_{borderCol.r:F2}";
+        string key = $"rndpnl_{w}_{h}_{radius:F1}_{fillCol.r:F2}_{fillCol.g:F2}_{fillCol.b:F2}_{fillCol.a:F2}_{borderCol.r:F2}_{borderCol.g:F2}_{borderCol.b:F2}_{borderCol.a:F2}_{borderThick:F1}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        var px = new Color[w * h];
-        for (int y = 0; y < h; y++)
-        {
-            float cy = y < radius ? radius - y : (y >= h - radius ? y - (h - 1 - radius) : 0f);
-            for (int x = 0; x < w; x++)
-            {
-                float cx = x < radius ? radius - x : (x >= w - radius ? x - (w - 1 - radius) : 0f);
-                float dist = Mathf.Sqrt(cx * cx + cy * cy);
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = radius * UiScale;
+        float sb = borderThick * UiScale;
 
-                if (dist > radius + 0.5f)
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
+        {
+            float py = y + 0.5f;
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
                 {
-                    px[y * w + x] = Color.clear;
+                    px[y * sw + x] = Color.clear;
                     continue;
                 }
 
-                float aa = Mathf.Clamp01(radius + 0.5f - dist);
-                Color c = (borderThick > 0f && (dist >= radius - borderThick || x < borderThick || x >= w - borderThick || y < borderThick || y >= h - borderThick))
-                    ? borderCol
-                    : fillCol;
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf;
+                Color c = fillCol;
+                if (sb > 0f)
+                {
+                    float borderMix = 1f - SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist);
+                    c = Color.Lerp(fillCol, borderCol, borderMix);
+                }
 
-                c.a *= aa;
-                px[y * w + x] = c;
+                c.a *= outerAA;
+                px[y * sw + x] = c;
             }
         }
 
-        var tex = New(w, h, px, false);
+        var tex = New(sw, sh, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // クリーンなホワイトベース角丸カード（実寸アスペクト比で歪みゼロ、2x HiDPI、外枠＋ソフトインナーリム＋下部立体ベベル）
+    public static Texture2D PopCard(int w, int h, float radius = 18f)
+    {
+        w = Mathf.Max(32, w);
+        h = Mathf.Max(32, h);
+        radius = Mathf.Clamp(radius, 4f, Mathf.Min(w, h) * 0.45f);
+
+        string key = $"popcard_{w}_{h}_{radius:F1}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = radius * UiScale;
+
+        float outerB = 2.4f * UiScale;      // 濃紺の引き締まった外枠
+        float whiteRim = 4.6f * UiScale;    // 純白のハイライトリム
+        float innerLine = 6.2f * UiScale;   // 爽やかなアイスブルーの内枠ライン
+        float bottomBevel = 6.0f * UiScale; // 下部の立体カード厚み
+
+        Color navyBorder = new Color(0.08f, 0.13f, 0.25f, 0.96f);
+        Color iceRim     = new Color(0.76f, 0.85f, 0.96f, 0.98f);
+        Color cardTop    = new Color(0.99f, 0.995f, 1.00f, 0.98f);
+        Color cardBot    = new Color(0.92f, 0.95f, 0.99f, 0.98f);
+        Color bevelShade = new Color(0.81f, 0.87f, 0.95f, 0.98f);
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
+        {
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
+            Color bgGrad = Color.Lerp(cardBot, cardTop, t);
+
+            // 下部ベベル陰影
+            float bevelT = 1f - SmoothStepAA(outerB + bottomBevel - 1.0f, outerB + bottomBevel + 1.0f, py);
+            Color body = Color.Lerp(bgGrad, bevelShade, bevelT * 0.65f);
+
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
+                {
+                    px[y * sw + x] = Color.clear;
+                    continue;
+                }
+
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf;
+
+                // 内側→アイスブルー内枠→ホワイトインナーリム→ネイビー外枠 を滑らかに補間
+                Color c = body;
+                c = Color.Lerp(iceRim, c, SmoothStepAA(innerLine - 0.65f, innerLine + 0.65f, edgeDist));
+                c = Color.Lerp(Color.white, c, SmoothStepAA(whiteRim - 0.65f, whiteRim + 0.65f, edgeDist));
+                c = Color.Lerp(navyBorder, c, SmoothStepAA(outerB - 0.65f, outerB + 0.65f, edgeDist));
+
+                c.a *= outerAA;
+                px[y * sw + x] = c;
+            }
+        }
+
+        var tex = New(sw, sh, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // カラフルな立体ヘッダーリボン（実寸サイズ生成で横伸び歪みゼロ、2x HiDPI、キャンディ光沢）
+    public static Texture2D PopRibbon(int w, int h, Color baseCol)
+    {
+        w = Mathf.Max(24, w);
+        h = Mathf.Max(16, h);
+
+        string key = $"popribbon_{w}_{h}_{baseCol.r:F2}_{baseCol.g:F2}_{baseCol.b:F2}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = sh * 0.5f;
+        float sb = 2.0f * UiScale;
+        float bevelH = 3.5f * UiScale;
+
+        Color borderCol = new Color(0.08f, 0.12f, 0.24f, 0.95f);
+        Color topCol = Color.Lerp(baseCol, Color.white, 0.28f);
+        Color botCol = Color.Lerp(baseCol, Color.black, 0.12f);
+        Color bevelCol = Color.Lerp(baseCol, Color.black, 0.28f);
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
+        {
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
+            Color grad = Color.Lerp(botCol, topCol, t);
+
+            // 上半分のツヤやかなキャンディハイライト帯
+            if (t > 0.48f)
+            {
+                float gloss = SmoothStepAA(0.48f, 0.56f, t) * (1f - SmoothStepAA(0.86f, 0.96f, t));
+                grad = Color.Lerp(grad, Color.white, gloss * 0.42f);
+            }
+
+            float bevelMix = 1f - SmoothStepAA(sb + bevelH - 0.8f, sb + bevelH + 0.8f, py);
+            Color body = Color.Lerp(grad, bevelCol, bevelMix * 0.75f);
+
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
+                {
+                    px[y * sw + x] = Color.clear;
+                    continue;
+                }
+
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf;
+                float borderMix = 1f - SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist);
+                Color c = Color.Lerp(body, borderCol, borderMix);
+
+                c.a *= outerAA;
+                px[y * sw + x] = c;
+            }
+        }
+
+        var tex = New(sw, sh, px, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
+        return tex;
+    }
+
+    // スタートボタン専用の特大キャンディゴールドピルボタン（2x HiDPI & SDF アンチエイリアス）
+    public static Texture2D RaceStartButton(int w, int h)
+    {
+        w = Mathf.Max(64, w);
+        h = Mathf.Max(24, h);
+
+        string key = $"racestartbtn_{w}_{h}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        int sw = w * UiScale;
+        int sh = h * UiScale;
+        float sr = sh * 0.5f;
+        float sb = 2.6f * UiScale;
+        float innerRim = 4.4f * UiScale;
+        float bevelH = 5.0f * UiScale;
+
+        Color borderCol = new Color(0.06f, 0.10f, 0.22f, 0.96f);
+        Color topGold   = new Color(1.00f, 0.86f, 0.18f, 1.00f);
+        Color botOrange = new Color(0.98f, 0.52f, 0.04f, 1.00f);
+        Color bevelDark = new Color(0.78f, 0.34f, 0.02f, 1.00f);
+        Color glossCol  = new Color(1.00f, 0.97f, 0.74f, 1.00f);
+
+        var px = new Color[sw * sh];
+        for (int y = 0; y < sh; y++)
+        {
+            float py = y + 0.5f;
+            float t = y / (float)(sh - 1);
+            Color grad = Color.Lerp(botOrange, topGold, t);
+
+            if (t > 0.48f)
+            {
+                float gloss = SmoothStepAA(0.48f, 0.55f, t) * (1f - SmoothStepAA(0.88f, 0.96f, t));
+                grad = Color.Lerp(grad, glossCol, gloss * 0.65f);
+            }
+
+            float bevelMix = 1f - SmoothStepAA(sb + bevelH - 0.8f, sb + bevelH + 0.8f, py);
+            Color body = Color.Lerp(grad, bevelDark, bevelMix * 0.8f);
+
+            for (int x = 0; x < sw; x++)
+            {
+                float sdf = SdfRoundedBox(x + 0.5f, py, sw, sh, sr);
+                if (sdf > 0.75f)
+                {
+                    px[y * sw + x] = Color.clear;
+                    continue;
+                }
+
+                float outerAA = 1f - SmoothStepAA(-0.65f, 0.65f, sdf);
+                float edgeDist = -sdf;
+
+                Color c = body;
+                c = Color.Lerp(new Color(1f, 0.96f, 0.55f), c, SmoothStepAA(innerRim - 0.65f, innerRim + 0.65f, edgeDist));
+                c = Color.Lerp(borderCol, c, SmoothStepAA(sb - 0.65f, sb + 0.65f, edgeDist));
+
+                c.a *= outerAA;
+                px[y * sw + x] = c;
+            }
+        }
+
+        var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;

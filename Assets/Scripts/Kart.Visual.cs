@@ -601,7 +601,9 @@ public partial class Kart
 
         steerVis = Mathf.Lerp(steerVis, steer, 1f - Mathf.Exp(-12f * dt));
         float roll = -steerVis * 4f * Mathf.Clamp01(Speed / MaxSpeed) - (drifting ? driftDir * 5f : 0f);
-        float targetPitch = (boostTimer > 0 || slipstreamTimer > 0) ? -3.4f : (isBraking && Speed > 4f ? 2.4f : 0f);
+        float targetPitch = isAirborne
+            ? Mathf.Clamp(-verticalVel * 1.6f, -20f, 20f)
+            : ((boostTimer > 0 || slipstreamTimer > 0) ? -3.4f : (isBraking && Speed > 4f ? 2.4f : 0f));
         visPitch = Mathf.Lerp(visPitch, targetPitch, 1f - Mathf.Exp(-10f * dt));
         float bob = Offroad && Speed > 5f ? Mathf.Sin(Time.time * 40f) * 0.04f : 0f;
         model.localPosition = new Vector3(0, hop + bob, 0);
@@ -661,7 +663,11 @@ public partial class Kart
                 boostFlames[i].localScale = new Vector3(radXZ, lenY, radXZ);
                 float pp = Mathf.PingPong(Time.time * 20f, 1f);
                 Color fCol;
-                if (boostTimer > 0)
+                if (slipstreamTimer > 0 || boostColorLevel == 4)
+                {
+                    fCol = Color.Lerp(new Color(0.20f, 0.88f, 1.0f, 0.92f), new Color(0.75f, 0.98f, 1.0f, 0.96f), pp);
+                }
+                else if (boostTimer > 0)
                 {
                     if (boostColorLevel == 1)
                         fCol = Color.Lerp(new Color(0.05f, 0.55f, 1.0f, 0.90f), new Color(0.25f, 0.88f, 1.0f, 0.94f), pp);
@@ -761,7 +767,7 @@ public partial class Kart
 
         if (IsPlayer && rm != null && !rm.Demo)
         {
-            rm.Audio.Tick();
+            rm.Audio.DriftSpark(lv);
             GamepadHaptics.Vibrate(PlayerIndex, 0.18f * lv, 0.45f + 0.15f * lv, 0.14f);
         }
     }
@@ -874,7 +880,12 @@ public partial class Kart
 
             Color outerFlame = new Color(1.0f, 0.52f, 0.08f, 0.92f);
             Color innerCore  = new Color(0.20f, 0.82f, 1.0f, 0.95f);
-            if (boostColorLevel == 1)
+            if (slipstreamTimer > 0 || boostColorLevel == 4)
+            {
+                outerFlame = new Color(0.22f, 0.90f, 1.0f, 0.92f);
+                innerCore  = new Color(0.85f, 0.98f, 1.0f, 0.96f);
+            }
+            else if (boostColorLevel == 1)
             {
                 outerFlame = new Color(0.04f, 0.58f, 1.0f, 0.92f);
                 innerCore  = new Color(0.55f, 0.94f, 1.0f, 0.95f);
@@ -897,15 +908,23 @@ public partial class Kart
         }
         if (Offroad && Speed > 6f && Random.value < 0.6f)
             Fx.Smoke((rearL + rearR) * 0.5f, carry * 0.4f + back * 2.5f + Vector3.up * 1.5f, new Color(0.65f, 0.55f, 0.35f, 0.45f), 0.8f, 0.6f, 1, 1.2f);
-        // スリップストリーム（ドラフティング）の風切りストリーム演出
-        if (InDraftStream && Speed > 13f)
+
+        // スリップストリーム（ドラフティング）の風切りストリーム演出（文字なしで直感的に認知できるよう強化）
+        if ((InDraftStream || slipstreamTimer > 0) && Speed > 13f)
         {
+            float charge01 = slipstreamTimer > 0 ? 1f : Mathf.Clamp01(slipstreamDraftTimer / 1.15f);
             float sideX = kenneyReady ? 0.72f : 0.88f;
-            var draftPosL = transform.TransformPoint(new Vector3(-sideX, 0.45f, 0.6f));
-            var draftPosR = transform.TransformPoint(new Vector3(sideX, 0.45f, 0.6f));
-            var streamCol = new Color(0.6f, 0.9f, 1f, 0.75f);
-            Fx.Emit(draftPosL, carry + back * 5f + Vector3.up * 0.4f, streamCol, 0.20f, 0.14f, 1, 0.25f);
-            Fx.Emit(draftPosR, carry + back * 5f + Vector3.up * 0.4f, streamCol, 0.20f, 0.14f, 1, 0.25f);
+            var draftPosL = transform.TransformPoint(new Vector3(-sideX, 0.48f, 0.7f));
+            var draftPosR = transform.TransformPoint(new Vector3( sideX, 0.48f, 0.7f));
+            var nosePos   = transform.TransformPoint(new Vector3(0f, 0.55f, 0.95f));
+            var streamCol = Color.Lerp(new Color(0.75f, 0.94f, 1f, 0.65f), new Color(0.30f, 0.95f, 1f, 0.92f), charge01);
+            Vector3 windVel = carry + back * Mathf.Lerp(7f, 11f, charge01) + Vector3.up * 0.25f;
+            Fx.Spark(draftPosL, windVel - transform.right * 0.6f, streamCol, 0.14f + charge01 * 0.05f, 0.16f, 1, 0.2f);
+            Fx.Spark(draftPosR, windVel + transform.right * 0.6f, streamCol, 0.14f + charge01 * 0.05f, 0.16f, 1, 0.2f);
+            if (charge01 > 0.35f || slipstreamTimer > 0)
+            {
+                Fx.Spark(nosePos + transform.right * Random.Range(-0.45f, 0.45f), windVel + Vector3.up * 0.5f, new Color(0.9f, 0.99f, 1f, 0.85f), 0.12f, 0.14f, 1, 0.15f);
+            }
         }
 
         if (shieldTimer > 0 && Random.value < 0.5f)
