@@ -1,8 +1,8 @@
 {
-  "version": "v1.9.0",
-  "name": "Turbo Circuit v1.9.0",
-  "published_at": "2026-10-11T09:20:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.0/TurboCircuit-win64.zip",
+  "version": "v1.9.1",
+  "name": "Turbo Circuit v1.9.1",
+  "published_at": "2026-10-11T09:35:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.1/TurboCircuit-win64.zip",
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "## Turbo Circuit v1.9.0 🏎️🐼🎁\n- ドライバー＆マシン分離システム（10キャラクター × 8種カスタムマシン＝全80通り！）\n- 新アニマルレーサー5名（PANDA, PENGUIN, FOX, BUNNY, LION）＆カスタムマシン8種が参戦\n- アイテム3Dモデル全面刷新（？ボックス、バナナ、チェッカーミサイル、3D回転シールド）\n- ポップ調HUDアイテムアイコン＆アニメ調ミサイル白煙トレイル演出を追加\n- 1P/2P・オンラインロビーでのドライバー＆マシン個別選択とネットワーク同期に対応"
+  "notes": "■ What's New in Turbo Circuit v1.9.1\n• 10 Drivers x 8 Custom Kart Machines (80 Combinations!)\n  - New Animal Racers: PANDA, PENGUIN, FOX, BUNNY, LION\n  - 8 Custom Machines: STANDARD, PIPE BUGGY, MACH FORMULA, MONSTER, CYBER GT, ROADSTER, MUSCLE V8, JET POD\n• 3D Item Visual Overhaul (Item Box, Banana, Homing Missile, 3D Shield)\n• Fixed Update Modal Button Clicks & Japanese Release Notes Rendering\n\n■ 主なアップデート内容 (v1.9.1)\n• ドライバー10名 × カートマシン8種の自由なセッティング（全80通り）\n• アイテム3Dモデル・ポップアイコン・ミサイル白煙エフェクトを全面刷新\n• アップデート画面の文字化け修正＆ボタンクリック判定を改善"
 }

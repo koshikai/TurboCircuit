@@ -84,7 +84,7 @@ public partial class RaceManager : MonoBehaviour
     readonly List<Banana> bananas = new List<Banana>();
     readonly List<Missile> missiles = new List<Missile>();
     Font font;
-    Font fontMain, fontNum, fontMono;
+    Font fontMain, fontNum, fontMono, fontSys;
 
     float stateTime, raceTime, shake, finishAt;
     int lastCountdownBeep;
@@ -163,7 +163,7 @@ public partial class RaceManager : MonoBehaviour
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
-    GUIStyle sButton, sField, sNum, sMono;
+    GUIStyle sButton, sField, sNum, sMono, sSys;
     readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
@@ -1148,12 +1148,6 @@ public partial class RaceManager : MonoBehaviour
         }
         if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
 
-        if (showSettings)
-        {
-            if (Input.GetKeyDown(KeyCode.Escape)) CloseSettings();
-            return;
-        }
-
         if (updater != null && updater.ShowModal)
         {
             if (Input.GetKeyDown(KeyCode.Escape))
@@ -1169,6 +1163,12 @@ public partial class RaceManager : MonoBehaviour
                 else if (updater.State == AppUpdater.UpdateState.UpToDate || updater.State == AppUpdater.UpdateState.Error) updater.ShowModal = false;
                 return;
             }
+            return;
+        }
+
+        if (showSettings)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape)) CloseSettings();
             return;
         }
 

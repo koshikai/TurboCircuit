@@ -199,6 +199,11 @@ public partial class RaceManager
                     showSettings = true;
                     settingsTab = 2;
                     break;
+                case "updatemodal":
+                case "update_modal":
+                    state = State.Title;
+                    if (updater != null) updater.SimulateUpdateAvailableForTesting();
+                    break;
                 case "netmenu":
                     state = State.Title;
                     netMenu = true;

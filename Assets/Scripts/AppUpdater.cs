@@ -13,7 +13,7 @@ public class AppUpdater : MonoBehaviour
     public static AppUpdater Instance { get; private set; }
 
     // 現在のアプリバージョン
-    public const string CurrentVersion = "v1.9.0";
+    public const string CurrentVersion = "v1.9.1";
 
     // GitHub リポジトリ情報
     public const string GitHubRepo = "koshikai/TurboCircuit";
@@ -42,7 +42,7 @@ public class AppUpdater : MonoBehaviour
     public float DownloadProgress = 0f;
     public ulong DownloadedBytes = 0;
     public ulong TotalBytes = 0;
-    public string StatusMessage = "";
+    public string StatusMessage = "Ready to check for updates.";
     public string ErrorMessage = "";
 
     public bool ShowModal = false;
@@ -202,7 +202,7 @@ public class AppUpdater : MonoBehaviour
             if (string.IsNullOrEmpty(rawName) || rawName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 ReleaseName = $"Turbo Circuit {LatestVersion}";
             else
-                ReleaseName = rawName;
+                ReleaseName = CleanSingleLine(Regex.Unescape(rawName));
 
             // body / notes
             var bodyMatch = Regex.Match(json, "\"body\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
@@ -211,7 +211,7 @@ public class AppUpdater : MonoBehaviour
 
             if (bodyMatch.Success)
             {
-                ReleaseNotes = Regex.Unescape(bodyMatch.Groups[1].Value);
+                ReleaseNotes = CleanReleaseNotes(Regex.Unescape(bodyMatch.Groups[1].Value));
             }
             else
             {
@@ -497,14 +497,56 @@ exit
     }
 
     /// <summary>
+    /// IMGUI で文字化けするサロゲートペア絵文字・CR(\r)・Markdown記法を整形して読みやすいプレーンテキストにする
+    /// </summary>
+    public static string CleanReleaseNotes(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+
+        // 1. 改行コード統一（\r が残ると Unity IMGUI で行末に □ が描画される）
+        string s = raw.Replace("\r\n", "\n").Replace("\r", "\n");
+
+        // 2. UTF-16 サロゲートペア（カラー絵文字等）および異体字セレクタ（\uFE00-\uFE0F）を除去
+        s = Regex.Replace(s, @"[\uD800-\uDFFF\uFE00-\uFE0F]", "");
+
+        // 3. Markdown 見出し・装飾・箇条書きを読みやすい記号に変換
+        s = Regex.Replace(s, @"^#{1,4}\s*(.+)$", "■ $1", RegexOptions.Multiline);
+        s = Regex.Replace(s, @"\*\*([^*]+)\*\*", "$1");
+        s = Regex.Replace(s, @"`([^`]+)`", "$1");
+        s = Regex.Replace(s, @"^[ \t]{2,}[\*\-]\s+", "    - ", RegexOptions.Multiline);
+        s = Regex.Replace(s, @"^[\*\-]\s+", "  • ", RegexOptions.Multiline);
+
+        // 4. 3行以上の連続空行を圧縮
+        s = Regex.Replace(s, @"\n{3,}", "\n\n");
+
+        return s.Trim();
+    }
+
+    public static string CleanSingleLine(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "";
+        return Regex.Replace(raw, @"[\r\n\uD800-\uDFFF\uFE00-\uFE0F]", "").Trim();
+    }
+
+    /// <summary>
     /// テスト・シミュレーション用（デバッグ用）
     /// </summary>
     public void SimulateUpdateAvailableForTesting()
     {
         LatestVersion = "v2.0.0-preview";
         ReleaseName = "Turbo Circuit v2.0.0 (Preview)";
-        ReleaseNotes = "★ New Features & Improvements:\n- New Track: Cosmic Speedway\n- Online Spectator Mode\n- 60FPS Physics Engine Tuning\n- UI Animations & Polish";
-        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.0/TurboCircuit-win64.zip";
+        ReleaseNotes = CleanReleaseNotes(
+            "## What's New in Turbo Circuit\n" +
+            "- 10 Drivers x 8 Custom Kart Machines (80 Combinations!)\n" +
+            "  * New Animal Racers: PANDA, PENGUIN, FOX, BUNNY, LION\n" +
+            "  * 8 Custom Machines: STANDARD, PIPE BUGGY, MACH FORMULA, MONSTER, CYBER GT, ROADSTER, MUSCLE V8, JET POD\n" +
+            "- 3D Item Visual Overhaul (Item Box, Banana, Homing Missile, 3D Shield)\n" +
+            "- UI Modal Click & Japanese Release Notes Rendering Fix\n\n" +
+            "### 主なアップデート内容\n" +
+            "- ドライバー10名 × カートマシン8種の自由なセッティングに対応\n" +
+            "- アイテム3Dモデル・ポップアイコン・白煙エフェクトを全面刷新\n" +
+            "- アップデート画面の日本語表示およびボタンクリック判定を改善");
+        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.1/TurboCircuit-win64.zip";
         State = UpdateState.UpdateAvailable;
         StatusMessage = "New update available: v2.0.0-preview";
         ShowModal = true;

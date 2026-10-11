@@ -289,14 +289,14 @@ public partial class Kart : MonoBehaviour
                 {
                     slipstreamDraftTimer = 0f;
                     slipstreamTimer = 1.6f;
+                    boostColorLevel = 4; // スリップストリーム専用シアンジェット色
                     Boost(1.6f);
                     if (IsPlayer)
                     {
                         rm.Audio.Boost();
-                        rm.Banner("SLIPSTREAM!", new Color(0.3f, 0.9f, 1f), PlayerIndex);
                         GamepadHaptics.Vibrate(PlayerIndex, 0.35f, 0.85f, 0.35f);
                     }
-                    Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.9f, 1f), 15, 6f, 0.35f);
+                    Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.95f, 1f), 18, 6.5f, 0.38f);
                 }
             }
             else
@@ -443,19 +443,20 @@ public partial class Kart : MonoBehaviour
                 {
                     trickDone = true;
                     trickWindowTimer = 0f;
-                    Fx.Burst(transform.position + Vector3.up * 0.8f, new Color(1f, 0.9f, 0.2f), 18, 7f, 0.45f);
+                    Fx.Burst(transform.position + Vector3.up * 0.8f, new Color(1f, 0.9f, 0.2f), 20, 7.5f, 0.45f);
                     if (IsPlayer)
                     {
                         rm.Audio.Boost();
                         rm.Shake(0.3f);
-                        rm.Banner("PERFECT TRICK!", new Color(1f, 0.85f, 0.1f), PlayerIndex);
                         GamepadHaptics.Vibrate(PlayerIndex, 0.45f, 0.95f, 0.35f);
                     }
                 }
             }
 
-            float spinSpeed = trickDone ? 1080f : 720f;
-            airTrickSpin += spinSpeed * dt; // 空中トリックスピン
+            if (trickDone)
+            {
+                airTrickSpin += 1080f * dt; // トリック成功時のみ空中スピン演出
+            }
 
             if (curPos.y <= roadY)
             {
@@ -467,9 +468,9 @@ public partial class Kart : MonoBehaviour
 
                 if (trickDone)
                 {
+                    boostColorLevel = 1;
                     Boost(1.3f); // トリック成功スーパー着地ミニターボ！
-                    Fx.Burst(curPos, new Color(0.2f, 0.9f, 1f), 16, 6f, 0.4f);
-                    if (IsPlayer) rm.Banner("TRICK BOOST!", new Color(0.2f, 0.9f, 1f), PlayerIndex);
+                    Fx.Burst(curPos, new Color(0.2f, 0.9f, 1f), 18, 6.5f, 0.4f);
                 }
                 else
                 {
@@ -586,7 +587,6 @@ public partial class Kart : MonoBehaviour
         {
             rm.Audio.Boost();
             rm.Shake(0.35f);
-            rm.Banner("BIG JUMP!", new Color(1f, 0.7f, 0.2f), PlayerIndex);
         }
         Fx.Burst(transform.position + Vector3.up * 0.5f, new Color(1f, 0.75f, 0.2f), 16, 7f, 0.4f);
     }
@@ -601,17 +601,19 @@ public partial class Kart : MonoBehaviour
             float held = throttleHeldSince < 0 ? -1f : Time.time - throttleHeldSince;
             if (held >= 0.15f && held <= 0.85f)
             {
+                boostColorLevel = 2;
                 Boost(1.5f);
                 rm.Audio.Boost();
-                rm.Banner("ROCKET START!", new Color(1f, 0.85f, 0.2f), PlayerIndex);
                 GamepadHaptics.Vibrate(PlayerIndex, 0.4f, 1.0f, 0.45f);
+                Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(1f, 0.85f, 0.2f), 18, 6.5f, 0.4f);
             }
             else if (held > 0.85f && held <= 1.2f)
             {
+                boostColorLevel = 1;
                 Boost(0.8f);
                 rm.Audio.Boost();
-                rm.Banner("GOOD START!", new Color(0.4f, 0.9f, 1f), PlayerIndex);
                 GamepadHaptics.Vibrate(PlayerIndex, 0.25f, 0.65f, 0.3f);
+                Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.9f, 1f), 14, 5.5f, 0.35f);
             }
             else if (held > 1.2f)
             {
@@ -619,7 +621,6 @@ public partial class Kart : MonoBehaviour
                 spinTimer = 1.2f;
                 Speed = -1.5f;
                 rm.Audio.Bump();
-                rm.Banner("BURNOUT!", new Color(1f, 0.3f, 0.2f), PlayerIndex);
                 GamepadHaptics.Vibrate(PlayerIndex, 0.85f, 0.15f, 0.5f);
                 Fx.Burst(transform.position, new Color(0.2f, 0.2f, 0.2f), 24, 7f, 0.6f);
                 Fx.Smoke(transform.position, Vector3.up * 2f, new Color(0.3f, 0.3f, 0.3f, 0.9f), 1.8f, 1f, 6);

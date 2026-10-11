@@ -85,6 +85,7 @@ public partial class RaceManager
 
         fontNum = Resources.Load<Font>("Fonts/RussoOne-Regular") ?? fontMain;
         fontMono = Resources.Load<Font>("Fonts/ShareTechMono-Regular") ?? fontNum ?? fontMain;
+        fontSys = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "MS Gothic", "Segoe UI", "Arial" }, 15) ?? fontMain;
         font = fontMain;
 
         string iconDir = Application.dataPath + "/Resources/Icons/";

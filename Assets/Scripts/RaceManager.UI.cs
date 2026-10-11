@@ -28,7 +28,7 @@ public partial class RaceManager
     GUIStyle St(GUIStyle b, int size = 0, TextAnchor? anchor = null, FontStyle? fs = null, bool wrap = false, Color? text = null)
     {
         if (b == null) b = sBig ?? GUI.skin.label;
-        int bid = b == sBig ? 0 : b == sMid ? 1 : b == sNum ? 3 : b == sMono ? 4 : 2;
+        int bid = b == sBig ? 0 : b == sMid ? 1 : b == sNum ? 3 : b == sMono ? 4 : b == sSys ? 5 : 2;
         int col = -1;
         if (text.HasValue) { Color32 c = text.Value; col = c.r << 16 | c.g << 8 | c.b; }
         var key = (bid, size, anchor.HasValue ? (int)anchor.Value : -1, fs.HasValue ? (int)fs.Value : -1, wrap, col);
@@ -57,6 +57,7 @@ public partial class RaceManager
             sField = new GUIStyle(GUI.skin.textField) { font = fontMain, fontSize = 20, alignment = TextAnchor.MiddleCenter };
             sNum = new GUIStyle(sBig) { font = fontNum, fontSize = 32 };
             sMono = new GUIStyle(sBig) { font = fontMono, fontSize = 24, fontStyle = FontStyle.Bold };
+            sSys = new GUIStyle(GUI.skin.label) { font = fontSys ?? fontMain, fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft, wordWrap = true };
         }
         float scale = Screen.height / 720f;
         if (previewSpectatorsRequested || suppressVerifyGui) return;
@@ -69,28 +70,47 @@ public partial class RaceManager
             DrawSpeedLines(w, h);
         }
 
-        if (showSettings)
-        {
-            DrawSettings(w, h);
-            return;
-        }
+        bool updateModalOpen = updater != null && updater.ShowModal;
+        bool overlayModalOpen = updateModalOpen || showSettings || paused;
 
+        // 背面レイヤー（モーダル表示中は背面ボタンがマウスクリックを奪わないよう GUI.enabled = false にする）
         switch (state)
         {
             case State.Title:
-                if (LobbyActive) DrawLobby(w, h);
-                else { DrawTitle(w, h); if (netMenu) DrawNetMenu(w, h); }
+                if (LobbyActive)
+                {
+                    GUI.enabled = !overlayModalOpen;
+                    DrawLobby(w, h);
+                }
+                else
+                {
+                    GUI.enabled = !overlayModalOpen && !netMenu;
+                    DrawTitle(w, h);
+                    if (netMenu)
+                    {
+                        GUI.enabled = !overlayModalOpen;
+                        DrawNetMenu(w, h);
+                    }
+                }
                 break;
-            case State.Countdown: DrawHuds(w, h, true); break;
-            case State.Racing: DrawHuds(w, h, false); break;
+            case State.Countdown:
+                GUI.enabled = !overlayModalOpen;
+                DrawHuds(w, h, true);
+                break;
+            case State.Racing:
+                GUI.enabled = !overlayModalOpen;
+                DrawHuds(w, h, false);
+                break;
             case State.Results:
+                GUI.enabled = !overlayModalOpen;
                 if (Time.time <= finishAt + 2.5f) DrawHuds(w, h, false);
                 else DrawResults(w, h);
                 break;
         }
 
-        if (paused)
+        if (paused && !showSettings)
         {
+            GUI.enabled = !updateModalOpen;
             GUI.color = new Color(0f, 0f, 0f, 0.65f);
             GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -137,17 +157,26 @@ public partial class RaceManager
             }
         }
 
-        if (updater != null && updater.ShowModal)
+        if (showSettings)
         {
+            GUI.enabled = !updateModalOpen;
+            DrawSettings(w, h);
+        }
+
+        if (updateModalOpen)
+        {
+            GUI.enabled = true;
             DrawUpdateModal(w, h);
         }
+
+        GUI.enabled = true;
     }
 
     // 現代的なポップ立体角丸ボタン（角丸カードにマッチする丸み、ホバー発光、下部シャドウ、ショートカットキー表記、クリック判定）
     bool DrawModernButton(Rect r, string label, string shortcut = "", Color? accentColor = null, bool isPrimary = false)
     {
         Vector2 mouse = Event.current.mousePosition;
-        bool hover = r.Contains(mouse);
+        bool hover = GUI.enabled && r.Contains(mouse);
         Color acc = accentColor ?? (isPrimary ? new Color(1f, 0.62f, 0.1f) : new Color(0.15f, 0.62f, 0.95f));
         float radius = Mathf.Min(12f, r.height * 0.35f);
 
@@ -423,7 +452,7 @@ public partial class RaceManager
             }
             else
             {
-                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), "🌐  VIEW ON GITHUB", "", new Color(0.45f, 0.35f, 0.85f)))
+                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), "►  VIEW ON GITHUB", "", new Color(0.45f, 0.35f, 0.85f)))
                 {
                     Application.OpenURL(AppUpdater.ReleasesPageUrl);
                 }
@@ -471,7 +500,7 @@ public partial class RaceManager
             }
             else
             {
-                if (DrawModernButton(new Rect(w - 330, 16, 140, 36), "▲ UPDATES", "[U]", new Color(0.28f, 0.4f, 0.6f)))
+                if (DrawModernButton(new Rect(w - 355, 16, 165, 36), "▲ UPDATES", "[U]", new Color(0.28f, 0.4f, 0.6f)))
                 {
                     updater.ShowModal = true;
                 }
@@ -1049,28 +1078,57 @@ public partial class RaceManager
                 break;
 
             case AppUpdater.UpdateState.UpToDate:
-                GUI.Label(new Rect(cx, cy + 50, cw, 32), "★ YOU ARE UP TO DATE! ★", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.18f, 0.75f, 0.38f)));
-                GUI.Label(new Rect(cx, cy + 95, cw, 40), $"You are running the latest version of Turbo Circuit ({AppUpdater.CurrentVersion}).\nNo new updates available right now.", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
+            {
+                GUI.Label(new Rect(cx, cy, cw, 28), "★ YOU ARE UP TO DATE! ★", St(sSmall, 18, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.18f, 0.75f, 0.38f)));
+                cy += 30f;
 
-                if (DrawModernButton(new Rect(cx + (cw - 200) * 0.5f, r.yMax - 54, 200, 36), "◄  CLOSE", "[ESC]", new Color(0.18f, 0.65f, 0.95f)))
+                if (!string.IsNullOrEmpty(updater.ReleaseNotes))
+                {
+                    float noteH = r.yMax - cy - 66f;
+                    var noteBox = new Rect(cx, cy, cw, noteH);
+                    GUI.DrawTexture(noteBox, TextureGen.RoundedPanel(Mathf.RoundToInt(noteBox.width), Mathf.RoundToInt(noteBox.height), 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.65f, 0.72f, 0.84f), 1.5f));
+
+                    var noteStyle = St(sSys, 14, TextAnchor.UpperLeft, FontStyle.Bold, true, new Color(0.16f, 0.22f, 0.36f));
+                    float viewW = noteBox.width - 32f;
+                    float contentH = Mathf.Max(noteBox.height - 16f, noteStyle.CalcHeight(new GUIContent(updater.ReleaseNotes), viewW) + 16f);
+                    updateNotesScroll = GUI.BeginScrollView(new Rect(noteBox.x + 4, noteBox.y + 4, noteBox.width - 8, noteBox.height - 8), updateNotesScroll, new Rect(0, 0, noteBox.width - 24, contentH));
+                    GUI.Label(new Rect(8, 6, viewW, contentH), updater.ReleaseNotes, noteStyle);
+                    GUI.EndScrollView();
+                }
+                else
+                {
+                    GUI.Label(new Rect(cx, cy + 50, cw, 44), $"You are running the latest version of Turbo Circuit ({AppUpdater.CurrentVersion}).\nNo new updates available right now.", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
+                }
+
+                float bYUp = r.yMax - 54;
+                float bW1Up = 220f, bW2Up = 180f, spUp = 16f;
+                float sXUp = cx + (cw - (bW1Up + bW2Up + spUp)) * 0.5f;
+                if (DrawModernButton(new Rect(sXUp, bYUp, bW1Up, 36), "►  CHECK AGAIN", "", new Color(0.18f, 0.65f, 0.95f)))
+                {
+                    updater.CheckForUpdates(openModalIfNew: true);
+                }
+                if (DrawModernButton(new Rect(sXUp + bW1Up + spUp, bYUp, bW2Up, 36), "◄  CLOSE", "[ESC]", new Color(0.2f, 0.82f, 0.45f)))
                 {
                     updater.ShowModal = false;
                 }
                 break;
+            }
 
             case AppUpdater.UpdateState.UpdateAvailable:
             {
-                GUI.Label(new Rect(cx, cy, cw, 26), $"★ NEW VERSION AVAILABLE: {updater.ReleaseName} ★", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(1f, 0.55f, 0.1f)));
+                GUI.Label(new Rect(cx, cy, cw, 26), $"★ NEW VERSION AVAILABLE: {updater.ReleaseName} ★", St(sSys, 16, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.95f, 0.48f, 0.05f)));
                 cy += 30f;
 
                 // リリースノートスクロールビュー
-                var noteBox = new Rect(cx, cy, cw, 195);
-                GUI.color = new Color(0.12f, 0.16f, 0.28f, 0.08f);
-                GUI.DrawTexture(noteBox, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.7f, 0.75f, 0.85f), 1f, 8f);
-                GUI.color = Color.white;
+                float noteH = r.yMax - cy - 66f;
+                var noteBox = new Rect(cx, cy, cw, noteH);
+                GUI.DrawTexture(noteBox, TextureGen.RoundedPanel(Mathf.RoundToInt(noteBox.width), Mathf.RoundToInt(noteBox.height), 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.65f, 0.72f, 0.84f), 1.5f));
 
-                updateNotesScroll = GUI.BeginScrollView(new Rect(noteBox.x + 4, noteBox.y + 4, noteBox.width - 8, noteBox.height - 8), updateNotesScroll, new Rect(0, 0, noteBox.width - 24, 450));
-                GUI.Label(new Rect(6, 4, noteBox.width - 32, 440), updater.ReleaseNotes, St(sSmall, 13, TextAnchor.UpperLeft, FontStyle.Normal, true, new Color(0.2f, 0.25f, 0.38f)));
+                var noteStyle = St(sSys, 14, TextAnchor.UpperLeft, FontStyle.Bold, true, new Color(0.16f, 0.22f, 0.36f));
+                float viewW = noteBox.width - 32f;
+                float contentH = Mathf.Max(noteBox.height - 16f, noteStyle.CalcHeight(new GUIContent(updater.ReleaseNotes), viewW) + 16f);
+                updateNotesScroll = GUI.BeginScrollView(new Rect(noteBox.x + 4, noteBox.y + 4, noteBox.width - 8, noteBox.height - 8), updateNotesScroll, new Rect(0, 0, noteBox.width - 24, contentH));
+                GUI.Label(new Rect(8, 6, viewW, contentH), updater.ReleaseNotes, noteStyle);
                 GUI.EndScrollView();
 
                 float bY = r.yMax - 54;
@@ -1117,7 +1175,7 @@ public partial class RaceManager
 
             case AppUpdater.UpdateState.Downloaded:
             {
-                GUI.Label(new Rect(cx, cy + 25, cw, 30), "✨ DOWNLOAD COMPLETE! ✨", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.18f, 0.85f, 0.45f)));
+                GUI.Label(new Rect(cx, cy + 25, cw, 30), "★ DOWNLOAD COMPLETE! ★", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.18f, 0.85f, 0.45f)));
                 GUI.Label(new Rect(cx, cy + 70, cw, 50), "Update package is downloaded and verified.\nClick below to install and relaunch Turbo Circuit!", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
 
                 float bW1Done = 280f, bW2Done = 160f, spDone = 16f;
@@ -1139,7 +1197,7 @@ public partial class RaceManager
                 break;
 
             case AppUpdater.UpdateState.Error:
-                GUI.Label(new Rect(cx, cy + 20, cw, 28), "⚠️ UPDATE FAILED", St(sSmall, 17, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.95f, 0.35f, 0.35f)));
+                GUI.Label(new Rect(cx, cy + 20, cw, 28), "!  UPDATE FAILED  !", St(sSmall, 17, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.95f, 0.35f, 0.35f)));
                 GUI.Label(new Rect(cx, cy + 60, cw, 50), updater.ErrorMessage, St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.45f, 0.3f, 0.3f)));
 
                 if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f, r.yMax - 54, 170, 36), "►  RETRY", "[ENTER]", new Color(0.18f, 0.65f, 0.95f)))
