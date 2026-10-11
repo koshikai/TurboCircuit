@@ -41,7 +41,7 @@ public partial class RaceManager
 
     void LateUpdate()
     {
-        if (previewSpectatorsRequested) return;
+        if (previewSpectatorsRequested || suppressVerifyCamera) return;
         float dt = Time.unscaledDeltaTime;
         if (paused) return;
 

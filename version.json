@@ -1,8 +1,8 @@
 {
-  "version": "v1.8.0",
-  "name": "Turbo Circuit v1.8.0",
-  "published_at": "2026-10-10T20:00:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.8.0/TurboCircuit-win64.zip",
+  "version": "v1.9.0",
+  "name": "Turbo Circuit v1.9.0",
+  "published_at": "2026-10-11T09:20:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.0/TurboCircuit-win64.zip",
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "## Turbo Circuit v1.8.0 🌉🔄🎺\n- 新コース「SKYLINE OVERPASS」（第6コース・8の字立体交差斜張橋）登場！\n- アプリ内ワンクリック自動アップデート機能（AppUpdater）を搭載\n- 3D観客サポーターキャラクター（SpectatorFan）＆スタジアム高解像度バナー刷新\n- スロットル・RPM連動の新レーシングエンジンサウンド\n- コーナリング連動のダイナミックカメラバンク（Dutch Roll）＆2P後方視点対応\n- カート造形・HUDスピードメーター・UIのポップデザイン統一"
+  "notes": "## Turbo Circuit v1.9.0 🏎️🐼🎁\n- ドライバー＆マシン分離システム（10キャラクター × 8種カスタムマシン＝全80通り！）\n- 新アニマルレーサー5名（PANDA, PENGUIN, FOX, BUNNY, LION）＆カスタムマシン8種が参戦\n- アイテム3Dモデル全面刷新（？ボックス、バナナ、チェッカーミサイル、3D回転シールド）\n- ポップ調HUDアイテムアイコン＆アニメ調ミサイル白煙トレイル演出を追加\n- 1P/2P・オンラインロビーでのドライバー＆マシン個別選択とネットワーク同期に対応"
 }

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: Kart_08_BUNNY
+  m_EditorClassIdentifier: Assembly-CSharp::KartData
+  characterName: BUNNY
+  driverName: Hopper Star
+  trait: Featherweight Dash
+  signatureColor: {r: 0.74, g: 0.42, b: 0.98, a: 1}
+  speed: 3
+  accel: 7
+  handling: 7
+  weight: 3

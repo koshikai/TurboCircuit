@@ -13,7 +13,7 @@ public class AppUpdater : MonoBehaviour
     public static AppUpdater Instance { get; private set; }
 
     // 現在のアプリバージョン
-    public const string CurrentVersion = "v1.8.0";
+    public const string CurrentVersion = "v1.9.0";
 
     // GitHub リポジトリ情報
     public const string GitHubRepo = "koshikai/TurboCircuit";
@@ -501,12 +501,12 @@ exit
     /// </summary>
     public void SimulateUpdateAvailableForTesting()
     {
-        LatestVersion = "v1.9.0-preview";
-        ReleaseName = "Turbo Circuit v1.9.0 (Preview)";
+        LatestVersion = "v2.0.0-preview";
+        ReleaseName = "Turbo Circuit v2.0.0 (Preview)";
         ReleaseNotes = "★ New Features & Improvements:\n- New Track: Cosmic Speedway\n- Online Spectator Mode\n- 60FPS Physics Engine Tuning\n- UI Animations & Polish";
-        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.8.0/TurboCircuit-win64.zip";
+        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.0/TurboCircuit-win64.zip";
         State = UpdateState.UpdateAvailable;
-        StatusMessage = "New update available: v1.9.0-preview";
+        StatusMessage = "New update available: v2.0.0-preview";
         ShowModal = true;
     }
 }

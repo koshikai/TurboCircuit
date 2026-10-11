@@ -59,7 +59,7 @@ public partial class RaceManager
             sMono = new GUIStyle(sBig) { font = fontMono, fontSize = 24, fontStyle = FontStyle.Bold };
         }
         float scale = Screen.height / 720f;
-        if (previewSpectatorsRequested) return;
+        if (previewSpectatorsRequested || suppressVerifyGui) return;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
         float w = Screen.width / scale, h = 720f;
 
@@ -533,55 +533,104 @@ public partial class RaceManager
         }
 
 
-        // 3. 右カード：ドライバー＆マシンセレクター（DRIVER & MACHINE）
+        // 3. 右カード：ドライバー＆マシンセレクター（DRIVER & KART）
         float rightX = w - cardW - 35f;
         DrawPopCard(new Rect(rightX, cardY, cardW, cardH));
-        DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, TwoPlayer ? "◄ P1 DRIVER [W][S] ►" : "◄ DRIVER & KART [W][S] ►");
+        DrawPopRibbon(new Rect(rightX + 15, cardY + 12, cardW - 30, 32), ribbonDriverTex, TwoPlayer ? "★ 1P & 2P SETUP ★" : "★ DRIVER & KART ★");
 
         if (!TwoPlayer)
         {
-            var curChar = KartCharacters[SelectedKart];
-            var charTitleStyle = St(sSmall, 23, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
-            Outlined(new Rect(rightX + 8, cardY + 48, cardW - 16, 30), $"< {curChar.name} >", charTitleStyle, curChar.color, 2);
+            int drvIdx = Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1);
+            int krtIdx = Mathf.Clamp(SelectedKart, 0, KartMachines.Length - 1);
+            var curDriver = KartCharacters[drvIdx];
+            var curKart = KartMachines[krtIdx];
+            GetCombinedStats(drvIdx, krtIdx, out int spd, out int acc, out int hdl, out int wgt);
 
-            var driverNickStyle = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.22f, 0.26f, 0.38f));
-            GUI.Label(new Rect(rightX + 10, cardY + 80, cardW - 20, 20), curChar.driver, driverNickStyle);
+            var secLabelStyle = St(sSmall, 11, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.32f, 0.38f, 0.52f));
+            var idxLabelStyle = St(sMono, 11, TextAnchor.MiddleRight, FontStyle.Bold, false, new Color(0.38f, 0.45f, 0.60f));
 
-            DrawPopPill(new Rect(rightX + 22, cardY + 106, cardW - 44, 24), curChar.trait, curChar.color * 0.9f);
+            // ─── DRIVER 選択セクション ───
+            GUI.Label(new Rect(rightX + 22, cardY + 46, 200, 16), "DRIVER  [W / S]", secLabelStyle);
+            GUI.Label(new Rect(rightX + cardW - 92, cardY + 46, 70, 16), $"{drvIdx + 1}/{KartCharacters.Length}", idxLabelStyle);
 
-            // 4項目ポップキャンディステータスゲージ
-            float statStartY = cardY + 146f;
-            DrawToonStatGauge(rightX + 22, statStartY + 0, cardW - 44, "SPEED", curChar.speed, 8, new Color(0.08f, 0.72f, 0.98f));
-            DrawToonStatGauge(rightX + 22, statStartY + 42, cardW - 44, "ACCEL", curChar.accel, 8, new Color(1f, 0.72f, 0.05f));
-            DrawToonStatGauge(rightX + 22, statStartY + 84, cardW - 44, "STEER", curChar.handling, 8, new Color(0.25f, 0.85f, 0.35f));
-            DrawToonStatGauge(rightX + 22, statStartY + 126, cardW - 44, "WEIGHT", curChar.weight, 8, new Color(1f, 0.32f, 0.38f));
+            if (DrawModernButton(new Rect(rightX + 18, cardY + 64, 32, 28), "◄", "", curDriver.color))
+                SwitchDriver(0, -1);
+            var charTitleStyle = St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
+            Outlined(new Rect(rightX + 52, cardY + 63, cardW - 104, 30), $"< {curDriver.name} >", charTitleStyle, curDriver.color, 2);
+            if (DrawModernButton(new Rect(rightX + cardW - 50, cardY + 64, 32, 28), "►", "", curDriver.color))
+                SwitchDriver(0, 1);
 
-            var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
-            GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "Press [W][S] to switch machine", switchGuide);
+            DrawPopPill(new Rect(rightX + 20, cardY + 96, cardW - 40, 20), $"{curDriver.driver}  •  {curDriver.trait}", curDriver.color * 0.9f);
+
+            // ─── KART MACHINE 選択セクション ───
+            GUI.Label(new Rect(rightX + 22, cardY + 122, 200, 16), "KART MACHINE  [Q / E]", secLabelStyle);
+            GUI.Label(new Rect(rightX + cardW - 92, cardY + 122, 70, 16), $"{krtIdx + 1}/{KartMachines.Length}", idxLabelStyle);
+
+            if (DrawModernButton(new Rect(rightX + 18, cardY + 140, 32, 28), "◄", "", curKart.color))
+                SwitchKart(0, -1);
+            var kartTitleStyle = St(sSmall, 18, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
+            Outlined(new Rect(rightX + 52, cardY + 139, cardW - 104, 30), $"< {curKart.name} >", kartTitleStyle, curKart.color, 2);
+            if (DrawModernButton(new Rect(rightX + cardW - 50, cardY + 140, 32, 28), "►", "", curKart.color))
+                SwitchKart(0, 1);
+
+            DrawPopPill(new Rect(rightX + 20, cardY + 172, cardW - 40, 20), $"{curKart.code}  •  {curKart.trait}", curKart.color * 0.9f);
+
+            // ─── 4項目 総合ステータスゲージ ───
+            GUI.Label(new Rect(rightX + 22, cardY + 198, cardW - 44, 16), "COMBINED PERFORMANCE", St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.32f, 0.38f, 0.52f)));
+            float statStartY = cardY + 218f;
+            DrawToonStatGauge(rightX + 22, statStartY + 0,  cardW - 44, "SPEED",  spd, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, statStartY + 34, cardW - 44, "ACCEL",  acc, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, statStartY + 68, cardW - 44, "STEER",  hdl, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, statStartY + 102, cardW - 44, "WEIGHT", wgt, 8, new Color(1f, 0.32f, 0.38f));
+
+            var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.40f, 0.46f, 0.62f));
+            GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "[W][S] Driver (10)   •   [Q][E] Kart (8)", switchGuide);
         }
         else
         {
-            // 2P: P1 & P2 の両方の情報をすっきり分割表示
-            var c1 = KartCharacters[SelectedKart];
-            Outlined(new Rect(rightX + 8, cardY + 44, cardW - 16, 26), $"P1: < {c1.name} >", St(sSmall, 19, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c1.color, 2);
-            DrawPopPill(new Rect(rightX + 22, cardY + 72, cardW - 44, 20), c1.trait, c1.color * 0.9f);
-            float s1Y = cardY + 98f;
-            DrawToonStatGauge(rightX + 22, s1Y + 0, cardW - 44, "SPD", c1.speed, 8, new Color(0.08f, 0.72f, 0.98f));
-            DrawToonStatGauge(rightX + 22, s1Y + 20, cardW - 44, "ACC", c1.accel, 8, new Color(1f, 0.72f, 0.05f));
-            DrawToonStatGauge(rightX + 22, s1Y + 40, cardW - 44, "STR", c1.handling, 8, new Color(0.25f, 0.85f, 0.35f));
-            DrawToonStatGauge(rightX + 22, s1Y + 60, cardW - 44, "WGT", c1.weight, 8, new Color(1f, 0.32f, 0.38f));
+            // 2P: P1 & P2 のキャラ＆カート選択と総合ステータスを上下分割表示
+            int d1Idx = Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1);
+            int k1Idx = Mathf.Clamp(SelectedKart, 0, KartMachines.Length - 1);
+            var d1 = KartCharacters[d1Idx];
+            var m1 = KartMachines[k1Idx];
+            GetCombinedStats(d1Idx, k1Idx, out int spd1, out int acc1, out int hdl1, out int wgt1);
 
-            var c2 = KartCharacters[SelectedKart2];
-            Outlined(new Rect(rightX + 8, cardY + 194, cardW - 16, 26), $"P2: < {c2.name} >", St(sSmall, 19, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), c2.color, 2);
-            DrawPopPill(new Rect(rightX + 22, cardY + 222, cardW - 44, 20), c2.trait, c2.color * 0.9f);
-            float s2Y = cardY + 248f;
-            DrawToonStatGauge(rightX + 22, s2Y + 0, cardW - 44, "SPD", c2.speed, 8, new Color(0.08f, 0.72f, 0.98f));
-            DrawToonStatGauge(rightX + 22, s2Y + 20, cardW - 44, "ACC", c2.accel, 8, new Color(1f, 0.72f, 0.05f));
-            DrawToonStatGauge(rightX + 22, s2Y + 40, cardW - 44, "STR", c2.handling, 8, new Color(0.25f, 0.85f, 0.35f));
-            DrawToonStatGauge(rightX + 22, s2Y + 60, cardW - 44, "WGT", c2.weight, 8, new Color(1f, 0.32f, 0.38f));
+            if (DrawModernButton(new Rect(rightX + 16, cardY + 48, 28, 24), "◄", "", d1.color)) SwitchDriver(0, -1);
+            Outlined(new Rect(rightX + 46, cardY + 47, cardW - 92, 26), $"P1 DRV: {d1.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), d1.color, 1.5f);
+            if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 48, 28, 24), "►", "", d1.color)) SwitchDriver(0, 1);
 
-            var switchGuide = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f));
-            GUI.Label(new Rect(rightX + 10, cardY + 365, cardW - 20, 20), "P1: [W][S]   •   P2: [UP][DOWN]", switchGuide);
+            if (DrawModernButton(new Rect(rightX + 16, cardY + 76, 28, 24), "◄", "", m1.color)) SwitchKart(0, -1);
+            Outlined(new Rect(rightX + 46, cardY + 75, cardW - 92, 26), $"P1 KRT: {m1.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), m1.color, 1.5f);
+            if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 76, 28, 24), "►", "", m1.color)) SwitchKart(0, 1);
+
+            float s1Y = cardY + 106f;
+            DrawToonStatGauge(rightX + 22, s1Y + 0,  cardW - 44, "SPD", spd1, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, s1Y + 19, cardW - 44, "ACC", acc1, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, s1Y + 38, cardW - 44, "STR", hdl1, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, s1Y + 57, cardW - 44, "WGT", wgt1, 8, new Color(1f, 0.32f, 0.38f));
+
+            int d2Idx = Mathf.Clamp(SelectedDriver2, 0, KartCharacters.Length - 1);
+            int k2Idx = Mathf.Clamp(SelectedKart2, 0, KartMachines.Length - 1);
+            var d2 = KartCharacters[d2Idx];
+            var m2 = KartMachines[k2Idx];
+            GetCombinedStats(d2Idx, k2Idx, out int spd2, out int acc2, out int hdl2, out int wgt2);
+
+            if (DrawModernButton(new Rect(rightX + 16, cardY + 196, 28, 24), "◄", "", d2.color)) SwitchDriver(1, -1);
+            Outlined(new Rect(rightX + 46, cardY + 195, cardW - 92, 26), $"P2 DRV: {d2.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), d2.color, 1.5f);
+            if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 196, 28, 24), "►", "", d2.color)) SwitchDriver(1, 1);
+
+            if (DrawModernButton(new Rect(rightX + 16, cardY + 224, 28, 24), "◄", "", m2.color)) SwitchKart(1, -1);
+            Outlined(new Rect(rightX + 46, cardY + 223, cardW - 92, 26), $"P2 KRT: {m2.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), m2.color, 1.5f);
+            if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 224, 28, 24), "►", "", m2.color)) SwitchKart(1, 1);
+
+            float s2Y = cardY + 254f;
+            DrawToonStatGauge(rightX + 22, s2Y + 0,  cardW - 44, "SPD", spd2, 8, new Color(0.08f, 0.72f, 0.98f));
+            DrawToonStatGauge(rightX + 22, s2Y + 19, cardW - 44, "ACC", acc2, 8, new Color(1f, 0.72f, 0.05f));
+            DrawToonStatGauge(rightX + 22, s2Y + 38, cardW - 44, "STR", hdl2, 8, new Color(0.25f, 0.85f, 0.35f));
+            DrawToonStatGauge(rightX + 22, s2Y + 57, cardW - 44, "WGT", wgt2, 8, new Color(1f, 0.32f, 0.38f));
+
+            var switchGuide = St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.40f, 0.46f, 0.62f));
+            GUI.Label(new Rect(rightX + 8, cardY + 365, cardW - 16, 20), "P1: [W/S] Drv [Q/E] Kart • P2: [↑/↓] Drv [←/→] Kart", switchGuide);
         }
 
         // プレイ人数の切り替え（モダンボタン）
@@ -637,8 +686,8 @@ public partial class RaceManager
 
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = TwoPlayer
-            ? "P1: [WASD] [SPACE] drift [E/LB] item  •  P2: [ARROWS] [R-SHIFT] drift [R-CTRL] item  •  [TAB/Y] 1P/2P  •  [ESC/START] Pause"
-            : "[W][S] Driver  •  [A][D/LB/RB] Track  •  [SPACE/RB] Drift  •  [E/LB/X] Item  •  [U] Update  •  [TAB/Y] 2P  •  [O/X] Net  •  [ESC/START] Pause";
+            ? "P1: [W/S] Drv [Q/E] Kart  •  P2: [↑/↓] Drv [←/→] Kart  •  [A/D] Track  •  [TAB/Y] 1P/2P  •  [ESC/START] Pause"
+            : "[W][S] Driver  •  [Q][E] Kart  •  [A][D/LB/RB] Track  •  [SPACE/RB] Drift  •  [E/LB/X] Item  •  [TAB/Y] 2P  •  [O/X] Net  •  [ESC] Pause";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 

@@ -16,7 +16,7 @@ MonoBehaviour:
   driverName: Aero Sonic
   trait: Maximum Top Speed
   signatureColor: {r: 0.18, g: 0.65, b: 1, a: 1}
-  speed: 8
+  speed: 7
   accel: 4
   handling: 4
   weight: 6

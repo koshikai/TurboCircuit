@@ -6,6 +6,7 @@ public partial class Kart
     // ───────────────────────── 見た目 ─────────────────────────
 
     static readonly string[] KenneyKarts = { "kart-oobi", "kart-oodi", "kart-ooli", "kart-oopi", "kart-oozi" };
+    static readonly string[] AnimalDrivers = { "panda", "penguin", "fox", "bunny", "lion" };
 
     public int DriftDirection => driftDir;
     public float SteerVisual => steerVis;
@@ -16,6 +17,28 @@ public partial class Kart
     Transform blobShadow;
     float visPitch;
     static Material sharedBlobShadowMat;
+    static Material sharedAnimalDriverMat;
+
+    Material GetAnimalDriverMaterial()
+    {
+        if (sharedAnimalDriverMat == null && rm != null && rm.wallMaterial != null)
+        {
+            sharedAnimalDriverMat = new Material(rm.wallMaterial);
+            string animalTexPath = Application.dataPath + "/Resources/Animals/Textures/colormap.png";
+            var colormapTex = RaceManager.LoadTexture("Animals/Textures/colormap", animalTexPath);
+            if (colormapTex != null)
+            {
+                sharedAnimalDriverMat.mainTexture = colormapTex;
+                sharedAnimalDriverMat.SetTexture("_BaseMap", colormapTex);
+                sharedAnimalDriverMat.SetTexture("_MainTex", colormapTex);
+            }
+            sharedAnimalDriverMat.color = Color.white;
+            sharedAnimalDriverMat.SetColor("_BaseColor", Color.white);
+            sharedAnimalDriverMat.SetColor("_Color", Color.white);
+            sharedAnimalDriverMat.SetFloat("_Smoothness", 0.18f);
+        }
+        return sharedAnimalDriverMat;
+    }
 
     void BuildModel()
     {
@@ -144,7 +167,7 @@ public partial class Kart
 
         if (!kenneyReady)
         {
-            // プロシージャルボディ時のみ排気管・ドライバー・ステアリングを生成（Kenneyモデルには元からドライバーとマフラーが造形済み）
+            // プロシージャルボディ時のみ排気管・ドライバー・ステアリングを生成
             Part(PrimitiveType.Cylinder, new Vector3(-0.28f, 0.28f, -1.22f), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
             Part(PrimitiveType.Cylinder, new Vector3(0.28f, 0.28f, -1.22f), new Vector3(0.14f, 0.22f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(90, 0, 0));
 
@@ -197,32 +220,48 @@ public partial class Kart
 
     bool TryBuildKenneyModel()
     {
-        int variant = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 1) % KenneyKarts.Length);
-        var kartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[variant]);
-        var wheelPrefab = Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default");
-        if (kartPrefab == null) return false;
+        int driverIdx = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedDriver : 0) : (Mathf.Abs(Index + 1) % 10);
+        int kartIdx = KartVariant >= 0 ? KartVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 2) % 8);
 
-        var body = Instantiate(kartPrefab, model);
-        body.transform.localPosition = new Vector3(0, 0.15f, 0);
+        var baseKartPrefab = Resources.Load<GameObject>("Karts/kart-oobi");
+        if (baseKartPrefab == null) return false;
+
+        float liftY = (kartIdx == 3) ? 0.10f : 0f; // MONSTER のみハイリフト車高
+
+        // 1. カート車体ベース（付属の character と静的 wheel-* を除去し、純粋なシャシーのみを使用）
+        var body = Instantiate(baseKartPrefab, model);
+        body.name = "KartChassis";
+        body.transform.localPosition = new Vector3(0, 0.15f + liftY, 0);
         body.transform.localRotation = Quaternion.identity;
         body.transform.localScale = Vector3.one * 1.5f;
         foreach (var c in body.GetComponentsInChildren<Collider>()) Destroy(c);
 
-        var paint = new MaterialPropertyBlock();
-        paint.SetColor("_Color", Color.Lerp(Color.white, Color, 0.65f));
-        paint.SetColor("_BaseColor", Color.Lerp(Color.white, Color, 0.65f));
-        foreach (var r in body.GetComponentsInChildren<Renderer>())
+        for (int i = body.transform.childCount - 1; i >= 0; i--)
         {
-            r.SetPropertyBlock(paint);
+            var ch = body.transform.GetChild(i);
+            if (ch.name.StartsWith("wheel") || ch.name.StartsWith("character"))
+            {
+                ch.SetParent(null);
+                ch.gameObject.SetActive(false);
+                Destroy(ch.gameObject);
+            }
         }
 
-        var wheelPos = new[]
+        var bodyPaint = new MaterialPropertyBlock();
+        Color bodyTint = Color.Lerp(Color.white, Color, 0.72f);
+        bodyPaint.SetColor("_Color", bodyTint);
+        bodyPaint.SetColor("_BaseColor", bodyTint);
+        foreach (var r in body.GetComponentsInChildren<Renderer>())
         {
-            new Vector3(-0.76f, 0.32f, 0.60f),  // 前左
-            new Vector3(0.76f, 0.32f, 0.60f),   // 前右
-            new Vector3(-0.78f, 0.34f, -0.52f), // 後左
-            new Vector3(0.78f, 0.34f, -0.52f)  // 後右
-        };
+            r.SetPropertyBlock(bodyPaint);
+        }
+
+        // 2. カート種類別（0〜7）のカスタム3Dパーツ造形＆ホイール設定
+        BuildCustomKartParts(kartIdx, liftY, out Vector3[] wheelPos, out bool useRacingWheel, out float frontWheelScale, out float rearWheelScale);
+
+        var wheelPrefab = useRacingWheel
+            ? (Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default"))
+            : (Resources.Load<GameObject>("Karts/wheel-default") ?? Resources.Load<GameObject>("Karts/wheel-racing"));
 
         for (int i = 0; i < 4; i++)
         {
@@ -234,12 +273,13 @@ public partial class Kart
             spin.SetParent(pivot, false);
             wheelSpin[i] = spin;
 
+            float wScale = i < 2 ? frontWheelScale : rearWheelScale;
             if (wheelPrefab != null)
             {
                 var w = Instantiate(wheelPrefab, spin);
                 w.transform.localPosition = Vector3.zero;
                 w.transform.localRotation = i % 2 == 0 ? Quaternion.identity : Quaternion.Euler(0, 180, 0);
-                w.transform.localScale = Vector3.one * 1.35f;
+                w.transform.localScale = Vector3.one * wScale;
                 foreach (var c in w.GetComponentsInChildren<Collider>()) Destroy(c);
             }
             else
@@ -248,8 +288,278 @@ public partial class Kart
                 var tire = Part(PrimitiveType.Cylinder, Vector3.zero, new Vector3(d, width, d), rm.tireMaterial, null, Quaternion.Euler(0, 0, 90));
                 tire.transform.SetParent(spin, false);
             }
+
+            // CYBER GT (4) はホイール側面に発光ネオンリングを追加
+            if (kartIdx == 4 && rm != null && rm.glowMaterial != null)
+            {
+                var rimMpb = new MaterialPropertyBlock();
+                Color neonCol = new Color(0.15f, 0.95f, 1f, 0.9f);
+                rimMpb.SetColor("_Color", neonCol);
+                rimMpb.SetColor("_BaseColor", neonCol);
+                rimMpb.SetColor("_TintColor", neonCol);
+                float sideX = (i % 2 == 0) ? -0.18f : 0.18f;
+                var rim = Part(PrimitiveType.Cylinder, new Vector3(sideX, 0f, 0f), new Vector3(0.36f * wScale, 0.015f, 0.36f * wScale), rm.glowMaterial, rimMpb, Quaternion.Euler(0, 0, 90));
+                rim.transform.SetParent(spin, false);
+            }
+            // MONSTER (3) や ROADSTER (5) はクロームセンターハブキャップを追加
+            else if ((kartIdx == 3 || kartIdx == 5) && rm != null && rm.chromeMaterial != null)
+            {
+                float sideX = (i % 2 == 0) ? -0.19f * (wScale / 1.35f) : 0.19f * (wScale / 1.35f);
+                var hub = Part(PrimitiveType.Cylinder, new Vector3(sideX, 0f, 0f), new Vector3(0.24f * wScale, 0.025f, 0.24f * wScale), rm.chromeMaterial, null, Quaternion.Euler(0, 0, 90));
+                hub.transform.SetParent(spin, false);
+            }
         }
+
+        // 3. ドライバー（キャラクター 0〜9）を独立してシートに搭乗させる
+        BuildCustomDriver(driverIdx, liftY);
+
         return true;
+    }
+
+    void BuildCustomKartParts(int kartIdx, float liftY, out Vector3[] wheelPos, out bool useRacingWheel, out float frontScale, out float rearScale)
+    {
+        var paint = new MaterialPropertyBlock();
+        paint.SetColor("_Color", Color);
+        paint.SetColor("_BaseColor", Color);
+
+        var dark = new MaterialPropertyBlock();
+        dark.SetColor("_Color", Color * 0.45f);
+        dark.SetColor("_BaseColor", Color * 0.45f);
+
+        Color dCol = DriverColor.maxColorComponent > 0.05f ? DriverColor : Color.white;
+        var accent = new MaterialPropertyBlock();
+        accent.SetColor("_Color", dCol);
+        accent.SetColor("_BaseColor", dCol);
+
+        wheelPos = new[]
+        {
+            new Vector3(-0.74f, 0.30f, 0.56f),  // 前左
+            new Vector3( 0.74f, 0.30f, 0.56f),  // 前右
+            new Vector3(-0.76f, 0.32f, -0.52f), // 後左
+            new Vector3( 0.76f, 0.32f, -0.52f)  // 後右
+        };
+        useRacingWheel = true;
+        frontScale = 1.35f;
+        rearScale = 1.38f;
+
+        switch (kartIdx)
+        {
+            case 0: // STANDARD (STD-01): クラシック・レーシングカート（フロントゼッケンプレート＋ツインクロームマフラー）
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.44f, 0.92f), new Vector3(0.52f, 0.14f, 0.24f), rm.kartPaintMaterial, accent, Quaternion.Euler(22f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.26f, 0.42f, -0.72f), new Vector3(0.13f, 0.18f, 0.13f), rm.chromeMaterial, null, Quaternion.Euler(78f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.26f, 0.42f, -0.72f), new Vector3(0.13f, 0.18f, 0.13f), rm.chromeMaterial, null, Quaternion.Euler(78f, 0f, 0f));
+                break;
+
+            case 1: // PIPE BUGGY (BUG-02): パイプフレーム・ロールケージバギー＋ブルバー＋サスペンション
+                useRacingWheel = false;
+                frontScale = 1.32f;
+                rearScale = 1.36f;
+                // フロントブルバー（バンパーガード）
+                Part(PrimitiveType.Cylinder, new Vector3(0f, 0.36f, 1.06f), new Vector3(0.08f, 0.52f, 0.08f), rm.chromeMaterial, null, Quaternion.Euler(0f, 0f, 90f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.32f, 0.42f, 1.00f), new Vector3(0.07f, 0.14f, 0.07f), rm.chromeMaterial, null, Quaternion.Euler(-25f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.32f, 0.42f, 1.00f), new Vector3(0.07f, 0.14f, 0.07f), rm.chromeMaterial, null, Quaternion.Euler(-25f, 0f, 0f));
+                // サイドロールバー＆ルーフパイプフレーム
+                Part(PrimitiveType.Cylinder, new Vector3(-0.46f, 0.62f, 0.28f), new Vector3(0.07f, 0.28f, 0.07f), rm.kartPaintMaterial, paint, Quaternion.Euler(-28f, 0f, -10f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.46f, 0.62f, 0.28f), new Vector3(0.07f, 0.28f, 0.07f), rm.kartPaintMaterial, paint, Quaternion.Euler(-28f, 0f,  10f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.46f, 0.66f, -0.52f), new Vector3(0.075f, 0.32f, 0.075f), rm.kartPaintMaterial, paint, Quaternion.Euler(16f, 0f, -8f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.46f, 0.66f, -0.52f), new Vector3(0.075f, 0.32f, 0.075f), rm.kartPaintMaterial, paint, Quaternion.Euler(16f, 0f,  8f));
+                Part(PrimitiveType.Cylinder, new Vector3(0f, 0.92f, -0.44f), new Vector3(0.08f, 0.44f, 0.08f), rm.kartPaintMaterial, accent, Quaternion.Euler(0f, 0f, 90f));
+                // リアコイルスプリング
+                Part(PrimitiveType.Cylinder, new Vector3(-0.48f, 0.46f, -0.56f), new Vector3(0.12f, 0.16f, 0.12f), rm.bananaMaterial);
+                Part(PrimitiveType.Cylinder, new Vector3( 0.48f, 0.46f, -0.56f), new Vector3(0.12f, 0.16f, 0.12f), rm.bananaMaterial);
+                break;
+
+            case 2: // MACH FORMULA (GP-03): F1フォーミュラ・フロントウイング＋サイドポッド＋大型リアGTウイング
+                frontScale = 1.28f;
+                rearScale = 1.50f;
+                wheelPos[2] = new Vector3(-0.82f, 0.34f, -0.54f);
+                wheelPos[3] = new Vector3( 0.82f, 0.34f, -0.54f);
+                // ロングノーズ＆ワイドフロントウイング
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.34f, 0.98f), new Vector3(0.46f, 0.16f, 0.48f), rm.kartPaintMaterial, paint, Quaternion.Euler(10f, 0f, 0f));
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.22f, 1.16f), new Vector3(1.56f, 0.06f, 0.28f), rm.kartPaintMaterial, accent);
+                Part(PrimitiveType.Cube, new Vector3(-0.78f, 0.28f, 1.14f), new Vector3(0.06f, 0.18f, 0.34f), rm.kartPaintMaterial, paint);
+                Part(PrimitiveType.Cube, new Vector3( 0.78f, 0.28f, 1.14f), new Vector3(0.06f, 0.18f, 0.34f), rm.kartPaintMaterial, paint);
+                // サイドエアロポッド
+                Part(PrimitiveType.Cube, new Vector3(-0.68f, 0.34f, -0.02f), new Vector3(0.28f, 0.22f, 0.76f), rm.kartPaintMaterial, paint);
+                Part(PrimitiveType.Cube, new Vector3( 0.68f, 0.34f, -0.02f), new Vector3(0.28f, 0.22f, 0.76f), rm.kartPaintMaterial, paint);
+                // 大型リアGTウイング＋翼端板
+                Part(PrimitiveType.Cube, new Vector3(-0.36f, 0.68f, -0.78f), new Vector3(0.06f, 0.42f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(-12f, 0f, 0f));
+                Part(PrimitiveType.Cube, new Vector3( 0.36f, 0.68f, -0.78f), new Vector3(0.06f, 0.42f, 0.14f), rm.chromeMaterial, null, Quaternion.Euler(-12f, 0f, 0f));
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.90f, -0.84f), new Vector3(1.62f, 0.07f, 0.34f), rm.kartPaintMaterial, paint, Quaternion.Euler(8f, 0f, 0f));
+                Part(PrimitiveType.Cube, new Vector3(-0.82f, 0.90f, -0.84f), new Vector3(0.06f, 0.24f, 0.40f), rm.kartPaintMaterial, accent);
+                Part(PrimitiveType.Cube, new Vector3( 0.82f, 0.90f, -0.84f), new Vector3(0.06f, 0.24f, 0.40f), rm.kartPaintMaterial, accent);
+                break;
+
+            case 3: // MONSTER (MON-04): 超巨大タイヤ・ハイリフトモンスタートラック＋煙突マフラー
+                useRacingWheel = false;
+                frontScale = 1.74f;
+                rearScale = 1.80f;
+                wheelPos = new[]
+                {
+                    new Vector3(-0.90f, 0.38f, 0.58f),
+                    new Vector3( 0.90f, 0.38f, 0.58f),
+                    new Vector3(-0.92f, 0.40f, -0.54f),
+                    new Vector3( 0.92f, 0.40f, -0.54f)
+                };
+                // ヘビーデューティ・サブフレーム＆フロントバッシュガード
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.24f, 0f), new Vector3(1.10f, 0.16f, 1.35f), rm.tireMaterial);
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.38f, 1.06f), new Vector3(1.18f, 0.22f, 0.14f), rm.chromeMaterial);
+                // 左右直立クローム煙突マフラー
+                Part(PrimitiveType.Cylinder, new Vector3(-0.44f, 0.78f, -0.62f), new Vector3(0.14f, 0.38f, 0.14f), rm.chromeMaterial);
+                Part(PrimitiveType.Cylinder, new Vector3( 0.44f, 0.78f, -0.62f), new Vector3(0.14f, 0.38f, 0.14f), rm.chromeMaterial);
+                break;
+
+            case 4: // CYBER GT (CYB-05): サイバーネオン・インターセプター（発光ネオンブレード＋双尾翼）
+                frontScale = 1.35f;
+                rearScale = 1.44f;
+                var neonMpb = new MaterialPropertyBlock();
+                Color neon = new Color(0.10f, 0.95f, 1.0f, 0.95f);
+                neonMpb.SetColor("_Color", neon);
+                neonMpb.SetColor("_BaseColor", neon);
+                neonMpb.SetColor("_TintColor", neon);
+                // フロントサイバースプリッター＆ネオンバー
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.24f, 1.08f), new Vector3(1.38f, 0.07f, 0.26f), rm.kartPaintMaterial, dark);
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.25f, 1.18f), new Vector3(1.32f, 0.045f, 0.06f), rm.glowMaterial, neonMpb);
+                // 左右サイドネオンスカート
+                Part(PrimitiveType.Cube, new Vector3(-0.72f, 0.24f, 0.02f), new Vector3(0.08f, 0.05f, 1.15f), rm.glowMaterial, neonMpb);
+                Part(PrimitiveType.Cube, new Vector3( 0.72f, 0.24f, 0.02f), new Vector3(0.08f, 0.05f, 1.15f), rm.glowMaterial, neonMpb);
+                // 双尾翼スタビライザーフィン
+                Part(PrimitiveType.Cube, new Vector3(-0.48f, 0.72f, -0.72f), new Vector3(0.07f, 0.38f, 0.46f), rm.kartPaintMaterial, paint, Quaternion.Euler(14f, 0f,  18f));
+                Part(PrimitiveType.Cube, new Vector3( 0.48f, 0.72f, -0.72f), new Vector3(0.07f, 0.38f, 0.46f), rm.kartPaintMaterial, paint, Quaternion.Euler(14f, 0f, -18f));
+                break;
+
+            case 5: // ROADSTER (RET-06): クラシック・ヴィンテージクーペ（葉巻型ロングノーズ＋風防バイザー＋サイドマフラー）
+                useRacingWheel = false;
+                frontScale = 1.36f;
+                rearScale = 1.38f;
+                // ヴィンテージ・ラウンドノーズ＆クロームグリル
+                Part(PrimitiveType.Capsule, new Vector3(0f, 0.42f, 0.76f), new Vector3(0.68f, 0.42f, 0.62f), rm.kartPaintMaterial, paint, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3(0f, 0.40f, 1.12f), new Vector3(0.46f, 0.04f, 0.44f), rm.chromeMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                // レトロ風防ウインドシールド
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.62f, 0.32f), new Vector3(0.56f, 0.16f, 0.05f), rm.visorMaterial, null, Quaternion.Euler(-28f, 0f, 0f));
+                // ロングクローム・サイドエキゾーストパイプ
+                Part(PrimitiveType.Cylinder, new Vector3(-0.66f, 0.34f, -0.05f), new Vector3(0.11f, 0.56f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.66f, 0.34f, -0.05f), new Vector3(0.11f, 0.56f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                break;
+
+            case 6: // MUSCLE V8 (MUS-07): スーパーチャージャー搭載マッスルカー＋4本出しマフラー＋ダックテール
+                frontScale = 1.28f;
+                rearScale = 1.54f;
+                wheelPos[2] = new Vector3(-0.82f, 0.35f, -0.54f);
+                wheelPos[3] = new Vector3( 0.82f, 0.35f, -0.54f);
+                // フロントV8スーパーチャージャー・ブロワースクープ
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.52f, 0.56f), new Vector3(0.38f, 0.18f, 0.38f), rm.chromeMaterial);
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.64f, 0.58f), new Vector3(0.44f, 0.12f, 0.32f), rm.chromeMaterial);
+                Part(PrimitiveType.Cylinder, new Vector3(-0.10f, 0.65f, 0.74f), new Vector3(0.10f, 0.04f, 0.10f), rm.taillightMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.10f, 0.65f, 0.74f), new Vector3(0.10f, 0.04f, 0.10f), rm.taillightMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                // リアダックテールスポイラー＆4本出しマフラー
+                Part(PrimitiveType.Cube, new Vector3(0f, 0.62f, -0.74f), new Vector3(1.18f, 0.16f, 0.18f), rm.kartPaintMaterial, paint, Quaternion.Euler(-24f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.34f, 0.34f, -0.78f), new Vector3(0.11f, 0.16f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(85f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.20f, 0.34f, -0.78f), new Vector3(0.11f, 0.16f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(85f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.20f, 0.34f, -0.78f), new Vector3(0.11f, 0.16f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(85f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.34f, 0.34f, -0.78f), new Vector3(0.11f, 0.16f, 0.11f), rm.chromeMaterial, null, Quaternion.Euler(85f, 0f, 0f));
+                break;
+
+            case 7: // JET POD (JET-08): ツインタービン・ジェットロケットカート＋デルタウイング
+                frontScale = 1.26f;
+                rearScale = 1.36f;
+                var jetGlow = new MaterialPropertyBlock();
+                Color jCol = new Color(0.25f, 0.85f, 1.0f, 0.95f);
+                jetGlow.SetColor("_Color", jCol);
+                jetGlow.SetColor("_BaseColor", jCol);
+                jetGlow.SetColor("_TintColor", jCol);
+                // 左右大型ジェットタービンポッド
+                Part(PrimitiveType.Cylinder, new Vector3(-0.64f, 0.50f, -0.26f), new Vector3(0.32f, 0.44f, 0.32f), rm.kartPaintMaterial, paint, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.64f, 0.50f, -0.26f), new Vector3(0.32f, 0.44f, 0.32f), rm.kartPaintMaterial, paint, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3(-0.64f, 0.50f,  0.18f), new Vector3(0.34f, 0.05f, 0.34f), rm.chromeMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Cylinder, new Vector3( 0.64f, 0.50f,  0.18f), new Vector3(0.34f, 0.05f, 0.34f), rm.chromeMaterial, null, Quaternion.Euler(90f, 0f, 0f));
+                Part(PrimitiveType.Sphere, new Vector3(-0.64f, 0.50f, -0.70f), new Vector3(0.26f, 0.26f, 0.18f), rm.glowMaterial, jetGlow);
+                Part(PrimitiveType.Sphere, new Vector3( 0.64f, 0.50f, -0.70f), new Vector3(0.26f, 0.26f, 0.18f), rm.glowMaterial, jetGlow);
+                // デルタカナード翼
+                Part(PrimitiveType.Cube, new Vector3(-0.88f, 0.46f, -0.34f), new Vector3(0.36f, 0.05f, 0.42f), rm.kartPaintMaterial, accent, Quaternion.Euler(0f, -18f, -8f));
+                Part(PrimitiveType.Cube, new Vector3( 0.88f, 0.46f, -0.34f), new Vector3(0.36f, 0.05f, 0.42f), rm.kartPaintMaterial, accent, Quaternion.Euler(0f,  18f,  8f));
+                break;
+        }
+    }
+
+    void BuildCustomDriver(int driverIdx, float liftY)
+    {
+        driverBody = new GameObject("DriverBody").transform;
+        driverBody.SetParent(model, false);
+        driverBody.localPosition = new Vector3(0f, 0.565f + liftY, -0.102f);
+
+        driverHead = new GameObject("DriverHead").transform;
+        driverHead.SetParent(driverBody, false);
+        driverHead.localPosition = Vector3.zero;
+
+        Color cCol = DriverColor.maxColorComponent > 0.05f ? DriverColor : Color;
+
+        if (driverIdx >= 0 && driverIdx < KenneyKarts.Length)
+        {
+            // 0〜4: Kenney キャラクター (OOBI, OODI, OOLI, OOPI, OOZI)
+            var charKartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[driverIdx]);
+            if (charKartPrefab != null)
+            {
+                var tempGo = Instantiate(charKartPrefab);
+                var charTr = tempGo.transform.Find("character");
+                if (charTr != null)
+                {
+                    charTr.SetParent(driverHead, false);
+                    charTr.localPosition = Vector3.zero;
+                    charTr.localRotation = Quaternion.identity;
+                    charTr.localScale = Vector3.one * 1.5f;
+                    foreach (var col in charTr.GetComponentsInChildren<Collider>()) Destroy(col);
+
+                    var charMpb = new MaterialPropertyBlock();
+                    Color tint = Color.Lerp(Color.white, cCol, 0.62f);
+                    charMpb.SetColor("_Color", tint);
+                    charMpb.SetColor("_BaseColor", tint);
+                    foreach (var r in charTr.GetComponentsInChildren<Renderer>())
+                    {
+                        r.SetPropertyBlock(charMpb);
+                    }
+                }
+                tempGo.SetActive(false);
+                Destroy(tempGo);
+            }
+        }
+        else
+        {
+            // 5〜9: 動物レーサー (PANDA, PENGUIN, FOX, BUNNY, LION)
+            int animIdx = Mathf.Clamp(driverIdx - KenneyKarts.Length, 0, AnimalDrivers.Length - 1);
+            string animName = AnimalDrivers[animIdx];
+            var animPrefab = Resources.Load<GameObject>("Animals/animal-" + animName);
+            if (animPrefab != null)
+            {
+                var animGo = Instantiate(animPrefab, driverHead);
+                float aScale = animName == "bunny" ? 0.66f : animName == "lion" ? 0.70f : 0.72f;
+                animGo.transform.localPosition = new Vector3(0f, -0.10f, 0.02f);
+                animGo.transform.localRotation = Quaternion.identity;
+                animGo.transform.localScale = Vector3.one * aScale;
+                foreach (var col in animGo.GetComponentsInChildren<Collider>()) Destroy(col);
+
+                // シート下に突き出る脚パーツを除去して座り姿勢にする
+                for (int i = animGo.transform.childCount - 1; i >= 0; i--)
+                {
+                    var ch = animGo.transform.GetChild(i);
+                    if (ch.name.StartsWith("leg-"))
+                    {
+                        ch.SetParent(null);
+                        ch.gameObject.SetActive(false);
+                        Destroy(ch.gameObject);
+                    }
+                }
+
+                var animMat = GetAnimalDriverMaterial();
+                if (animMat != null)
+                {
+                    foreach (var r in animGo.GetComponentsInChildren<Renderer>())
+                    {
+                        r.sharedMaterial = animMat;
+                    }
+                }
+            }
+        }
     }
 
     GameObject Part(PrimitiveType type, Vector3 pos, Vector3 scale, Material mat, MaterialPropertyBlock mpb = null, Quaternion? rot = null)
@@ -310,6 +620,14 @@ public partial class Kart
         for (int i = 0; i < 4; i++) wheelSpin[i].localRotation = Quaternion.Euler(wheelAngle, 0, 0);
         for (int i = 0; i < 2; i++) frontPivot[i].localRotation = Quaternion.Euler(0, steerVis * 28f, 0);
 
+        // スキッドマークの発生位置もドリフトでヨー回転した実リアタイヤの接地面に追従させる
+        if (skidTrails[0] != null && skidTrails[1] != null && wheelSpin[2] != null && wheelSpin[3] != null)
+        {
+            Vector3 groundOffset = -transform.up * 0.28f;
+            skidTrails[0].transform.position = wheelSpin[2].position + groundOffset;
+            skidTrails[1].transform.position = wheelSpin[3].position + groundOffset;
+        }
+
         // ドライバーのアニメーション（ドリフト時のハングオン傾きと視線）
         if (driverBody != null && driverHead != null)
         {
@@ -337,17 +655,29 @@ public partial class Kart
                 boostFlames[i].gameObject.SetActive(showFlame);
             if (showFlame && flameMpb != null)
             {
-                float pulse = 0.85f + Mathf.Sin(Time.time * 48f + i * 1.5f) * 0.25f;
-                float lenY = (boostTimer > 0 ? 0.42f : 0.32f) * pulse;
-                float radXZ = (boostTimer > 0 ? 0.18f : 0.14f) * (0.9f + pulse * 0.15f);
+                float pulse = 0.88f + Mathf.Sin(Time.time * 52f + i * 1.5f) * 0.25f;
+                float lenY = (boostTimer > 0 ? 0.42f : 0.30f) * pulse;
+                float radXZ = (boostTimer > 0 ? 0.17f : 0.13f) * (0.9f + pulse * 0.15f);
                 boostFlames[i].localScale = new Vector3(radXZ, lenY, radXZ);
-                Color fCol = boostTimer > 0
-                    ? Color.Lerp(new Color(1.0f, 0.48f, 0.08f, 0.92f), new Color(0.35f, 0.88f, 1.0f, 0.95f), Mathf.PingPong(Time.time * 18f, 1f))
-                    : new Color(0.35f, 0.88f, 1.0f, 0.88f);
+                float pp = Mathf.PingPong(Time.time * 20f, 1f);
+                Color fCol;
+                if (boostTimer > 0)
+                {
+                    if (boostColorLevel == 1)
+                        fCol = Color.Lerp(new Color(0.05f, 0.55f, 1.0f, 0.90f), new Color(0.25f, 0.88f, 1.0f, 0.94f), pp);
+                    else if (boostColorLevel == 3)
+                        fCol = Color.Lerp(new Color(0.95f, 0.12f, 0.85f, 0.90f), new Color(0.55f, 0.22f, 1.0f, 0.94f), pp);
+                    else
+                        fCol = Color.Lerp(new Color(1.0f, 0.42f, 0.04f, 0.90f), new Color(1.0f, 0.80f, 0.12f, 0.94f), pp);
+                }
+                else
+                {
+                    fCol = new Color(0.20f, 0.78f, 1.0f, 0.85f);
+                }
                 flameMpb.SetColor("_TintColor", fCol);
                 flameMpb.SetColor("_Color", fCol);
                 flameMpb.SetColor("_BaseColor", fCol);
-                flameMpb.SetColor("_EmissionColor", fCol * 2.2f);
+                flameMpb.SetColor("_EmissionColor", fCol * 1.6f);
                 boostFlameRends[i].SetPropertyBlock(flameMpb);
             }
         }
@@ -365,37 +695,155 @@ public partial class Kart
         }
     }
 
+    public static void GetDriftSparkColors(int lv, out Color colMain, out Color colSub, out Color colCore)
+    {
+        if (lv >= 3)
+        {
+            // Lv3 ウルトラターボ：高彩度ネオンマゼンタ ＆ エレクトリックパープル ＆ ピンクコア
+            colMain = new Color(0.96f, 0.10f, 0.86f, 0.95f);
+            colSub  = new Color(0.52f, 0.14f, 1.00f, 0.95f);
+            colCore = new Color(1.00f, 0.56f, 0.98f, 0.98f);
+        }
+        else if (lv == 2)
+        {
+            // Lv2 スーパーターボ：鮮烈なブレイズオレンジ ＆ ゴールデンアンバー ＆ イエローコア
+            colMain = new Color(1.00f, 0.36f, 0.02f, 0.95f);
+            colSub  = new Color(1.00f, 0.76f, 0.06f, 0.95f);
+            colCore = new Color(1.00f, 0.94f, 0.45f, 0.98f);
+        }
+        else
+        {
+            // Lv1 ミニターボ：鮮やかなディープエレクトリックブルー ＆ ネオンシアン ＆ アイスブルーコア
+            colMain = new Color(0.04f, 0.50f, 1.00f, 0.95f);
+            colSub  = new Color(0.10f, 0.85f, 1.00f, 0.95f);
+            colCore = new Color(0.58f, 0.94f, 1.00f, 0.98f);
+        }
+    }
+
+    // ドリフトでヨー回転した実リアタイヤ（wheelSpin[2], wheelSpin[3]）の真下・接地後端座標を取得
+    void GetRearTireSparkPoints(out Vector3 rearL, out Vector3 rearR, out Vector3 sparkBack, out Vector3 sparkRight)
+    {
+        sparkRight = transform.right;
+        // 進行方向真後ろ（-Forward）をベースに、ドリフト外向きへわずかに傾けた自然な後方ベクトル
+        sparkBack = (-Forward - sparkRight * (drifting ? driftDir * 0.20f : 0f)).normalized;
+
+        if (wheelSpin != null && wheelSpin.Length >= 4 && wheelSpin[2] != null && wheelSpin[3] != null)
+        {
+            // 各リアタイヤの中心（wheelSpin）から真下（路面接地部）＋進行方向後ろ側0.18mに配置
+            Vector3 contactOffset = -transform.up * 0.24f - Forward * 0.18f;
+            rearL = wheelSpin[2].position + contactOffset;
+            rearR = wheelSpin[3].position + contactOffset;
+        }
+        else
+        {
+            float rz = kenneyReady ? -0.52f : -1.0f;
+            float rx = kenneyReady ? 0.78f : 0.9f;
+            Transform refTr = model != null ? model : transform;
+            rearL = refTr.TransformPoint(new Vector3(-rx, 0.08f, rz - 0.18f));
+            rearR = refTr.TransformPoint(new Vector3(rx, 0.08f, rz - 0.18f));
+        }
+    }
+
+    // ドリフトターボの段階（青→オレンジ→紫）が上がった瞬間のド派手なイグニッション火花バースト
+    void OnDriftLevelUp(int lv)
+    {
+        GetRearTireSparkPoints(out Vector3 rearL, out Vector3 rearR, out Vector3 sparkBack, out Vector3 sparkRight);
+        Vector3 carry = (previewLockTimer > 0f) ? Vector3.zero : VelDir * (Speed * 0.78f);
+        var baseVel = carry + sparkBack * (6.8f + lv * 1.4f) + Vector3.up * 1.1f;
+
+        GetDriftSparkColors(lv, out Color colMain, out Color colSub, out Color colCore);
+        int burstCount = 12 + lv * 4;
+        float spread = 1.8f + lv * 0.35f;
+        Fx.SparkBurst(rearL, baseVel - sparkRight * 0.4f, colMain, colCore, burstCount, spread, 0.20f + lv * 0.025f);
+        Fx.SparkBurst(rearR, baseVel + sparkRight * 0.4f, colSub, colCore, burstCount, spread, 0.20f + lv * 0.025f);
+        Fx.Emit(rearL, carry + sparkBack * 1.8f + Vector3.up * 0.4f, colMain, 0.50f + lv * 0.08f, 0.13f, 2, 0.4f);
+        Fx.Emit(rearR, carry + sparkBack * 1.8f + Vector3.up * 0.4f, colSub, 0.50f + lv * 0.08f, 0.13f, 2, 0.4f);
+
+        if (IsPlayer && rm != null && !rm.Demo)
+        {
+            rm.Audio.Tick();
+            GamepadHaptics.Vibrate(PlayerIndex, 0.18f * lv, 0.45f + 0.15f * lv, 0.14f);
+        }
+    }
+
+    // ドリフト解除によるミニターボ発動時の解放スパーク爆発
+    void OnDriftReleaseBoost(int lv)
+    {
+        GetRearTireSparkPoints(out Vector3 rearL, out Vector3 rearR, out Vector3 sparkBack, out Vector3 sparkRight);
+        Vector3 carry = (previewLockTimer > 0f) ? Vector3.zero : VelDir * (Speed * 0.78f);
+        var baseVel = carry + sparkBack * (7.8f + lv * 1.6f) + Vector3.up * 1.3f;
+
+        GetDriftSparkColors(lv, out Color colMain, out Color colSub, out Color colCore);
+        int count = 16 + lv * 5;
+        Fx.SparkBurst(rearL, baseVel - sparkRight * 0.6f, colMain, colCore, count, 2.2f + lv * 0.4f, 0.22f + lv * 0.03f);
+        Fx.SparkBurst(rearR, baseVel + sparkRight * 0.6f, colSub, colCore, count, 2.2f + lv * 0.4f, 0.22f + lv * 0.03f);
+        Fx.Emit(rearL, carry + sparkBack * 2.5f + Vector3.up * 0.6f, colMain, 0.60f, 0.16f, 3, 0.8f);
+        Fx.Emit(rearR, carry + sparkBack * 2.5f + Vector3.up * 0.6f, colSub, 0.60f, 0.16f, 3, 0.8f);
+    }
+
     void Effects(float dt)
     {
-        float rz = kenneyReady ? -0.52f : -1.0f;
-        float rx = kenneyReady ? 0.78f : 0.9f;
-        var rearL = transform.TransformPoint(new Vector3(-rx, 0.15f, rz));
-        var rearR = transform.TransformPoint(new Vector3(rx, 0.15f, rz));
+        GetRearTireSparkPoints(out Vector3 rearL, out Vector3 rearR, out Vector3 sparkBack, out Vector3 sparkRight);
         var back = -Forward;
+        Vector3 carry = (previewLockTimer > 0f) ? Vector3.zero : VelDir * (Speed * 0.78f);
 
         if (drifting)
         {
             int lv = DriftLevel;
-            Color c = lv == 3 ? new Color(1f, 0.3f, 1f) : lv == 2 ? new Color(1f, 0.55f, 0.1f) : lv == 1 ? new Color(0.3f, 0.65f, 1f) : new Color(0.8f, 0.8f, 0.8f, 0.5f);
-            float size = lv == 0 ? 0.5f : 0.35f + lv * 0.08f;
-            var vel = back * 3f + Vector3.up * (lv > 0 ? 3f : 1f);
-            Fx.Emit(rearL, vel, c, size, lv == 0 ? 0.4f : 0.25f, 1, lv > 0 ? 2.5f : 0.8f);
-            Fx.Emit(rearR, vel, c, size, lv == 0 ? 0.4f : 0.25f, 1, lv > 0 ? 2.5f : 0.8f);
-
-            // タイヤスモーク（モクモク広がる白煙）
-            var smokeCol = new Color(0.88f, 0.88f, 0.92f, lv > 0 ? 0.4f : 0.22f);
-            Fx.Smoke(rearL, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
-            Fx.Smoke(rearR, back * 1.5f + Vector3.up * 1f, smokeCol, 0.6f + lv * 0.15f, 0.55f, 1, 0.8f);
-
-            // ドリフト火花スパーク（マリオカート風にタイヤから弾け飛ぶ粒子）
-            if (lv > 0)
+            if (lv == 0)
             {
-                var sparkCol = lv == 3 ? new Color(1f, 0.4f, 1f) : lv == 2 ? new Color(1f, 0.7f, 0.1f) : new Color(0.4f, 0.8f, 1f);
-                Vector3 sparkVelL = -transform.right * Random.Range(2.5f, 5.5f) + Vector3.up * Random.Range(1.5f, 4.5f) + back * Random.Range(0.5f, 2f);
-                Vector3 sparkVelR = transform.right * Random.Range(2.5f, 5.5f) + Vector3.up * Random.Range(1.5f, 4.5f) + back * Random.Range(0.5f, 2f);
-                Fx.Emit(rearL, sparkVelL, sparkCol, 0.22f, 0.18f, 2, 2.5f);
-                Fx.Emit(rearR, sparkVelR, sparkCol, 0.22f, 0.18f, 2, 2.5f);
+                // チャージ開始前：白煙＋タイヤ接地面から真後ろへ跳ねる摩擦火花
+                var preCol = new Color(0.85f, 0.88f, 0.95f, 0.42f);
+                Fx.Emit(rearL, carry + sparkBack * 3f + Vector3.up * 0.6f, preCol, 0.38f, 0.22f, 1, 0.45f);
+                Fx.Emit(rearR, carry + sparkBack * 3f + Vector3.up * 0.6f, preCol, 0.38f, 0.22f, 1, 0.45f);
+                if (Random.value < 0.70f)
+                {
+                    var frictionCol = new Color(1f, 0.82f, 0.32f, 0.90f);
+                    Vector3 fVel = carry + sparkBack * Random.Range(5.0f, 7.5f) + sparkRight * Random.Range(-1.2f, 1.2f) + Vector3.up * Random.Range(0.4f, 1.6f);
+                    Fx.Spark(rearL, fVel, frictionCol, 0.13f, 0.14f, 1, 0.4f);
+                    Fx.Spark(rearR, fVel, frictionCol, 0.13f, 0.14f, 1, 0.4f);
+                }
             }
+            else
+            {
+                GetDriftSparkColors(lv, out Color colMain, out Color colSub, out Color colCore);
+                float popBonus = driftFlarePopTimer > 0f ? 1.22f : 1.0f;
+
+                // 1) 左右リアタイヤの接地後端に密着するプラズマ発光コア（両輪の真下で青/橙/紫に輝く）
+                float orbSize = (0.40f + lv * 0.07f) * popBonus;
+                var orbVel = carry + sparkBack * 1.6f + Vector3.up * 0.35f;
+                Fx.Emit(rearL, orbVel, colMain, orbSize, 0.11f, 1, 0.30f);
+                Fx.Emit(rearR, orbVel, colMain, orbSize, 0.11f, 1, 0.30f);
+                Fx.Emit(rearL, orbVel, colCore, orbSize * 0.62f, 0.09f, 1, 0.18f);
+                Fx.Emit(rearR, orbVel, colCore, orbSize * 0.62f, 0.09f, 1, 0.18f);
+
+                // 2) 左右それぞれのリアタイヤ接地後端から、真後ろへ均等な扇状に迸る高密度レーザー火花シャワー
+                int sparkPairs = 4 + lv * 2; // Lv1=6組(12本), Lv2=8組(16本), Lv3=10組(20本)/frame
+                float spkSize = (0.15f + lv * 0.025f) * popBonus;
+                float spkLife = 0.15f + lv * 0.02f;
+
+                for (int s = 0; s < sparkPairs; s++)
+                {
+                    Color sCol = (s % 3 == 0) ? colCore : ((s % 2 == 1) ? colMain : colSub);
+                    float backSpd = Random.Range(6.0f, 10.0f + lv * 1.6f);
+                    // 両タイヤともタイヤ後端から真後ろを中心に±1.8m/sの自然な扇状コーンで噴射（片側のタイヤ側面へ飛び出すのを防ぐ）
+                    float coneL = Random.Range(-1.8f, 1.4f);
+                    float coneR = Random.Range(-1.4f, 1.8f);
+                    float upSpd = Random.Range(0.35f, 2.2f + lv * 0.45f);
+
+                    Vector3 posL = rearL + sparkRight * Random.Range(-0.10f, 0.10f);
+                    Vector3 posR = rearR + sparkRight * Random.Range(-0.10f, 0.10f);
+                    Vector3 vL = carry + sparkBack * backSpd + sparkRight * coneL + Vector3.up * upSpd;
+                    Vector3 vR = carry + sparkBack * backSpd + sparkRight * coneR + Vector3.up * upSpd;
+                    Fx.Spark(posL, vL, sCol, spkSize, spkLife, 1, 0.40f);
+                    Fx.Spark(posR, vR, sCol, spkSize, spkLife, 1, 0.40f);
+                }
+            }
+
+            // タイヤスモーク（火花の輝きを引き立てる控えめな白煙）
+            var smokeCol = new Color(0.88f, 0.90f, 0.95f, lv > 0 ? 0.15f : 0.22f);
+            Fx.Smoke(rearL, carry * 0.5f + sparkBack * 1.8f + Vector3.up * 0.4f, smokeCol, 0.46f + lv * 0.07f, 0.38f, 1, 0.5f);
+            Fx.Smoke(rearR, carry * 0.5f + sparkBack * 1.8f + Vector3.up * 0.4f, smokeCol, 0.46f + lv * 0.07f, 0.38f, 1, 0.5f);
         }
 
         // スピン中のピヨピヨ星（頭上を回転するスター）
@@ -412,8 +860,8 @@ public partial class Kart
         if (isBraking && Speed > 6f && Random.value < 0.7f)
         {
             var brakeSmoke = new Color(0.9f, 0.9f, 0.92f, 0.3f);
-            Fx.Smoke(rearL, back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
-            Fx.Smoke(rearR, back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
+            Fx.Smoke(rearL, carry * 0.5f + back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
+            Fx.Smoke(rearR, carry * 0.5f + back * 2f + Vector3.up * 0.8f, brakeSmoke, 0.55f, 0.45f, 1, 0.6f);
         }
 
         if (boostTimer > 0)
@@ -423,15 +871,32 @@ public partial class Kart
             float exX = kenneyReady ? 0.28f : 0.35f;
             var exL = transform.TransformPoint(new Vector3(-exX, exY, exZ));
             var exR = transform.TransformPoint(new Vector3(exX, exY, exZ));
-            // オレンジのアフターバーナー炎
-            Fx.Emit(exL, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
-            Fx.Emit(exR, back * 9f + VelDir * Speed * 0.8f, new Color(1f, 0.6f, 0.15f), 0.75f, 0.18f, 2, 1.2f);
-            // コアの青白熱炎
-            Fx.Emit(exL, back * 7f + VelDir * Speed * 0.8f, new Color(0.35f, 0.75f, 1f), 0.45f, 0.12f, 1, 0.4f);
-            Fx.Emit(exR, back * 7f + VelDir * Speed * 0.8f, new Color(0.35f, 0.75f, 1f), 0.45f, 0.12f, 1, 0.4f);
+
+            Color outerFlame = new Color(1.0f, 0.52f, 0.08f, 0.92f);
+            Color innerCore  = new Color(0.20f, 0.82f, 1.0f, 0.95f);
+            if (boostColorLevel == 1)
+            {
+                outerFlame = new Color(0.04f, 0.58f, 1.0f, 0.92f);
+                innerCore  = new Color(0.55f, 0.94f, 1.0f, 0.95f);
+            }
+            else if (boostColorLevel == 3)
+            {
+                outerFlame = new Color(0.96f, 0.14f, 0.88f, 0.92f);
+                innerCore  = new Color(0.55f, 0.22f, 1.0f, 0.95f);
+            }
+
+            // アフターバーナー炎（車体と並走させつつ後方へ噴射することでカメラへの飛び込みを防ぐ）
+            Fx.Emit(exL, carry + back * 5.5f, outerFlame, 0.48f, 0.12f, 1, 0.6f);
+            Fx.Emit(exR, carry + back * 5.5f, outerFlame, 0.48f, 0.12f, 1, 0.6f);
+            Fx.Emit(exL, carry + back * 4.0f, innerCore, 0.32f, 0.09f, 1, 0.3f);
+            Fx.Emit(exR, carry + back * 4.0f, innerCore, 0.32f, 0.09f, 1, 0.3f);
+
+            // ブースト中もタイヤ脇から火花ストリークがV字に迸る
+            Fx.Spark(rearL, carry + back * 6.5f - transform.right * Random.Range(2.0f, 4.8f) + Vector3.up * Random.Range(1.0f, 3.2f), outerFlame, 0.15f, 0.16f, 1, 1.2f);
+            Fx.Spark(rearR, carry + back * 6.5f + transform.right * Random.Range(2.0f, 4.8f) + Vector3.up * Random.Range(1.0f, 3.2f), innerCore, 0.15f, 0.16f, 1, 1.2f);
         }
         if (Offroad && Speed > 6f && Random.value < 0.6f)
-            Fx.Smoke((rearL + rearR) * 0.5f, back * 2.5f + Vector3.up * 1.5f, new Color(0.65f, 0.55f, 0.35f, 0.45f), 0.8f, 0.6f, 1, 1.2f);
+            Fx.Smoke((rearL + rearR) * 0.5f, carry * 0.4f + back * 2.5f + Vector3.up * 1.5f, new Color(0.65f, 0.55f, 0.35f, 0.45f), 0.8f, 0.6f, 1, 1.2f);
         // スリップストリーム（ドラフティング）の風切りストリーム演出
         if (InDraftStream && Speed > 13f)
         {
@@ -439,19 +904,52 @@ public partial class Kart
             var draftPosL = transform.TransformPoint(new Vector3(-sideX, 0.45f, 0.6f));
             var draftPosR = transform.TransformPoint(new Vector3(sideX, 0.45f, 0.6f));
             var streamCol = new Color(0.6f, 0.9f, 1f, 0.75f);
-            Fx.Emit(draftPosL, back * 7f + Vector3.up * 0.5f, streamCol, 0.22f, 0.16f, 1, 0.25f);
-            Fx.Emit(draftPosR, back * 7f + Vector3.up * 0.5f, streamCol, 0.22f, 0.16f, 1, 0.25f);
+            Fx.Emit(draftPosL, carry + back * 5f + Vector3.up * 0.4f, streamCol, 0.20f, 0.14f, 1, 0.25f);
+            Fx.Emit(draftPosR, carry + back * 5f + Vector3.up * 0.4f, streamCol, 0.20f, 0.14f, 1, 0.25f);
         }
 
         if (shieldTimer > 0 && Random.value < 0.5f)
-            Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
+            Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, carry + Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
     }
 
     public void SetPreviewSpeedAndBoost(float previewSpeed, float boostDur = 0f, ItemType previewItem = ItemType.None)
     {
+        Fx.Clear();
+        previewLockTimer = 0.18f;
         Speed = previewSpeed;
+        VelDir = Forward;
+        drifting = false;
+        driftDir = 0;
+        driftCharge = 0f;
+        lastDriftLevel = 0;
         boostTimer = boostDur;
+        if (boostDur > 0f && boostColorLevel == 0) boostColorLevel = 1;
         if (previewItem != ItemType.None) Item = previewItem;
+        visYaw = 0f;
         UpdateVisual(0.05f, 0f);
+        if (boostDur > 0f) Effects(0.016f);
+    }
+
+    public void SetPreviewDrift(int dir, float charge, float previewSpeed = 27.5f, ItemType previewItem = ItemType.None)
+    {
+        Fx.Clear();
+        previewLockTimer = 0.18f;
+        Speed = previewSpeed;
+        VelDir = Forward;
+        drifting = dir != 0 && charge > 0f;
+        driftDir = dir;
+        driftCharge = charge;
+        lastDriftLevel = DriftLevel;
+        driftFlarePopTimer = drifting ? 0.20f : 0f;
+        boostTimer = 0f;
+        if (previewItem != ItemType.None) Item = previewItem;
+        visYaw = drifting ? driftDir * 22f : 0f;
+        steerVis = dir * 0.85f;
+        UpdateVisual(0.05f, dir * 0.85f);
+        if (drifting)
+        {
+            OnDriftLevelUp(DriftLevel);
+            Effects(0.016f);
+        }
     }
 }

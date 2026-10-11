@@ -59,15 +59,20 @@ public partial class RaceManager
 
     void DrawHud(Kart pl, float w, float h, bool compact, int pi)
     {
-        // ──────────────── アイテム枠（角丸ゴールド立体フレーム） ────────────────
+        // ──────────────── アイテム枠（角丸ポップゴールド＆スカイブルー立体フレーム） ────────────────
         var slot = new Rect(24, 20, 114, 114);
+        var slotShadow = TextureGen.RoundedShadow(114, 114, 20f);
+        if (slotShadow != null)
+        {
+            GUI.DrawTexture(new Rect(slot.x + 2, slot.y + 5, slot.width, slot.height), slotShadow);
+        }
         if (itemSlotTex != null)
         {
             GUI.DrawTexture(slot, itemSlotTex);
         }
         else
         {
-            GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+            GUI.color = new Color(0.20f, 0.60f, 0.96f, 0.92f);
             GUI.DrawTexture(slot, Texture2D.whiteTexture);
             GUI.color = Color.white;
             DrawFrame(slot, 3, new Color(1f, 0.85f, 0.25f));
@@ -101,7 +106,7 @@ public partial class RaceManager
 
             if (icon != null)
             {
-                GUI.DrawTexture(new Rect(slot.x + 10, slot.y + 10, slot.width - 20, slot.height - 20), icon, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(new Rect(slot.x + 9, slot.y + 7, slot.width - 18, slot.height - 20), icon, ScaleMode.ScaleToFit);
             }
             else
             {
@@ -113,13 +118,16 @@ public partial class RaceManager
             }
 
             if (pl.RouletteTimer <= 0)
-                Outlined(new Rect(slot.x, slot.yMax - 26, slot.width, 22), "[E] USE", St(sSmall, 15), new Color(1f, 1f, 0.4f), 2);
+            {
+                var usePill = new Rect(slot.x + 15, slot.yMax - 20, slot.width - 30, 22);
+                DrawPopPill(usePill, "[E] USE", new Color(1.0f, 0.78f, 0.12f));
+            }
         }
         else
         {
             // 未所持時はポップな「?」ウォーターマークとラベルを表示
-            GUI.Label(new Rect(slot.x, slot.y + 10, slot.width, slot.height - 28), "?", St(sBig, 52, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(1f, 1f, 1f, 0.16f)));
-            GUI.Label(new Rect(slot.x, slot.yMax - 26, slot.width, 18), "ITEM", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(1f, 0.9f, 0.5f, 0.38f)));
+            Outlined(new Rect(slot.x, slot.y + 8, slot.width, slot.height - 28), "?", St(sBig, 54, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 1f, 1f, 0.55f), 2);
+            Outlined(new Rect(slot.x, slot.yMax - 28, slot.width, 18), "ITEM", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 0.95f, 0.55f, 0.85f), 1.5f);
         }
 
         // ──────────────── ドリフトミニターボゲージ ────────────────

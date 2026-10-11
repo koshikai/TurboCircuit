@@ -20,10 +20,12 @@ public partial class Kart : MonoBehaviour
 
     public string Name;
     public Color Color;
+    public Color DriverColor = Color.white;
     public bool IsPlayer;
     public int PlayerIndex;     // 人間操作時の識別（0 = P1、1 = P2）
     public bool IsRemote;       // オンライン対戦で相手側が計算しているカート（受信した状態を再現するだけ）
-    public int ModelVariant = -1; // 人間操作時に使うキャラのモデル番号（-1 = 自動）
+    public int ModelVariant = -1;  // ドライバーモデル番号（-1 = 自動）
+    public int KartVariant = -1;   // カートマシン番号（-1 = 自動）
     public IKartInputProvider InputProvider { get; set; }
 
     // レース状況
@@ -63,8 +65,9 @@ public partial class Kart : MonoBehaviour
     AudioSource engine3D;
 
     float boostTimer, shieldTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
+    float driftFlarePopTimer;
     bool drifting;
-    int driftDir;
+    int driftDir, lastDriftLevel, boostColorLevel;
     ItemType pendingItem;
     float throttleHeldSince = -1f;
 
@@ -129,14 +132,15 @@ public partial class Kart : MonoBehaviour
 
     public void RebuildModel()
     {
-        if (model != null) Destroy(model.gameObject);
+        if (model != null) { model.SetParent(null); model.gameObject.SetActive(false); Destroy(model.gameObject); model = null; }
+        if (blobShadow != null) { blobShadow.SetParent(null); blobShadow.gameObject.SetActive(false); Destroy(blobShadow.gameObject); blobShadow = null; }
         var spot = transform.Find("HeadlightBeam");
-        if (spot != null) Destroy(spot.gameObject);
+        if (spot != null) { spot.SetParent(null); spot.gameObject.SetActive(false); Destroy(spot.gameObject); }
         var sk0 = transform.Find("Skidmark_0");
-        if (sk0 != null) Destroy(sk0.gameObject);
+        if (sk0 != null) { sk0.SetParent(null); sk0.gameObject.SetActive(false); Destroy(sk0.gameObject); }
         var sk1 = transform.Find("Skidmark_1");
-        if (sk1 != null) Destroy(sk1.gameObject);
-        if (shieldRenderer != null) Destroy(shieldRenderer.gameObject);
+        if (sk1 != null) { sk1.SetParent(null); sk1.gameObject.SetActive(false); Destroy(sk1.gameObject); }
+        if (shieldRenderer != null) { shieldRenderer.transform.SetParent(null); shieldRenderer.gameObject.SetActive(false); Destroy(shieldRenderer.gameObject); shieldRenderer = null; }
 
         BuildModel();
     }
@@ -172,6 +176,10 @@ public partial class Kart : MonoBehaviour
         trickDone = false;
         InDraftStream = false;
         drifting = false;
+        lastDriftLevel = 0;
+        boostColorLevel = 0;
+        driftFlarePopTimer = 0f;
+        previewLockTimer = 0f;
         isBraking = false;
         spinAngle = 0;
         verticalVel = 0;
@@ -185,11 +193,20 @@ public partial class Kart : MonoBehaviour
         UpdateVisual(0, 0);
     }
 
+    float previewLockTimer;
+
     // ───────────────────────── 物理 ─────────────────────────
 
     public void Tick(float dt, bool canDrive)
     {
         if (IsRemote) { RemoteTick(dt); return; }
+        if (previewLockTimer > 0f)
+        {
+            previewLockTimer -= dt;
+            UpdateVisual(dt, drifting ? driftDir * 0.85f : 0f);
+            Effects(dt);
+            return;
+        }
         var inp = InputProvider != null 
             ? InputProvider.GetInput(this, dt) 
             : ((IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt));
@@ -208,6 +225,8 @@ public partial class Kart : MonoBehaviour
         }
 
         boostTimer -= dt;
+        if (boostTimer <= 0) boostColorLevel = 0;
+        driftFlarePopTimer = Mathf.Max(0f, driftFlarePopTimer - dt);
         shieldTimer -= dt;
         invulnTimer -= dt;
 
@@ -229,6 +248,7 @@ public partial class Kart : MonoBehaviour
             Speed = Mathf.MoveTowards(Speed, 0, 22f * dt);
             drifting = false;
             driftCharge = 0;
+            lastDriftLevel = 0;
         }
         else
         {
@@ -292,6 +312,7 @@ public partial class Kart : MonoBehaviour
                     drifting = true;
                     driftDir = inp.steer > 0 ? 1 : -1;
                     driftCharge = 0;
+                    lastDriftLevel = 0;
                 }
             }
             if (drifting && (!inp.drift || Speed < 8f)) ReleaseDrift();
@@ -315,6 +336,13 @@ public partial class Kart : MonoBehaviour
                 float s = Mathf.Lerp(0.45f, 1.4f, (inp.steer * driftDir + 1f) * 0.5f);
                 turn = driftDir * s * 80f;
                 driftCharge += dt * (0.75f + 0.5f * Mathf.Max(0, inp.steer * driftDir));
+                int curLv = DriftLevel;
+                if (curLv > lastDriftLevel)
+                {
+                    lastDriftLevel = curLv;
+                    driftFlarePopTimer = 0.28f;
+                    OnDriftLevelUp(curLv);
+                }
             }
             else
             {
@@ -510,8 +538,8 @@ public partial class Kart : MonoBehaviour
             engine3D.volume = Mathf.MoveTowards(engine3D.volume, targetVol, dt * 2.0f);
         }
 
-        Effects(dt);
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
+        Effects(dt);
     }
 
     void ReleaseDrift()
@@ -519,19 +547,24 @@ public partial class Kart : MonoBehaviour
         int lv = DriftLevel;
         drifting = false;
         driftCharge = 0;
+        lastDriftLevel = 0;
         if (IsPlayer)
         {
             GamepadHaptics.SetDrift(PlayerIndex, 0);
             if (lv > 0)
             {
+                boostColorLevel = lv;
                 Boost(0.35f + 0.35f * lv);
+                OnDriftReleaseBoost(lv);
                 rm.Audio.Pop(lv);
-                GamepadHaptics.Vibrate(PlayerIndex, 0.25f, 0.65f + 0.12f * lv, 0.25f);
+                GamepadHaptics.Vibrate(PlayerIndex, 0.28f, 0.68f + 0.10f * lv, 0.26f);
             }
         }
         else if (lv > 0)
         {
+            boostColorLevel = lv;
             Boost(0.35f + 0.35f * lv);
+            OnDriftReleaseBoost(lv);
         }
     }
 
@@ -669,6 +702,38 @@ public class KartData : ScriptableObject
             driver = driverName,
             trait = trait,
             color = signatureColor,
+            speed = speed,
+            accel = accel,
+            handling = handling,
+            weight = weight
+        };
+    }
+}
+
+// カートマシン（車体）定義の ScriptableObject
+[CreateAssetMenu(fileName = "NewKartMachineData", menuName = "Turbo Circuit/Kart Machine Data")]
+public class KartMachineData : ScriptableObject
+{
+    [Header("Machine Profile")]
+    public string machineName = "STANDARD";
+    public string codeName = "STD-01";
+    public string trait = "Balanced All-Rounder";
+    public Color bodyColor = new Color(0.95f, 0.25f, 0.25f);
+
+    [Header("Performance (1-8, 5 is standard)")]
+    [Range(1, 8)] public int speed = 5;
+    [Range(1, 8)] public int accel = 5;
+    [Range(1, 8)] public int handling = 5;
+    [Range(1, 8)] public int weight = 5;
+
+    public KartMachineDef ToDef()
+    {
+        return new KartMachineDef
+        {
+            name = machineName,
+            code = codeName,
+            trait = trait,
+            color = bodyColor,
             speed = speed,
             accel = accel,
             handling = handling,

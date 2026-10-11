@@ -888,37 +888,75 @@ public static class TextureGen
         return tex;
     }
 
-    // 角丸の立体感あるアイテムスロット枠（ゴールド光沢フレーム＋ダークインナー）
+    // 角丸の立体感あるポップ・アーケード調アイテムスロット枠（太いネイビー縁＋キャンディゴールド枠＋明るいスカイブルー放射インナー）
     public static Texture2D ItemSlotFrame(int size = 114)
     {
-        string key = $"itemslot_{size}";
+        string key = $"itemslot_pop_{size}";
         if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
         var px = new Color[size * size];
-        float radius = 16f;
-        Color outerGold = new Color(1f, 0.85f, 0.25f, 1f);
-        Color innerDark = new Color(0.08f, 0.10f, 0.16f, 0.90f);
-        Color glowGold = new Color(1f, 0.65f, 0.1f, 0.7f);
+        float radius = 20f;
+        Color navyOutline = new Color(0.06f, 0.10f, 0.20f, 0.96f);
+        Color goldTop     = new Color(1.00f, 0.92f, 0.32f, 1.00f);
+        Color goldBot     = new Color(0.96f, 0.66f, 0.08f, 1.00f);
+        Color innerCenter = new Color(0.55f, 0.88f, 1.00f, 0.94f);
+        Color innerEdge   = new Color(0.18f, 0.56f, 0.95f, 0.92f);
 
+        float half = (size - 1) * 0.5f;
         for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
         {
-            float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - radius) : 0);
-            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - radius) : 0);
-            float dist = Mathf.Sqrt(cx * cx + cy * cy);
-            if (dist > radius)
+            float ty = y / (float)(size - 1);
+            Color goldGrad = Color.Lerp(goldBot, goldTop, ty);
+            if (ty > 0.68f) goldGrad = Color.Lerp(goldGrad, Color.white, (ty - 0.68f) * 1.1f);
+
+            float cy = y < radius ? radius - y : (y >= size - radius ? y - (size - 1 - radius) : 0f);
+            for (int x = 0; x < size; x++)
             {
-                px[y * size + x] = Color.clear;
-                continue;
+                float cx = x < radius ? radius - x : (x >= size - radius ? x - (size - 1 - radius) : 0f);
+                float cornerDist = Mathf.Sqrt(cx * cx + cy * cy);
+                if (cornerDist > radius + 0.5f)
+                {
+                    px[y * size + x] = Color.clear;
+                    continue;
+                }
+
+                float aa = Mathf.Clamp01(radius + 0.5f - cornerDist);
+                float edgeDist = Mathf.Min(Mathf.Min(x, size - 1 - x), Mathf.Min(y, size - 1 - y));
+                if (cx > 0f && cy > 0f) edgeDist = Mathf.Min(edgeDist, radius - cornerDist);
+
+                Color c;
+                if (edgeDist < 2.5f)
+                {
+                    c = navyOutline;
+                }
+                else if (edgeDist < 8.5f)
+                {
+                    c = goldGrad;
+                }
+                else if (edgeDist < 10.5f)
+                {
+                    c = Color.white;
+                }
+                else
+                {
+                    float rx = (x - half) / half;
+                    float ry = (y - half * 1.08f) / half;
+                    float rad01 = Mathf.Clamp01(Mathf.Sqrt(rx * rx + ry * ry));
+                    c = Color.Lerp(innerCenter, innerEdge, rad01 * rad01);
+                    // 上部キャンディハイライト
+                    if (ty > 0.55f && edgeDist > 12f)
+                    {
+                        c = Color.Lerp(c, Color.white, (ty - 0.55f) * 0.42f);
+                    }
+                }
+
+                c.a *= aa;
+                px[y * size + x] = c;
             }
-
-            bool isBorder = x < 4 || x >= size - 4 || y < 4 || y >= size - 4 || (dist >= radius - 4);
-            bool isInnerGlow = (x >= 4 && x < 8) || (x >= size - 8 && x < size - 4) || (y >= 4 && y < 8) || (y >= size - 8 && y < size - 4);
-
-            px[y * size + x] = isBorder ? outerGold : isInnerGlow ? Color.Lerp(innerDark, glowGold, 0.5f) : innerDark;
         }
         var tex = New(size, size, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         cache[key] = tex;
         return tex;
     }
@@ -1458,5 +1496,34 @@ public static class TextureGen
         cache[key] = tex;
         return tex;
     }
+
+    // ドリフト・ターボ火花用の鋭い光の筋（スパークストリーク）テクスチャ
+    public static Texture2D SparkStreak()
+    {
+        const string key = "spark_streak";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 64;
+        var px = new Color[n * n];
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float nx = (x - (n - 1) * 0.5f) / (n * 0.5f);
+            float ny = (y - (n - 1) * 0.5f) / (n * 0.5f);
+            float d = Mathf.Sqrt(nx * nx + ny * ny);
+            // 中心の強いコア＋十字・ダイヤ状の鋭い光芒
+            float core = Mathf.Clamp01(1f - d * 1.15f);
+            float diamond = Mathf.Clamp01(1f - (Mathf.Abs(nx) * 0.85f + Mathf.Abs(ny) * 0.85f));
+            float crossX = Mathf.Exp(-Mathf.Abs(ny) * 6.5f) * Mathf.Clamp01(1f - Mathf.Abs(nx));
+            float crossY = Mathf.Exp(-Mathf.Abs(nx) * 6.5f) * Mathf.Clamp01(1f - Mathf.Abs(ny));
+            float a = Mathf.Clamp01(core * core * 0.85f + diamond * 0.55f + (crossX + crossY) * 0.45f);
+            px[y * n + x] = new Color(1f, 1f, 1f, a);
+        }
+        var t = New(n, n, px, false);
+        t.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = t;
+        return t;
+    }
 }
+
 

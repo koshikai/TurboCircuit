@@ -12,7 +12,7 @@ public partial class RaceManager
     void OnNetHostClientConnected(Unity.Networking.Transport.NetworkConnection conn)
     {
         if (TwoPlayer) SetTwoPlayer(false);
-        playerKarts[5] = SelectedKart;
+        playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart);
         // 未割り当ての人間スロットを探す
         int nextSlot = HumanSlots.FirstOrDefault(s => !playerKarts.ContainsKey(s));
         if (nextSlot == 0 && playerKarts.ContainsKey(0)) nextSlot = 6;
@@ -40,7 +40,8 @@ public partial class RaceManager
     {
         if (clientSlots.TryGetValue(conn, out int slot))
         {
-            playerKarts[slot] = Mathf.Clamp(kartChar, 0, KartCharacters.Length - 1);
+            UnpackDriverKart(kartChar, out int drv, out int krt);
+            playerKarts[slot] = PackDriverKart(drv, krt);
             playerNames[slot] = string.IsNullOrEmpty(pName) ? $"P{slot + 1}" : pName;
             SyncLobby();
         }
@@ -49,15 +50,16 @@ public partial class RaceManager
     void OnNetClientConnected()
     {
         if (TwoPlayer) SetTwoPlayer(false);
+        int packed = PackDriverKart(SelectedDriver, SelectedKart);
         if (Net.IsHost)
         {
-            playerKarts[5] = SelectedKart;
+            playerKarts[5] = packed;
             playerNames[5] = DisplayName;
             SyncLobby();
         }
         else
         {
-            Net.SendHello(SelectedKart, DisplayName);
+            Net.SendHello(packed, DisplayName);
         }
         if (Audio != null) Audio.Select();
     }
@@ -74,7 +76,7 @@ public partial class RaceManager
             if (i != mySlot) Karts[i].IsRemote = true;
         }
         if (SelectedCourse != course) LoadCourse(course);
-        Net.SendHello(SelectedKart, DisplayName);
+        Net.SendHello(PackDriverKart(SelectedDriver, SelectedKart), DisplayName);
         if (Audio != null) Audio.Select();
     }
 
@@ -92,7 +94,7 @@ public partial class RaceManager
 
     void SyncLobby()
     {
-        playerKarts[5] = SelectedKart;
+        playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart);
         playerNames[5] = DisplayName;
         var list = playerKarts.Select(kv => (kv.Key, kv.Value, playerNames.TryGetValue(kv.Key, out var n) ? n : (kv.Key == 5 ? DisplayName : $"P{kv.Key + 1}"))).ToList();
         Net.SendLobbySync(list);
@@ -105,12 +107,16 @@ public partial class RaceManager
         foreach (var kv in playerKarts)
         {
             int slot = kv.Key;
-            int kIdx = Mathf.Clamp(kv.Value, 0, KartCharacters.Length - 1);
-            var d = KartCharacters[kIdx];
+            UnpackDriverKart(kv.Value, out int drvIdx, out int krtIdx);
+            var d = KartCharacters[drvIdx];
+            var m = KartMachines[krtIdx];
             var k = Karts[slot];
-            k.ModelVariant = kIdx;
-            k.Color = d.color;
-            k.ApplyStats(d.speed, d.accel, d.handling, d.weight);
+            k.ModelVariant = drvIdx;
+            k.KartVariant = krtIdx;
+            k.DriverColor = d.color;
+            k.Color = m.color;
+            GetCombinedStats(drvIdx, krtIdx, out int spd, out int acc, out int hdl, out int wgt);
+            k.ApplyStats(spd, acc, hdl, wgt);
 
             int order = System.Array.IndexOf(HumanSlots, slot);
             string customName = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : "";
@@ -153,11 +159,15 @@ public partial class RaceManager
     {
         int ai = slot < playerGridSlot ? slot : slot - 1;
         bool named = slot != playerGridSlot;
+        int aiDrv = (ai + 2) % KartCharacters.Length;
+        int aiKrt = (ai + 1) % KartMachines.Length;
         k.IsPlayer = false;
         k.IsRemote = false;
         k.PlayerIndex = 0;
-        k.ModelVariant = -1;
+        k.ModelVariant = aiDrv;
+        k.KartVariant = aiKrt;
         k.Name = named ? AiNames[ai] : "Guest";
+        k.DriverColor = KartCharacters[aiDrv].color;
         k.Color = named ? AiColors[ai] : new Color(0.7f, 0.75f, 0.85f);
         k.ApplyStats(5, 5, 5, 5);
         k.RebuildModel();
@@ -257,9 +267,9 @@ public partial class RaceManager
 
         int rows = back > 0 ? 2 : 1;
         float width = spacing * (front - 1) + 3.5f;
-        float dist = Mathf.Max(7.2f, width * 0.72f) + (rows - 1) * 3.0f;
+        float dist = Mathf.Max(8.6f, width * 0.84f) + (rows - 1) * 2.4f;
         var center = origin - dir * ((rows - 1) * rowGap * 0.5f);
-        var camPos = center + dir * dist + right * 0.8f + Vector3.up * (2.4f + (rows - 1) * 2.0f);
+        var camPos = center + dir * dist + right * 0.1f + Vector3.up * (2.5f + (rows - 1) * 1.9f);
         var look = center + Vector3.up * (rows == 1 ? 0.65f : 0.85f);
         float k2 = 1f - Mathf.Exp(-5f * dt);
         cam.transform.position = Vector3.Lerp(cam.transform.position, camPos, k2);
@@ -369,21 +379,24 @@ public partial class RaceManager
         {
             int slot = sortedSlots[i];
             int orderIndex = lobbySlots.IndexOf(slot);
-            var d = KartCharacters[Mathf.Clamp(playerKarts[slot], 0, KartCharacters.Length - 1)];
-            var sp = cam.WorldToScreenPoint(Karts[slot].transform.position + Vector3.up * 1.85f);
+            UnpackDriverKart(playerKarts[slot], out int drvIdx, out int krtIdx);
+            var d = KartCharacters[drvIdx];
+            var m = KartMachines[krtIdx];
+            var sp = cam.WorldToScreenPoint(Karts[slot].transform.position + Vector3.up * 1.75f);
             if (sp.z <= 0f) continue;
             float gx = sp.x / scale, gy = (Screen.height - sp.y) / scale;
 
-            // 上部バー（ROOM CODE等）や下部操作パネルへの侵入を防止する安全ガード
+            // 上部バー（ROOM CODE等）・左右画面端・下部操作パネルへの侵入を防止する安全ガード
+            float tw = 186f;
+            gx = Mathf.Clamp(gx, tw * 0.5f + 12f, w - tw * 0.5f - 12f);
             gy = Mathf.Clamp(gy, 136f, py - 30f);
 
             bool me = slot == mySlot;
             string custom = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : (me ? DisplayName : (slot == 5 ? "HOST" : $"P{orderIndex + 1}"));
             string role = me ? (slot == 5 ? "YOU · HOST" : "YOU") : (slot == 5 ? "HOST" : $"P{orderIndex + 1}");
-            float tw = 160f;
             var bg = me ? new Color(0.15f, 0.7f, 0.38f) : new Color(0.16f, 0.2f, 0.4f);
             DrawPopPill(new Rect(gx - tw / 2, gy - 44, tw, 20), $"{role}: {custom}", bg);
-            DrawPopPill(new Rect(gx - tw / 2, gy - 22, tw, 22), d.name, d.color * 0.85f);
+            DrawPopPill(new Rect(gx - tw / 2, gy - 22, tw, 22), $"{d.name} • {m.name}", m.color * 0.85f);
         }
 
         // 下部パネル
@@ -392,20 +405,29 @@ public partial class RaceManager
         GUI.color = Color.white;
         DrawFrame(new Rect(0, py, w, 190), 1, new Color(1f, 0.85f, 0.25f, 0.5f));
 
-        // 左：自分のドライバー
-        var me2 = KartCharacters[SelectedKart];
-        var card = new Rect(24, py + 14, 340, 164);
+        // 左：自分のドライバー＆マシン選択
+        var myDrv = KartCharacters[Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1)];
+        var myKrt = KartMachines[Mathf.Clamp(SelectedKart, 0, KartMachines.Length - 1)];
+        GetCombinedStats(SelectedDriver, SelectedKart, out int spd, out int acc, out int hdl, out int wgt);
+        var card = new Rect(24, py + 12, 380, 166);
         DrawPopCard(card);
-        Outlined(new Rect(card.x + 8, card.y + 6, card.width - 16, 28), $"< {me2.name} >", St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), me2.color, 2);
-        DrawPopPill(new Rect(card.x + 20, card.y + 38, card.width - 40, 20), me2.trait, me2.color * 0.9f);
-        float gy0 = card.y + 66;
-        DrawToonStatGauge(card.x + 20, gy0 + 0, card.width - 40, "SPEED", me2.speed, 8, new Color(0.08f, 0.72f, 0.98f));
-        DrawToonStatGauge(card.x + 20, gy0 + 22, card.width - 40, "ACCEL", me2.accel, 8, new Color(1f, 0.72f, 0.05f));
-        DrawToonStatGauge(card.x + 20, gy0 + 44, card.width - 40, "STEER", me2.handling, 8, new Color(0.25f, 0.85f, 0.35f));
-        GUI.Label(new Rect(card.x + 10, card.y + 138, card.width - 20, 20), "[W][S]  change driver", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.45f, 0.5f, 0.65f)));
+        if (DrawModernButton(new Rect(card.x + 12, card.y + 8, 30, 26), "◄", "", myDrv.color)) SwitchDriver(0, -1);
+        Outlined(new Rect(card.x + 44, card.y + 7, card.width - 88, 28), $"DRIVER: {myDrv.name}", St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myDrv.color, 1.5f);
+        if (DrawModernButton(new Rect(card.xMax - 42, card.y + 8, 30, 26), "►", "", myDrv.color)) SwitchDriver(0, 1);
+
+        if (DrawModernButton(new Rect(card.x + 12, card.y + 38, 30, 26), "◄", "", myKrt.color)) SwitchKart(0, -1);
+        Outlined(new Rect(card.x + 44, card.y + 37, card.width - 88, 28), $"KART: {myKrt.name}", St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myKrt.color, 1.5f);
+        if (DrawModernButton(new Rect(card.xMax - 42, card.y + 38, 30, 26), "►", "", myKrt.color)) SwitchKart(0, 1);
+
+        float gy0 = card.y + 70;
+        DrawToonStatGauge(card.x + 18, gy0 + 0, card.width - 36, "SPEED", spd, 8, new Color(0.08f, 0.72f, 0.98f));
+        DrawToonStatGauge(card.x + 18, gy0 + 19, card.width - 36, "ACCEL", acc, 8, new Color(1f, 0.72f, 0.05f));
+        DrawToonStatGauge(card.x + 18, gy0 + 38, card.width - 36, "STEER", hdl, 8, new Color(0.25f, 0.85f, 0.35f));
+        DrawToonStatGauge(card.x + 18, gy0 + 57, card.width - 36, "WEIGHT", wgt, 8, new Color(0.95f, 0.42f, 0.25f));
+        GUI.Label(new Rect(card.x + 10, card.y + 146, card.width - 20, 18), "[W][S] Driver   •   [Q][E] Kart", St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.45f, 0.5f, 0.65f)));
 
         // 中央：スタート
-        float cx = w / 2;
+        float cx = w / 2 + 16f;
         if (Net.IsHost)
         {
             float pulse = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;

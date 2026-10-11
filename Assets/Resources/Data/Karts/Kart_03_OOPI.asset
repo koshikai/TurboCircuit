@@ -18,5 +18,5 @@ MonoBehaviour:
   signatureColor: {r: 1, g: 0.62, b: 0.12, a: 1}
   speed: 4
   accel: 6
-  handling: 8
+  handling: 7
   weight: 3

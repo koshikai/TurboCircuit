@@ -106,6 +106,24 @@ public partial class Kart
             driftDir = net.DriftDir == 0 ? 1 : net.DriftDir;
             driftCharge = net.DriftLevel == 3 ? 2.7f : net.DriftLevel == 2 ? 1.7f : net.DriftLevel == 1 ? 0.9f : 0f;
             boostTimer = (f & NetKartState.FBoost) != 0 ? 0.3f : 0f;
+            if (boostTimer <= 0) boostColorLevel = 0;
+            driftFlarePopTimer = Mathf.Max(0f, driftFlarePopTimer - dt);
+            int curLv = drifting ? DriftLevel : 0;
+            if (curLv > lastDriftLevel)
+            {
+                lastDriftLevel = curLv;
+                driftFlarePopTimer = 0.28f;
+                OnDriftLevelUp(curLv);
+            }
+            else if (!drifting)
+            {
+                if (lastDriftLevel > 0 && boostTimer > 0)
+                {
+                    boostColorLevel = lastDriftLevel;
+                    OnDriftReleaseBoost(lastDriftLevel);
+                }
+                lastDriftLevel = 0;
+            }
             shieldTimer = (f & NetKartState.FShield) != 0 ? 3f : 0f;
             spinTimer = (f & NetKartState.FSpin) != 0 ? 0.3f : 0f;
             isAirborne = (f & NetKartState.FAir) != 0;
@@ -126,7 +144,7 @@ public partial class Kart
             skidTrails[0].emitting = skidding;
             skidTrails[1].emitting = skidding;
         }
-        Effects(dt);
         UpdateVisual(dt, spinTimer > 0 ? 0 : net.Steer);
+        Effects(dt);
     }
 }

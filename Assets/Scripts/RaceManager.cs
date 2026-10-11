@@ -17,6 +17,19 @@ public struct KartCharacterDef
     public int weight;    // 1〜8
 }
 
+[System.Serializable]
+public struct KartMachineDef
+{
+    public string name;
+    public string code;
+    public string trait;
+    public Color color;
+    public int speed;     // 1〜8
+    public int accel;     // 1〜8
+    public int handling;  // 1〜8
+    public int weight;    // 1〜8
+}
+
 // レース全体の進行・順位・アイテム・カメラ・UI
 public partial class RaceManager : MonoBehaviour
 {
@@ -79,6 +92,9 @@ public partial class RaceManager : MonoBehaviour
     // ローカル対戦（2P 画面分割）。インデックス 0 = P1、1 = P2
     public bool TwoPlayer { get; private set; }
     public Kart Player2 { get; private set; }
+    public int SelectedDriver { get; private set; } = 0;
+    public int SelectedDriver2 { get; private set; } = 1;
+    public int SelectedKart { get; private set; } = 0;
     public int SelectedKart2 { get; private set; } = 1;
     int P2Slot => playerGridSlot - 1;
     readonly float[] lapStart = new float[2], bestLap = new float[2], camYaws = new float[2];
@@ -93,7 +109,7 @@ public partial class RaceManager : MonoBehaviour
     public bool Online => Net != null && (Net.Connected || (Net.IsHost && Net.State == NetSession.Phase.Waiting));
     public static readonly int[] HumanSlots = { 5, 4, 3, 2, 1, 0, 6, 7 };
     int mySlot = 5;
-    readonly Dictionary<int, int> playerKarts = new Dictionary<int, int>(); // slot -> kartCharIdx
+    readonly Dictionary<int, int> playerKarts = new Dictionary<int, int>(); // slot -> packed (driverIdx | (kartIdx << 4))
     readonly Dictionary<Unity.Networking.Transport.NetworkConnection, int> clientSlots = new Dictionary<Unity.Networking.Transport.NetworkConnection, int>();
     bool LobbyActive => state == State.Title && Net != null && Net.Busy && playerKarts.Count > 0;
     public int OnlinePlayerCount => Net != null && Net.Busy ? Mathf.Max(1, playerKarts.Count) : 1;
@@ -128,7 +144,8 @@ public partial class RaceManager : MonoBehaviour
         if (n == playerName) return;
         playerName = n;
         PlayerPrefs.SetString("tc_player_name", playerName);
-        if (Player != null && !TwoPlayer) Player.Name = $"{DisplayName} ({KartCharacters[SelectedKart].name})";
+        if (Player != null && !TwoPlayer)
+            Player.Name = $"{DisplayName} ({KartCharacters[SelectedDriver].name}/{KartMachines[SelectedKart].name})";
     }
 
     void CloseSettings()
@@ -166,27 +183,85 @@ public partial class RaceManager : MonoBehaviour
     Texture2D circleDotTex, speedoPlateTex;
     System.Func<Vector3, Vector2> toMap;
 
+    // ───────────────────────── 全10種類のドライバー（キャラクター）定義 ─────────────────────────
     public static readonly KartCharacterDef[] DefaultKartCharacters =
     {
-        new KartCharacterDef { 
+        new KartCharacterDef {
             name = "OOBI", driver = "Alien Ace", trait = "Balanced / All-Rounder", color = new Color(0.95f, 0.25f, 0.25f),
-            speed = 5, accel = 5, handling = 5, weight = 5 
+            speed = 5, accel = 5, handling = 5, weight = 5
         },
-        new KartCharacterDef { 
+        new KartCharacterDef {
             name = "OODI", driver = "Pink Dash", trait = "High Drift & Turbo Boost", color = new Color(0.98f, 0.38f, 0.78f),
-            speed = 4, accel = 7, handling = 6, weight = 3 
+            speed = 4, accel = 7, handling = 6, weight = 3
         },
-        new KartCharacterDef { 
+        new KartCharacterDef {
             name = "OOLI", driver = "Aero Sonic", trait = "Maximum Top Speed", color = new Color(0.18f, 0.65f, 1.0f),
-            speed = 8, accel = 4, handling = 4, weight = 6 
+            speed = 7, accel = 4, handling = 4, weight = 6
         },
-        new KartCharacterDef { 
+        new KartCharacterDef {
             name = "OOPI", driver = "Racer Swift", trait = "Sharp Handling & Turn", color = new Color(1.0f, 0.62f, 0.12f),
-            speed = 4, accel = 6, handling = 8, weight = 3 
+            speed = 4, accel = 6, handling = 7, weight = 3
         },
-        new KartCharacterDef { 
+        new KartCharacterDef {
             name = "OOZI", driver = "Cool Titan", trait = "Heavy Weight & High Grip", color = new Color(0.22f, 0.88f, 0.38f),
-            speed = 6, accel = 3, handling = 4, weight = 8 
+            speed = 6, accel = 3, handling = 4, weight = 7
+        },
+        new KartCharacterDef {
+            name = "PANDA", driver = "Bamboo Boss", trait = "Heavyweight Brawler", color = new Color(0.18f, 0.80f, 0.62f),
+            speed = 6, accel = 4, handling = 4, weight = 7
+        },
+        new KartCharacterDef {
+            name = "PENGUIN", driver = "Ice Slider", trait = "Smooth Ice Drifter", color = new Color(0.22f, 0.78f, 0.98f),
+            speed = 4, accel = 6, handling = 7, weight = 4
+        },
+        new KartCharacterDef {
+            name = "FOX", driver = "Nitro Kitsune", trait = "Agile Speedster", color = new Color(1.0f, 0.48f, 0.14f),
+            speed = 6, accel = 6, handling = 6, weight = 3
+        },
+        new KartCharacterDef {
+            name = "BUNNY", driver = "Hopper Star", trait = "Featherweight Dash", color = new Color(0.74f, 0.42f, 0.98f),
+            speed = 3, accel = 7, handling = 7, weight = 3
+        },
+        new KartCharacterDef {
+            name = "LION", driver = "Golden King", trait = "Royal Top Speed", color = new Color(1.0f, 0.76f, 0.12f),
+            speed = 7, accel = 4, handling = 4, weight = 7
+        },
+    };
+
+    // ───────────────────────── 全8種類のカートマシン（車体）定義 ─────────────────────────
+    public static readonly KartMachineDef[] DefaultKartMachines =
+    {
+        new KartMachineDef {
+            name = "STANDARD", code = "STD-01", trait = "Balanced All-Rounder", color = new Color(0.95f, 0.25f, 0.25f),
+            speed = 5, accel = 5, handling = 5, weight = 5
+        },
+        new KartMachineDef {
+            name = "PIPE BUGGY", code = "BUG-02", trait = "Light & Quick Accel", color = new Color(1.0f, 0.55f, 0.12f),
+            speed = 4, accel = 7, handling = 6, weight = 3
+        },
+        new KartMachineDef {
+            name = "MACH FORMULA", code = "GP-03", trait = "High-Speed Aero Wing", color = new Color(0.15f, 0.55f, 1.0f),
+            speed = 7, accel = 4, handling = 5, weight = 5
+        },
+        new KartMachineDef {
+            name = "MONSTER", code = "MON-04", trait = "Heavy Off-Road Tire", color = new Color(0.20f, 0.82f, 0.35f),
+            speed = 6, accel = 3, handling = 3, weight = 7
+        },
+        new KartMachineDef {
+            name = "CYBER GT", code = "CYB-05", trait = "Neon Drift Machine", color = new Color(0.88f, 0.22f, 0.95f),
+            speed = 6, accel = 6, handling = 6, weight = 4
+        },
+        new KartMachineDef {
+            name = "ROADSTER", code = "RET-06", trait = "Classic Smooth Turn", color = new Color(0.96f, 0.76f, 0.18f),
+            speed = 5, accel = 6, handling = 7, weight = 4
+        },
+        new KartMachineDef {
+            name = "MUSCLE V8", code = "MUS-07", trait = "Supercharged Power", color = new Color(0.48f, 0.25f, 0.95f),
+            speed = 7, accel = 4, handling = 3, weight = 7
+        },
+        new KartMachineDef {
+            name = "JET POD", code = "JET-08", trait = "Twin-Turbine Rocket", color = new Color(0.12f, 0.85f, 0.95f),
+            speed = 7, accel = 6, handling = 4, weight = 4
         },
     };
 
@@ -198,7 +273,7 @@ public partial class RaceManager : MonoBehaviour
             if (runtimeKartCharacters == null)
             {
                 var loaded = Resources.LoadAll<KartData>("Data/Karts");
-                if (loaded != null && loaded.Length > 0)
+                if (loaded != null && loaded.Length >= DefaultKartCharacters.Length)
                 {
                     System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
                     runtimeKartCharacters = loaded.Select(k => k.ToDef()).ToArray();
@@ -212,7 +287,51 @@ public partial class RaceManager : MonoBehaviour
         }
     }
 
-    public int SelectedKart { get; private set; } = 0;
+    static KartMachineDef[] runtimeKartMachines;
+    public static KartMachineDef[] KartMachines
+    {
+        get
+        {
+            if (runtimeKartMachines == null)
+            {
+                var loaded = Resources.LoadAll<KartMachineData>("Data/Machines");
+                if (loaded != null && loaded.Length >= DefaultKartMachines.Length)
+                {
+                    System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
+                    runtimeKartMachines = loaded.Select(m => m.ToDef()).ToArray();
+                }
+                else
+                {
+                    runtimeKartMachines = DefaultKartMachines;
+                }
+            }
+            return runtimeKartMachines;
+        }
+    }
+
+    public static void GetCombinedStats(int driverIdx, int kartIdx, out int speed, out int accel, out int handling, out int weight)
+    {
+        var d = KartCharacters[Mathf.Clamp(driverIdx, 0, KartCharacters.Length - 1)];
+        var m = KartMachines[Mathf.Clamp(kartIdx, 0, KartMachines.Length - 1)];
+        speed    = Mathf.Clamp(d.speed + m.speed - 5, 1, 8);
+        accel    = Mathf.Clamp(d.accel + m.accel - 5, 1, 8);
+        handling = Mathf.Clamp(d.handling + m.handling - 5, 1, 8);
+        weight   = Mathf.Clamp(d.weight + m.weight - 5, 1, 8);
+    }
+
+    public static int PackDriverKart(int driverIdx, int kartIdx)
+    {
+        int d = Mathf.Clamp(driverIdx, 0, 15) & 0x0F;
+        int k = Mathf.Clamp(kartIdx, 0, 15) & 0x0F;
+        return d | (k << 4);
+    }
+
+    public static void UnpackDriverKart(int packed, out int driverIdx, out int kartIdx)
+    {
+        driverIdx = Mathf.Clamp(packed & 0x0F, 0, KartCharacters.Length - 1);
+        kartIdx = Mathf.Clamp((packed >> 4) & 0x0F, 0, KartMachines.Length - 1);
+    }
+
     float stickNavTimer = 0f;
 
     static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
@@ -231,6 +350,7 @@ public partial class RaceManager : MonoBehaviour
         testBoostRequested = args.Contains("-testboost");
         autoShotRequested = args.Contains("-autoshot");
         previewSpectatorsRequested = args.Contains("-preview-spectators");
+        ParseVerifyArgs(args);
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "-shotdelay" && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float d))
@@ -291,14 +411,16 @@ public partial class RaceManager : MonoBehaviour
         QualitySettings.shadowCascades = 4;
         QualitySettings.shadowResolution = UnityEngine.ShadowResolution.High;
 
-        // コマンドライン引数 -course の解析
+        // コマンドライン引数 -course, -driver, -kart の解析
         int cIdx = 0;
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i] == "-course" && int.TryParse(args[i + 1], out int parsed))
                 cIdx = parsed;
+            if (args[i] == "-driver" && int.TryParse(args[i + 1], out int parsedDriver))
+                SelectedDriver = Mathf.Clamp(parsedDriver, 0, KartCharacters.Length - 1);
             if (args[i] == "-kart" && int.TryParse(args[i + 1], out int parsedKart))
-                SelectedKart = Mathf.Clamp(parsedKart, 0, KartCharacters.Length - 1);
+                SelectedKart = Mathf.Clamp(parsedKart, 0, KartMachines.Length - 1);
         }
 
         track = new GameObject("Track").AddComponent<Track>();
@@ -312,10 +434,19 @@ public partial class RaceManager : MonoBehaviour
             bool isPlayer = i == playerGridSlot;
             int ai = i < playerGridSlot ? i : i - 1;
             GridSlot(i, out int idx, out float lat);
-            string kName = isPlayer ? ("YOU (" + KartCharacters[SelectedKart].name + ")") : AiNames[ai];
-            Color kCol = isPlayer ? KartCharacters[SelectedKart].color : AiColors[ai];
+            int dIdx = isPlayer ? SelectedDriver : ((ai + 3) % KartCharacters.Length);
+            int mIdx = isPlayer ? SelectedKart : ((ai + 1) % KartMachines.Length);
+            k.ModelVariant = dIdx;
+            k.KartVariant = mIdx;
+            k.DriverColor = KartCharacters[dIdx].color;
+            string kName = isPlayer
+                ? $"{DisplayName} ({KartCharacters[dIdx].name}/{KartMachines[mIdx].name})"
+                : $"{AiNames[ai]} ({KartCharacters[dIdx].name})";
+            Color kCol = isPlayer ? KartMachines[mIdx].color : AiColors[ai];
             float skill = isPlayer ? 1f : Mathf.Lerp(1.02f, 0.94f, (float)i / 7f);
             k.Init(this, track, kName, kCol, isPlayer, idx, lat, skill);
+            GetCombinedStats(dIdx, mIdx, out int spd, out int acc, out int hnd, out int wgt);
+            k.ApplyStats(spd, acc, hnd, wgt);
             Karts.Add(k);
             placeOrder.Add(k);
             if (isPlayer) { Player = k; ApplyKartStats(); }
@@ -351,6 +482,7 @@ public partial class RaceManager : MonoBehaviour
 
     void Start()
     {
+        if (TryStartVerifyCoroutine()) return;
         if (previewSpectatorsRequested) StartCoroutine(CaptureSpectatorPreviews());
         else if (autoShotRequested) StartCoroutine(AutoCaptureScreens());
     }
@@ -472,6 +604,23 @@ public partial class RaceManager : MonoBehaviour
         ScreenCapture.CaptureScreenshot("shot_01_title.png");
         yield return new WaitForSeconds(0.4f);
 
+        // カスタムキャラ＆カート組み合わせのタイトル画面確認 (例: PANDA + MACH FORMULA)
+        SelectedDriver = 5;
+        SelectedKart = 2;
+        ConfigureHuman(0);
+        yield return new WaitForSeconds(0.5f);
+        ScreenCapture.CaptureScreenshot("shot_01b_title_custom.png");
+        yield return new WaitForSeconds(0.3f);
+
+        // 2P分割時のタイトル画面確認
+        SelectedDriver2 = 7; // FOX
+        SelectedKart2 = 4;   // CYBER GT
+        SetTwoPlayer(true);
+        yield return new WaitForSeconds(0.5f);
+        ScreenCapture.CaptureScreenshot("shot_01c_title_2p.png");
+        yield return new WaitForSeconds(0.3f);
+        SetTwoPlayer(false);
+
         showSettings = true;
         settingsTab = 0;
         yield return new WaitForSeconds(0.4f);
@@ -503,9 +652,19 @@ public partial class RaceManager : MonoBehaviour
 
         yield return new WaitForSeconds(2.8f);
         if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Missile);
-        yield return null;
+        yield return new WaitForSeconds(0.10f);
         ScreenCapture.CaptureScreenshot("shot_05_racing_1p.png");
-        yield return new WaitForSeconds(0.3f);
+        yield return new WaitForSeconds(0.25f);
+
+        if (Player != null) Player.SetPreviewDrift(1, 1.15f, 27.8f, ItemType.Missile);
+        yield return new WaitForSeconds(0.10f);
+        ScreenCapture.CaptureScreenshot("shot_05b_drift_blue.png");
+        yield return new WaitForSeconds(0.25f);
+
+        if (Player != null) Player.SetPreviewDrift(-1, 2.85f, 28.5f, ItemType.Turbo);
+        yield return new WaitForSeconds(0.10f);
+        ScreenCapture.CaptureScreenshot("shot_05c_drift_purple.png");
+        yield return new WaitForSeconds(0.25f);
 
         paused = true;
         yield return new WaitForSeconds(0.4f);
@@ -555,23 +714,25 @@ public partial class RaceManager : MonoBehaviour
         IsTimeAttack = false;
         Net.HostDirect();
         Net.JoinCode = "WFHPQQ";
-        playerKarts[5] = 0; playerNames[5] = "HostPlayer";
-        playerKarts[0] = 1; playerNames[0] = "RivalOne";
-        playerKarts[1] = 2; playerNames[1] = "Speedy";
-        playerKarts[2] = 3; playerNames[2] = "KartMaster";
+        playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart); playerNames[5] = "HostPlayer";
+        playerKarts[0] = PackDriverKart(1, 1); playerNames[0] = "RivalOne";
+        playerKarts[1] = PackDriverKart(6, 3); playerNames[1] = "Speedy";
+        playerKarts[2] = PackDriverKart(8, 7); playerNames[2] = "KartMaster";
         lobbySlots.Clear();
         foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        ApplyLobbyKarts();
         yield return new WaitForSeconds(0.8f);
         ScreenCapture.CaptureScreenshot("shot_10_lobby_4p.png");
         yield return new WaitForSeconds(0.4f);
 
         // 11. オンライン待機画面 (LOBBY - ROOM CODE 付き 8人満員)
-        playerKarts[3] = 4; playerNames[3] = "Racer4";
-        playerKarts[4] = 0; playerNames[4] = "Racer5";
-        playerKarts[6] = 1; playerNames[6] = "Racer6";
-        playerKarts[7] = 2; playerNames[7] = "Racer7";
+        playerKarts[3] = PackDriverKart(4, 5); playerNames[3] = "Racer4";
+        playerKarts[4] = PackDriverKart(9, 6); playerNames[4] = "Racer5";
+        playerKarts[6] = PackDriverKart(2, 2); playerNames[6] = "Racer6";
+        playerKarts[7] = PackDriverKart(7, 4); playerNames[7] = "Racer7";
         lobbySlots.Clear();
         foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        ApplyLobbyKarts();
         yield return new WaitForSeconds(0.8f);
         ScreenCapture.CaptureScreenshot("shot_11_lobby_8p.png");
         yield return new WaitForSeconds(0.4f);
@@ -743,8 +904,8 @@ public partial class RaceManager : MonoBehaviour
 
     void ApplyKartStats()
     {
-        var d = KartCharacters[SelectedKart];
-        Player.ApplyStats(d.speed, d.accel, d.handling, d.weight);
+        GetCombinedStats(SelectedDriver, SelectedKart, out int spd, out int acc, out int hdl, out int wgt);
+        Player.ApplyStats(spd, acc, hdl, wgt);
     }
 
     Kart HumanKart(int p) => p == 0 ? Player : Player2;
@@ -758,28 +919,39 @@ public partial class RaceManager : MonoBehaviour
         ConfigureHuman(1);
     }
 
-    // P1 / P2 のカートを人間操作（または P2 のみ CPU）に設定し、見た目と性能を選択キャラに合わせる
+    // P1 / P2 のカートを人間操作（または P2 のみ CPU）に設定し、見た目と性能を選択キャラ＋カートに合わせる
     void ConfigureHuman(int p)
     {
         var k = HumanKart(p);
         if (p == 0 || TwoPlayer)
         {
-            int sel = p == 0 ? SelectedKart : SelectedKart2;
-            var d = KartCharacters[sel];
+            int drv = p == 0 ? SelectedDriver : SelectedDriver2;
+            int krt = p == 0 ? SelectedKart : SelectedKart2;
+            drv = Mathf.Clamp(drv, 0, KartCharacters.Length - 1);
+            krt = Mathf.Clamp(krt, 0, KartMachines.Length - 1);
+            var d = KartCharacters[drv];
+            var m = KartMachines[krt];
             k.IsPlayer = true;
             k.PlayerIndex = p;
-            k.ModelVariant = sel;
+            k.ModelVariant = drv;
+            k.KartVariant = krt;
             k.Name = TwoPlayer ? $"P{p + 1} ({d.name})" : $"{DisplayName} ({d.name})";
-            k.Color = d.color;
-            k.ApplyStats(d.speed, d.accel, d.handling, d.weight);
+            k.DriverColor = d.color;
+            k.Color = m.color;
+            GetCombinedStats(drv, krt, out int spd, out int acc, out int hdl, out int wgt);
+            k.ApplyStats(spd, acc, hdl, wgt);
         }
         else
         {
             int ai = P2Slot; // P2Slot < playerGridSlot なので CPU 名簿のインデックスと一致
             k.IsPlayer = false;
             k.PlayerIndex = 0;
-            k.ModelVariant = -1;
+            int aiDrv = (ai + 2) % KartCharacters.Length;
+            int aiKrt = (ai + 1) % KartMachines.Length;
+            k.ModelVariant = aiDrv;
+            k.KartVariant = aiKrt;
             k.Name = AiNames[ai];
+            k.DriverColor = KartCharacters[aiDrv].color;
             k.Color = AiColors[ai];
             k.ApplyStats(5, 5, 5, 5);
         }
@@ -868,24 +1040,41 @@ public partial class RaceManager : MonoBehaviour
         }
     }
 
-    void SwitchKart(int p, int delta)
+    public void SwitchDriver(int p, int delta)
+    {
+        int cur = p == 0 ? SelectedDriver : SelectedDriver2;
+        int next = (cur + delta + KartCharacters.Length) % KartCharacters.Length;
+        if (next == cur) return;
+        if (p == 0) SelectedDriver = next; else SelectedDriver2 = next;
+        if (Audio != null) Audio.Select();
+        if (HumanKart(p) != null) ConfigureHuman(p);
+        SyncOnlineSelectionIfNeeded(p);
+    }
+
+    public void SwitchKart(int p, int delta)
     {
         int cur = p == 0 ? SelectedKart : SelectedKart2;
-        int next = (cur + delta + KartCharacters.Length) % KartCharacters.Length;
+        int next = (cur + delta + KartMachines.Length) % KartMachines.Length;
         if (next == cur) return;
         if (p == 0) SelectedKart = next; else SelectedKart2 = next;
         if (Audio != null) Audio.Select();
         if (HumanKart(p) != null) ConfigureHuman(p);
+        SyncOnlineSelectionIfNeeded(p);
+    }
+
+    void SyncOnlineSelectionIfNeeded(int p)
+    {
         if (p == 0 && Online)
         {
+            int packed = PackDriverKart(SelectedDriver, SelectedKart);
             if (Net.IsHost)
             {
-                playerKarts[mySlot] = SelectedKart;
+                playerKarts[mySlot] = packed;
                 SyncLobby();
             }
             else
             {
-                Net.SendHello(SelectedKart, DisplayName);
+                Net.SendHello(packed, DisplayName);
             }
         }
     }
@@ -1060,17 +1249,25 @@ public partial class RaceManager : MonoBehaviour
                     if (IsTimeAttack) IsTimeAttack = false;
                     SetTwoPlayer(!TwoPlayer);
                 }
-                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.JoystickButton4))
+                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.JoystickButton4))
                     SwitchCourse(-1);
-                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.JoystickButton5))
+                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.JoystickButton5))
                     SwitchCourse(1);
                 else if (Input.GetKeyDown(KeyCode.W) || stickUp || (!TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow)))
-                    SwitchKart(0, -1);
+                    SwitchDriver(0, -1);
                 else if (Input.GetKeyDown(KeyCode.S) || stickDown || (!TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow)))
+                    SwitchDriver(0, 1);
+                else if (Input.GetKeyDown(KeyCode.Q) || (!TwoPlayer && Input.GetKeyDown(KeyCode.LeftArrow)))
+                    SwitchKart(0, -1);
+                else if (Input.GetKeyDown(KeyCode.E) || (!TwoPlayer && Input.GetKeyDown(KeyCode.RightArrow)))
                     SwitchKart(0, 1);
                 else if (TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
-                    SwitchKart(1, -1);
+                    SwitchDriver(1, -1);
                 else if (TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
+                    SwitchDriver(1, 1);
+                else if (TwoPlayer && Input.GetKeyDown(KeyCode.LeftArrow))
+                    SwitchKart(1, -1);
+                else if (TwoPlayer && Input.GetKeyDown(KeyCode.RightArrow))
                     SwitchKart(1, 1);
 
                 if (!titleShotRequested && (enter || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f)))

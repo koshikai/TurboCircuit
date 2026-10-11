@@ -70,7 +70,7 @@ public static class BuildTool
 
         PlayerSettings.productName = "Turbo Circuit";
         PlayerSettings.companyName = "kaito";
-        PlayerSettings.bundleVersion = "1.8.0";
+        PlayerSettings.bundleVersion = "1.9.0";
         PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
         PlayerSettings.defaultScreenWidth = 1280;
         PlayerSettings.defaultScreenHeight = 720;
@@ -165,12 +165,14 @@ public static class BuildTool
 public static class DataAssetGenerator
 {
     const string KartDataDir = "Assets/Resources/Data/Karts";
+    const string MachineDataDir = "Assets/Resources/Data/Machines";
     const string CourseDataDir = "Assets/Resources/Data/Courses";
 
     [MenuItem("Turbo Circuit/Export Data to ScriptableObjects")]
     public static void ExportAllData()
     {
         Directory.CreateDirectory(KartDataDir);
+        Directory.CreateDirectory(MachineDataDir);
         Directory.CreateDirectory(CourseDataDir);
 
         // 1. カートキャラクターデータの書き出し
@@ -189,6 +191,30 @@ public static class DataAssetGenerator
             asset.driverName = def.driver;
             asset.trait = def.trait;
             asset.signatureColor = def.color;
+            asset.speed = def.speed;
+            asset.accel = def.accel;
+            asset.handling = def.handling;
+            asset.weight = def.weight;
+            EditorUtility.SetDirty(asset);
+        }
+
+        // 1b. カートマシンデータの書き出し
+        var machines = RaceManager.DefaultKartMachines;
+        for (int i = 0; i < machines.Length; i++)
+        {
+            var def = machines[i];
+            string cleanName = def.name.Replace(" ", "_");
+            string path = $"{MachineDataDir}/Machine_{i:D2}_{cleanName}.asset";
+            var asset = AssetDatabase.LoadAssetAtPath<KartMachineData>(path);
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<KartMachineData>();
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            asset.machineName = def.name;
+            asset.codeName = def.code;
+            asset.trait = def.trait;
+            asset.bodyColor = def.color;
             asset.speed = def.speed;
             asset.accel = def.accel;
             asset.handling = def.handling;
@@ -233,6 +259,6 @@ public static class DataAssetGenerator
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[TurboCircuit] Successfully exported all KartData and CourseData ScriptableObjects to Assets/Resources/Data!");
+        Debug.Log("[TurboCircuit] Successfully exported all KartData, KartMachineData, and CourseData ScriptableObjects to Assets/Resources/Data!");
     }
 }

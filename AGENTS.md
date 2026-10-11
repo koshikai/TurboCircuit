@@ -12,7 +12,7 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 * **ジャンル**: 3D カートレーシングゲーム（1Pソロ / 2P画面分割対戦 / 最大8人オンライン対戦）
 * **特徴**:
   * 6コース（TURBO CIRCUIT, SUNSET DUNES, FROST PEAK, NEON METROPOLIS, HOKKAIDO CAMPUS, SKYLINE OVERPASS）
-  * 5キャラクター/カート（OOBI, OODI, OOLI, OOPI, OOZI）
+  * 10ドライバー（OOBI, OODI, OOLI, OOPI, OOZI, PANDA, PENGUIN, FOX, BUNNY, LION）× 8カートマシン（STANDARD, PIPE BUGGY, MACH FORMULA, MONSTER, CYBER GT, ROADSTER, MUSCLE V8, JET POD）の自由組み合わせ
   * ドリフトブースト、アイテムバトル、ジャンプ台、ゴースト再生
   * Unity Relay / Direct IP によるオンラインマルチプレイ対応
 
@@ -94,30 +94,33 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 
 ## 5. ビルド & 実機検証手順 (Build & Test Workflow)
 
-コード変更やUI修正を行った際は、**必ずヘッドレスビルドを実行し、`-autoshot` によるスクリーンショット撮影で視覚的な検証**を行ってください。
+コード変更・UI修正・3Dモデル調整を行った際は、スキル [`.agents/skills/build-and-verify/SKILL.md`](file:///c:/Users/kaito/UnityProjects/TurboCircuit/.agents/skills/build-and-verify/SKILL.md) の **`verify.ps1`** を用いて視覚的な検証を行ってください。
 
-### 5.1 ヘッドレスバッチビルド
-以下のコマンドで Unity エディタをバッチモードで実行し、エラーなくビルドが通ることを確認します。
+### 5.1 ピンポイント高速検証（推奨：約1〜2秒）
+フル撮影（`-autoshot`）を回さず、変更対象のみを即座に撮影・合成（2×2コンタクトシート化）して確認できます。
 
 ```powershell
-cmd.exe /c "C:\Program Files\Unity\Hub\Editor\6000.6.3f1\Editor\Unity.exe" -batchmode -nographics -projectPath "." -executeMethod BuildTool.BuildWindows -logFile -
+# 1. 3Dモデル4面図スタジオ（1m基準グリッド＆高さルーラー＋正確なBounds数値出力）
+pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -Build -ShotModel "kart:5:2"
+# 他対象例: "kart:all", "driver:all", "animal:cow", "fan:0", "item:all"
+
+# 2. コース任意地点のピンポイント確認（複数地点を2x2シートに自動合成）
+pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -Course 4 -Progress "0.106,0.29,0.555,0.82" -NoHud
+
+# 3. 特定UI画面のみの高速確認
+pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -ShotUi "title,results"
 ```
 
-### 5.2 自動スクリーンショット撮影 (`-autoshot`)
-ビルド生成物の `TurboCircuit.exe` に `-autoshot` 引数を渡すと、タイトル・設定・ポーズ・リザルト・ロビー等の全画面スクリーンショットが自動生成されます。
+* **生成先**: `Build/Windows/TurboCircuit_Data/verify_*.png` および `verify_model_bounds.txt`
+
+### 5.2 フル回帰スクリーンショット撮影 (`-autoshot`)
+全体的な回帰確認時は `-AutoShot`（または `TurboCircuit.exe -autoshot`）で全画面スクリーンショットを一括生成します。
 
 ```powershell
-cmd.exe /c "pushd Build\Windows && TurboCircuit.exe -autoshot && popd"
+pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -AutoShot
 ```
 
 * **生成先**: `Build/Windows/TurboCircuit_Data/shot_*.png`
-  * `shot_01_title.png` (タイトル画面)
-  * `shot_02_settings_general.png` (設定: 一般)
-  * `shot_03_settings_keys.png` (設定: キーコンフィグ)
-  * `shot_06_paused.png` (ポーズ画面)
-  * `shot_07_results.png` (リザルト画面)
-  * `shot_08_racing_2p.png` (2P画面分割HUD)
-  * `shot_10_lobby_4p.png` / `shot_11_lobby_8p.png` (オンラインロビー)
 * 画像ファイルを確認し、UI要素の文字被り・レイアウト崩れ・デザインのトーン＆マナー不一致がないか必ず目視検証すること。
 
 ---
@@ -128,3 +131,7 @@ cmd.exe /c "pushd Build\Windows && TurboCircuit.exe -autoshot && popd"
    * カートのドリフト物理挙動、壁との衝突反発計算、オンラインパケット同期の基本構造を安易に変更・破壊しないこと。
 2. **ドキュメンテーション**:
    * 新しい機能追加やキーバインド変更時は、[`README.md`](file:///c:/Users/kaito/UnityProjects/TurboCircuit/README.md) の操作説明表もあわせて更新すること。
+3. **スキル（Skills）への知識・手順の切り出し**:
+   * 新たな作業・検証手順・アセット生成フロー・コース/キャラ追加手順・トラブルシューティングなどを行った際は、次回以降も高い再現性で実行できるよう、積極的に **`.agents/skills/<skill-name>/SKILL.md`** へスキルとして切り出し・更新を行うこと。
+   * スキルは YAML フロントマター（`name`, `description`）を記載し、再利用可能なスクリプトがある場合は `.agents/skills/<skill-name>/scripts/` に格納すること。
+
