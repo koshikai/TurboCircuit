@@ -68,8 +68,27 @@ public class AppUpdater : MonoBehaviour
 
     void Start()
     {
+        // 前回のアップデート適用後に残った一時フォルダがあれば起動時に掃除
+        CleanupTempUpdateDir();
+
         // 起動時にバックグラウンドで最新バージョンをチェック（モーダルは開かず静かに通知）
         StartCoroutine(AutoCheckOnStartupRoutine());
+    }
+
+    static void CleanupTempUpdateDir()
+    {
+        try
+        {
+            string updateDir = Path.Combine(Path.GetTempPath(), "TurboCircuit_Update");
+            if (Directory.Exists(updateDir))
+            {
+                Directory.Delete(updateDir, true);
+            }
+        }
+        catch
+        {
+            // ロック中などの場合は無視
+        }
     }
 
     IEnumerator AutoCheckOnStartupRoutine()
@@ -177,9 +196,13 @@ public class AppUpdater : MonoBehaviour
                 tagMatch = Regex.Match(json, "\"version\"\\s*:\\s*\"([^\"]+)\"");
             LatestVersion = tagMatch.Success ? tagMatch.Groups[1].Value : "";
 
-            // name
+            // name (アセットの .zip 名に誤マッチした場合はバージョン名にフォールバック)
             var nameMatch = Regex.Match(json, "\"name\"\\s*:\\s*\"([^\"]+)\"");
-            ReleaseName = nameMatch.Success ? nameMatch.Groups[1].Value : LatestVersion;
+            string rawName = nameMatch.Success ? nameMatch.Groups[1].Value : "";
+            if (string.IsNullOrEmpty(rawName) || rawName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                ReleaseName = $"Turbo Circuit {LatestVersion}";
+            else
+                ReleaseName = rawName;
 
             // body / notes
             var bodyMatch = Regex.Match(json, "\"body\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
@@ -387,48 +410,76 @@ public class AppUpdater : MonoBehaviour
         // Application.dataPath は "Build/Windows/TurboCircuit_Data" なので、その親が実行フォルダ
         string targetDir = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         string exeName = "TurboCircuit.exe";
+        string exeFullPath = Path.Combine(targetDir, exeName);
+        string extractDir = Path.Combine(updateDir, "extracted");
+        string ps1Path = Path.Combine(updateDir, "apply_update.ps1");
         string batPath = Path.Combine(updateDir, "apply_update.bat");
+        int currentPid = System.Diagnostics.Process.GetCurrentProcess().Id;
 
-        // Windows バッチスクリプトを作成
-        string batContent = $@"@echo off
+        string EscPs(string s) => s.Replace("'", "''");
+
+        // PowerShell スクリプト（UTF-8 with BOM で保存することで日本語パス・空白・特殊文字に完全対応）
+        string ps1Content = $@"$ErrorActionPreference = 'Stop'
+$pidToWait = {currentPid}
+$zipPath = '{EscPs(zipPath)}'
+$extractDir = '{EscPs(extractDir)}'
+$targetDir = '{EscPs(targetDir)}'
+$exePath = '{EscPs(exeFullPath)}'
+
+Write-Host '====================================================================' -ForegroundColor Cyan
+Write-Host '                  TURBO CIRCUIT AUTO UPDATER                        ' -ForegroundColor Cyan
+Write-Host '====================================================================' -ForegroundColor Cyan
+Write-Host ''
+Write-Host '[1/4] Waiting for game process to safely exit...'
+try {{
+    Wait-Process -Id $pidToWait -Timeout 15 -ErrorAction SilentlyContinue
+}} catch {{}}
+Start-Sleep -Seconds 1
+
+Write-Host '[2/4] Extracting update package...'
+if (Test-Path -LiteralPath $extractDir) {{
+    Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+}}
+Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+
+$src = $extractDir
+$items = @(Get-ChildItem -LiteralPath $src)
+if ($items.Count -eq 1 -and $items[0].PSIsContainer) {{
+    $src = $items[0].FullName
+}}
+
+Write-Host '[3/4] Applying update files to install directory...'
+Get-ChildItem -LiteralPath $src | ForEach-Object {{
+    Copy-Item -LiteralPath $_.FullName -Destination $targetDir -Recurse -Force
+}}
+
+Write-Host '[4/4] Cleaning up temporary files & relaunching Turbo Circuit...'
+Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+
+Start-Sleep -Milliseconds 600
+Start-Process -FilePath $exePath -WorkingDirectory $targetDir
+";
+
+        // 起動用バッチファイル（%~dp0 で自身のフォルダにある apply_update.ps1 を呼び出す）
+        string batContent = @"@echo off
 chcp 65001 >nul
 title Turbo Circuit - Auto Updater
-echo ====================================================================
-echo                   TURBO CIRCUIT AUTO UPDATER
-echo ====================================================================
-echo.
-echo [1/3] Waiting for game process to safely exit...
-timeout /t 2 /nobreak >nul
-
-:WAIT_PROCESS
-tasklist /FI ""IMAGENAME eq {exeName}"" 2>NUL | find /I /N ""{exeName}"">NUL
-if ""%ERRORLEVEL%""==""0"" (
-    timeout /t 1 /nobreak >nul
-    goto WAIT_PROCESS
-)
-
-echo [2/3] Extracting update files...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""Expand-Archive -LiteralPath '{zipPath.Replace("'", "''")}' -DestinationPath '{updateDir.Replace("'", "''")}\extracted' -Force""
-
-echo [2/3] Copying files to install location...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ""$src = '{updateDir.Replace("'", "''")}\extracted'; $items = Get-ChildItem -LiteralPath $src; if ($items.Count -eq 1 -and $items[0].PSIsContainer) {{ $src = $items[0].FullName }}; Copy-Item -Path """"$src\*"""" -Destination '{targetDir.Replace("'", "''")}' -Recurse -Force""
-
-echo [3/3] Relaunching Turbo Circuit...
-timeout /t 1 /nobreak >nul
-start """" ""{Path.Combine(targetDir, exeName)}""
-
-echo Update complete! Cleaning up...
+powershell -NoProfile -ExecutionPolicy Bypass -File ""%~dp0apply_update.ps1""
 exit
 ";
 
-        File.WriteAllText(batPath, batContent, System.Text.Encoding.GetEncoding("shift_jis"));
+        // .ps1 は UTF-8 (BOMあり)、.bat は UTF-8 (BOMなし) で書き出し
+        File.WriteAllText(ps1Path, ps1Content, new System.Text.UTF8Encoding(true));
+        File.WriteAllText(batPath, batContent, new System.Text.UTF8Encoding(false));
 
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = $"/c \"{batPath}\"",
+                Arguments = $"/c \"\"{batPath}\"\"",
+                WorkingDirectory = updateDir,
                 CreateNoWindow = false,
                 UseShellExecute = true
             };
