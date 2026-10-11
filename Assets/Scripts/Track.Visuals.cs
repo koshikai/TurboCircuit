@@ -15,7 +15,7 @@ public partial class Track
     static void SafeDestroy(Object obj)
     {
         if (obj == null) return;
-        if (Application.isPlaying) Destroy(obj);
+        if (Application.isPlaying) Object.Destroy(obj);
         else DestroyImmediate(obj);
     }
 
@@ -115,9 +115,11 @@ public partial class Track
         BuildBridgePillars(rm, def);
         BuildJumpRamps(rm);
         BuildTunnels(rm, def);
+        int decorStart = transform.childCount;
         BuildScenery(rm, def);
         BuildSponsorBoards(rm, def);
         BuildCircuitProps(rm, def);
+        ApplyDecorOverrides(decorStart);
         BuildAnimals(rm, def);
     }
 

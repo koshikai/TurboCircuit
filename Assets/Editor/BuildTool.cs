@@ -15,6 +15,7 @@ public static class BuildTool
     [MenuItem("Turbo Circuit/Setup Scene")]
     public static void Setup()
     {
+        CourseDecorWindow.DestroyAllPreviews(); // 編集用プレビュー（DontSave）がシーン作り直し後も残らないように
         DataAssetGenerator.ExportAllData();
         Directory.CreateDirectory(SceneDir);
         Directory.CreateDirectory(MatDir);

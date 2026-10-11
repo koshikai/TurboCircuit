@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08c184dbe3c14ad0b24737533caa7661, type: 3}
+  m_Name: Course_04
+  m_EditorClassIdentifier: Assembly-CSharp::CourseDecorData
+  courseName: HOKKAIDO CAMPUS
+  entries:
+  - key: MapleTree_3@1548,15,1022
+    deleted: 0
+    position: {x: 189.16, y: 2.71, z: 123.62}
+    rotation: {x: -0.040281296, y: 0.85695034, z: 0.1149685, w: 0.50079525}
+    scale: {x: 5, y: 5, z: 5}
+  - key: MapleTree_3@1564,17,1044
+    deleted: 0
+    position: {x: 189.23, y: 1.83, z: 121.32}
+    rotation: {x: -0.09755402, y: 0.88763887, z: -0.14043191, w: -0.42762062}
+    scale: {x: 5, y: 5, z: 5}
+  - key: MapleTree_2@1525,17,1068
+    deleted: 0
+    position: {x: 201.3, y: 1.6934385, z: 102.9}
+    rotation: {x: -0, y: 0.42261833, z: -0, w: -0.90630776}
+    scale: {x: 5.75, y: 5.75, z: 5.75}
+  - key: MapleTree_3@1564,19,1040
+    deleted: 0
+    position: {x: 195, y: 1.8, z: 110.2}
+    rotation: {x: -0.043264307, y: 0.16026987, z: -0.1138745, w: -0.97952765}
+    scale: {x: 5, y: 5, z: 5}
+  - key: MapleTree_3@1579,20,963
+    deleted: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 0}
+    scale: {x: 0, y: 0, z: 0}
+  - key: MapleTree_3@1592,21,944
+    deleted: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 0}
+    scale: {x: 0, y: 0, z: 0}
+  - key: MapleTree_3@1812,21,1259
+    deleted: 0
+    position: {x: 179.26, y: 1.38, z: 126.54}
+    rotation: {x: 0.04822438, y: 0.97270685, z: 0.11192123, w: -0.1974576}
+    scale: {x: 5, y: 5, z: 5}
+  - key: MapleTree_3@1565,21,959
+    deleted: 1
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 0}
+    scale: {x: 0, y: 0, z: 0}
+  - key: MapleTree_3@1506,21,935
+    deleted: 0
+    position: {x: 195.29, y: 1.17, z: 91.04}
+    rotation: {x: -0, y: 0.21643962, z: -0, w: 0.976296}
+    scale: {x: 5.75, y: 5.75, z: 5.75}
+  clones: []
