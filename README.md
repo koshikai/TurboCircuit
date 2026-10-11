@@ -266,16 +266,28 @@ Turbo Circuit は**アプリ内からのワンクリック自動アップデー�
 ソースコードから自身でビルドを行う場合の手順です。
 
 ### 動作環境
-- **Unity**: `6000.6.3f1` (Universal Render Pipeline / URP)
+- **Unity**: `6000.6.5f1` (Universal Render Pipeline / URP)
 
 ### コマンドラインでのヘッドレスビルド
 PowerShell または コマンドプロンプトから以下のコマンドを実行します：
 
 ```powershell
-"C:\Program Files\Unity\Hub\Editor\6000.6.3f1\Editor\Unity.exe" -batchmode -nographics -quit -projectPath . -executeMethod BuildTool.BuildWindows -logFile -
+"C:\Program Files\Unity\Hub\Editor\6000.6.5f1\Editor\Unity.exe" -batchmode -nographics -quit -projectPath . -executeMethod BuildTool.BuildWindows -logFile -
 ```
 
 ビルド成果物は `Build/Windows/` に出力されます。
+
+### コース装飾の手動調整 (Course Decor Editor)
+コースの木・岩・看板・建物などはコードで自動生成されますが、Unity Editor 上で配置を微調整できます。
+
+1. `Race.unity` を開き、メニュー `Turbo Circuit > Course Decor Editor` を開く
+2. コースを選んで **Open** → 装飾物が Scene に展開される（Scene ファイルには保存されない）
+3. 移動・回転・拡縮、削除（Delete / 非アクティブ化）、複製（Ctrl+D）
+4. **Save** → `Assets/Resources/Data/CourseDecor/Course_XX.asset` に差分のみ保存。Play / ビルドで自動反映
+
+- 未保存の編集は、再コンパイル・Play 開始・シーン切り替えで失われます。
+- 路面・壁・地形・トンネル・橋脚・ジャンプ台・動物は対象外です（形状は `CourseData` の制御点で調整）。
+- `Build Windows` は毎回 `Setup()` で Kart / Machine / Course の `.asset` をコード側の既定値で再生成します（装飾の調整データは影響を受けません）。
 
 ### 自動スクリーンショット撮影テスト (`-autoshot`)
 ```powershell

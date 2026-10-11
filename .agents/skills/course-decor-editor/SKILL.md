@@ -32,5 +32,11 @@ description: >-
 - 新しい装飾ビルダーを追加する場合は、`BuildVisuals` の `decorStart` 〜 `ApplyDecorOverrides` の範囲内で呼ぶ。
 - 生成は決定的であること（`UnityEngine.Random` / `Time` を使わない）。
 
+## ハマりどころ（過去の不具合）
+- **プレビューが紫になる**: プレビューは `DontSaveInEditor` のオブジェクト。マテリアルは実行時生成で保存されず、再コンパイルやシーン入れ替え（`NewScene`＝`Build Windows` / `Setup`）で壊れた残骸が Hierarchy に出ないまま残る。`CourseDecorWindow` の `DestroyAllPreviews`（起動時・Play 開始・シーン切替・`Setup()` 冒頭）が `hideFlags == DontSaveInEditor` で拾って消す。手動なら `Turbo Circuit > Clean Course Decor Preview`。
+- **`.asset` が「script is missing」**: ScriptableObject をクラス名と別のファイルに置くと発生。`CourseDecorData` 等は同名ファイルに置くこと（`KartData` / `CourseData` も同様に分離済み）。
+- 調整データを入れた `.asset` の `m_Script` が `{fileID: 0}` なら、型の入ったファイル名とクラス名を確認する。
+- Unity が非フォーカスだと再コンパイルされない。`Assets > Refresh`（Ctrl+R）で促す。
+
 ## 検証
 `verify.ps1 -Course N -Progress "..." -NoHud`（build-and-verify スキル）で調整前後を撮影して比較する。

@@ -7,7 +7,7 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 ## 1. プロジェクト概要
 
 * **プロジェクト名**: Turbo Circuit
-* **エンジン**: Unity 6000.6.3f1 (Universal Render Pipeline / URP)
+* **エンジン**: Unity 6000.6.5f1 (Universal Render Pipeline / URP)
 * **プラットフォーム**: Windows (64-bit)
 * **ジャンル**: 3D カートレーシングゲーム（1Pソロ / 2P画面分割対戦 / 最大8人オンライン対戦）
 * **特徴**:
@@ -21,7 +21,7 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 ## 2. 開発環境 & 基本ルール
 
 * **Unity エディタ実行パス**:
-  `C:\Program Files\Unity\Hub\Editor\6000.6.3f1\Editor\Unity.exe`
+  `C:\Program Files\Unity\Hub\Editor\6000.6.5f1\Editor\Unity.exe`
 * **Python の実行**:
   Python スクリプトを実行する際は、**必ず `uv` を使用すること**（例: `uv run python ...`）。
 * **パッケージマネージャ**:
@@ -63,7 +63,14 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 * **`Kart.Net.cs`**:
   * ネットワーク補間同期ロジック
 
-### 3.3 その他重要システム
+### 3.3 データ定義 & コース装飾の調整
+* **`KartData.cs` / `KartMachineData.cs` / `CourseData.cs`**: ScriptableObject 定義（`Assets/Resources/Data/` の `.asset` の型）。
+  * **ScriptableObject は必ずクラス名と同名のファイルに置くこと**。別ファイルに置くと `.asset` の `m_Script` が `{fileID: 0}` になり、`Resources.LoadAll` が「referenced script is missing」警告を出して読み込まれない。
+  * `BuildTool` の `Setup()`（`Build Windows` 経由を含む）は `ExportAllData` で、これらの `.asset` をコード側の既定値（`Track.DefaultCourses` など）で毎回上書きする。手編集した値は残らない。
+* **`CourseDecor.cs` / `CourseDecorData.cs` / `DecorTag.cs` / `Track.Decor.cs`**: コース装飾（`BuildScenery` / `BuildSponsorBoards` / `BuildCircuitProps` が作る Track 直下のオブジェクト）の手動調整。`Assets/Editor/CourseDecorWindow.cs`（メニュー `Turbo Circuit > Course Decor Editor`）で編集し、`Assets/Resources/Data/CourseDecor/Course_XX.asset` に差分保存、実行時に生成直後へ適用する。詳細は [`.agents/skills/course-decor-editor/SKILL.md`](file:///c:/Users/kaito/UnityProjects/TurboCircuit/.agents/skills/course-decor-editor/SKILL.md)。
+  * `Track` 内の `Destroy` は `Track.Decor.cs` で `SafeDestroy` に差し替えてある（編集モードで `BuildVisuals` を動かすため）。
+
+### 3.4 その他重要システム
 * **`Track.cs` / `Track.Visuals.cs`**: コース生成、路面メッシュ、ウェイポイント、環境装飾
 * **`Items.cs`**: アイテム取得・発砲・効果ロジック（ロケット、バナナ、スター等）
 * **`NetSession.cs`**: Unity Netcode for GameObjects (NGO) & Unity Relay 接続基盤

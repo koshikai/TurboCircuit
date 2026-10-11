@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")
 Set-Location $ProjectRoot
 
-$UnityExe = "C:\Program Files\Unity\Hub\Editor\6000.6.3f1\Editor\Unity.exe"
+$UnityExe = "C:\Program Files\Unity\Hub\Editor\6000.6.5f1\Editor\Unity.exe"
 $GameExe  = Join-Path $ProjectRoot "Build\Windows\TurboCircuit.exe"
 $DataDir  = Join-Path $ProjectRoot "Build\Windows\TurboCircuit_Data"
 $LogDir   = Join-Path $ProjectRoot "Logs"
