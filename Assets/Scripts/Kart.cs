@@ -201,6 +201,7 @@ public partial class Kart : MonoBehaviour
 
     public void Tick(float dt, bool canDrive)
     {
+        if (!gameObject.activeSelf) return; // タイムアタックで非表示のカートはシミュレートしない
         if (IsRemote) { RemoteTick(dt); return; }
         if (previewLockTimer > 0f)
         {
@@ -441,8 +442,7 @@ public partial class Kart : MonoBehaviour
                 bool doTrick = false;
                 if (IsPlayer && !rm.Demo)
                 {
-                    doTrick = inp.driftDown || Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(InputSettings.KeyDriftAlt)
-                           || Input.GetKeyDown(KeyCode.JoystickButton4) || Input.GetKeyDown(KeyCode.JoystickButton5);
+                    doTrick = inp.driftDown;
                 }
                 else if (!IsPlayer)
                 {
@@ -508,7 +508,7 @@ public partial class Kart : MonoBehaviour
         }
 
         // 奈落落下・コース外転落時の安全復帰（レスキュー）
-        if (curPos.y < -12f || Mathf.Abs(Lateral) > Track.WallOffset + 15f)
+        if (curPos.y < -12f)
         {
             curPos = track.PointAt(Index, 0f) + Vector3.up * 0.4f;
             Speed = Mathf.Clamp(Speed * 0.5f, -5f, 10f);

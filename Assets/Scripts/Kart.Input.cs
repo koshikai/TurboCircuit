@@ -1,5 +1,22 @@
 using UnityEngine;
 
+public enum PadBind
+{
+    None = 0,
+    A = 1,       // Button 0 (South)
+    B = 2,       // Button 1 (East)
+    X = 3,       // Button 2 (West)
+    Y = 4,       // Button 3 (North)
+    LB = 5,      // Button 4 (Left Shoulder)
+    RB = 6,      // Button 5 (Right Shoulder)
+    Back = 7,    // Button 6 (View / Back / Select)
+    Start = 8,   // Button 7 (Menu / Start)
+    LS = 9,      // Button 8 (Left Stick Click)
+    RS = 10,     // Button 9 (Right Stick Click)
+    LT = 11,     // Left Trigger
+    RT = 12,     // Right Trigger
+}
+
 // 人間の操作入力（キーボード / ゲームパッド / 2P 分割）
 public partial class Kart
 {
@@ -8,27 +25,24 @@ public partial class Kart
     public KartInput PlayerInput()
     {
         InputSettings.Init();
+        GamepadHaptics.PollPads();
         var inp = new KartInput();
         if (rm.TwoPlayer) return SplitScreenInput(inp);
 
-        // XInput の LT / RT は個別軸（9th / 10th）で取得する。
-        float rt = 0f, lt = 0f;
-        try
-        {
-            rt = Mathf.Clamp01(Input.GetAxis("RightTrigger"));
-            lt = Mathf.Clamp01(Input.GetAxis("LeftTrigger"));
-        }
-        catch { }
+        float padAccel = InputSettings.GetPadAnalog(InputSettings.PadAccel, InputSettings.PadAccelAlt, 0);
+        float padBrake = InputSettings.GetPadAnalog(InputSettings.PadBrake, InputSettings.PadBrakeAlt, 0);
 
-        bool up = Input.GetKey(InputSettings.KeyAccel) || Input.GetKey(InputSettings.KeyAccelAlt) 
-               || Input.GetKey(KeyCode.JoystickButton0) || rt > 0.15f;
-        bool down = Input.GetKey(InputSettings.KeyBrake) || Input.GetKey(InputSettings.KeyBrakeAlt) 
-                 || Input.GetKey(KeyCode.JoystickButton1) || lt > 0.15f;
+        bool keyUp = Input.GetKey(InputSettings.KeyAccel) || Input.GetKey(InputSettings.KeyAccelAlt);
+        bool keyDown = Input.GetKey(InputSettings.KeyBrake) || Input.GetKey(InputSettings.KeyBrakeAlt);
 
-        inp.throttle = up ? Mathf.Max(rt > 0.15f ? rt : 1f, 0f) : down ? -Mathf.Max(lt > 0.15f ? lt : 1f, 0f) : 0f;
+        if (keyUp || padAccel > 0.15f)
+            inp.throttle = keyUp ? 1f : padAccel;
+        else if (keyDown || padBrake > 0.15f)
+            inp.throttle = -(keyDown ? 1f : padBrake);
+        else
+            inp.throttle = 0f;
 
-        float steerAxis = Input.GetAxisRaw("Horizontal");
-        if (Mathf.Abs(steerAxis) < InputSettings.StickDeadzone) steerAxis = 0f;
+        float steerAxis = InputSettings.GetPadSteer(0);
 
         float keySteer = 0f;
         if (Input.GetKey(InputSettings.KeySteerRight) || Input.GetKey(InputSettings.KeySteerRightAlt)) keySteer += 1f;
@@ -36,40 +50,57 @@ public partial class Kart
 
         inp.steer = Mathf.Clamp(Mathf.Abs(keySteer) > 0.01f ? keySteer : steerAxis, -1f, 1f);
 
-        inp.drift = Input.GetKey(InputSettings.KeyDrift) || Input.GetKey(InputSettings.KeyDriftAlt) 
-                 || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.JoystickButton4) || Input.GetKey(KeyCode.JoystickButton5);
-        inp.driftDown = Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(InputSettings.KeyDriftAlt) 
-                     || Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.JoystickButton4) || Input.GetKeyDown(KeyCode.JoystickButton5);
+        inp.drift = Input.GetKey(InputSettings.KeyDrift) || Input.GetKey(InputSettings.KeyDriftAlt)
+                 || Input.GetKey(KeyCode.RightShift)
+                 || InputSettings.GetPadHeld(InputSettings.PadDrift, InputSettings.PadDriftAlt, 0);
+        inp.driftDown = Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(InputSettings.KeyDriftAlt)
+                     || Input.GetKeyDown(KeyCode.RightShift)
+                     || InputSettings.GetPadDown(InputSettings.PadDrift, InputSettings.PadDriftAlt, 0);
 
-        inp.useItem = Input.GetKeyDown(InputSettings.KeyItem) || Input.GetKeyDown(InputSettings.KeyItemAlt) 
-                   || Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.JoystickButton2) || Input.GetKeyDown(KeyCode.JoystickButton3);
+        inp.useItem = Input.GetKeyDown(InputSettings.KeyItem) || Input.GetKeyDown(InputSettings.KeyItemAlt)
+                   || Input.GetKeyDown(KeyCode.RightControl)
+                   || InputSettings.GetPadDown(InputSettings.PadItem, InputSettings.PadItemAlt, 0);
         return inp;
     }
 
-    // 2P 対戦時のキー割り当て：P1 = WASD、P2 = 矢印キー（キーボード 1 台で操作できる）
+    // 2P 対戦時のキー割り当て：P1 = カスタムキー/WASD + Pad1、P2 = 矢印キー + Pad2
     KartInput SplitScreenInput(KartInput inp)
     {
-        if (PlayerIndex == 0)
+        int p = PlayerIndex;
+        float padAccel = InputSettings.GetPadAnalog(InputSettings.PadAccel, InputSettings.PadAccelAlt, p);
+        float padBrake = InputSettings.GetPadAnalog(InputSettings.PadBrake, InputSettings.PadBrakeAlt, p);
+        float padSteer = InputSettings.GetPadSteer(p, includeUnityAxis: p == 0);
+        bool padDrift = InputSettings.GetPadHeld(InputSettings.PadDrift, InputSettings.PadDriftAlt, p);
+        bool padDriftDown = InputSettings.GetPadDown(InputSettings.PadDrift, InputSettings.PadDriftAlt, p);
+        bool padItem = InputSettings.GetPadDown(InputSettings.PadItem, InputSettings.PadItemAlt, p);
+
+        if (p == 0)
         {
-            inp.throttle = Input.GetKey(KeyCode.W) ? 1f : Input.GetKey(KeyCode.S) ? -1f : 0f;
-            inp.steer = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
-            inp.drift = Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftShift);
-            inp.driftDown = Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.LeftShift);
-            inp.useItem = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.LeftControl);
+            bool kUp = Input.GetKey(InputSettings.KeyAccel);
+            bool kDown = Input.GetKey(InputSettings.KeyBrake);
+            inp.throttle = (kUp || padAccel > 0.15f) ? (kUp ? 1f : padAccel) : (kDown || padBrake > 0.15f) ? -(kDown ? 1f : padBrake) : 0f;
+            float kSteer = (Input.GetKey(InputSettings.KeySteerRight) ? 1f : 0f) - (Input.GetKey(InputSettings.KeySteerLeft) ? 1f : 0f);
+            inp.steer = Mathf.Abs(kSteer) > 0.01f ? kSteer : padSteer;
+            inp.drift = Input.GetKey(InputSettings.KeyDrift) || Input.GetKey(KeyCode.LeftShift) || padDrift;
+            inp.driftDown = Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(KeyCode.LeftShift) || padDriftDown;
+            inp.useItem = Input.GetKeyDown(InputSettings.KeyItem) || Input.GetKeyDown(KeyCode.LeftControl) || padItem;
         }
         else
         {
-            inp.throttle = Input.GetKey(KeyCode.UpArrow) ? 1f : Input.GetKey(KeyCode.DownArrow) ? -1f : 0f;
-            inp.steer = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
-            inp.drift = Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.Period);
-            inp.driftDown = Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.Period);
-            inp.useItem = Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.Slash);
+            bool kUp = Input.GetKey(KeyCode.UpArrow);
+            bool kDown = Input.GetKey(KeyCode.DownArrow);
+            inp.throttle = (kUp || padAccel > 0.15f) ? (kUp ? 1f : padAccel) : (kDown || padBrake > 0.15f) ? -(kDown ? 1f : padBrake) : 0f;
+            float kSteer = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
+            inp.steer = Mathf.Abs(kSteer) > 0.01f ? kSteer : padSteer;
+            inp.drift = Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.Period) || padDrift;
+            inp.driftDown = Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.Period) || padDriftDown;
+            inp.useItem = Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.Slash) || padItem;
         }
         return inp;
     }
 }
 
-// キーコンフィグ & 入力設定
+// キーコンフィグ & コントローラー入力設定
 public static class InputSettings
 {
     public static KeyCode KeyAccel = KeyCode.W;
@@ -87,9 +118,26 @@ public static class InputSettings
     public static KeyCode KeyDriftAlt = KeyCode.LeftShift;
     public static KeyCode KeyItemAlt = KeyCode.LeftControl;
 
+    // コントローラー（ゲームパッド）割り当て
+    public static PadBind PadAccel = PadBind.RT;
+    public static PadBind PadAccelAlt = PadBind.A;
+    public static PadBind PadBrake = PadBind.LT;
+    public static PadBind PadBrakeAlt = PadBind.B;
+    public static PadBind PadDrift = PadBind.RB;
+    public static PadBind PadDriftAlt = PadBind.LB;
+    public static PadBind PadItem = PadBind.X;
+    public static PadBind PadItemAlt = PadBind.Y;
+    public static PadBind PadRearView = PadBind.RS;
+    public static PadBind PadRearViewAlt = PadBind.None;
+
     public static float StickDeadzone = 0.15f;
 
     static bool initialized = false;
+    static bool prevUnityLT = false;
+    static bool prevUnityRT = false;
+    static bool curUnityLT = false;
+    static bool curUnityRT = false;
+    static int lastTrigFrame = -1;
 
     public static void Init()
     {
@@ -107,6 +155,18 @@ public static class InputSettings
         KeyDrift = (KeyCode)PlayerPrefs.GetInt("tc_key_drift", (int)KeyCode.Space);
         KeyItem = (KeyCode)PlayerPrefs.GetInt("tc_key_item", (int)KeyCode.E);
         KeyRearView = (KeyCode)PlayerPrefs.GetInt("tc_key_rear", (int)KeyCode.C);
+
+        PadAccel = (PadBind)PlayerPrefs.GetInt("tc_pad_accel", (int)PadBind.RT);
+        PadAccelAlt = (PadBind)PlayerPrefs.GetInt("tc_pad_accel_alt", (int)PadBind.A);
+        PadBrake = (PadBind)PlayerPrefs.GetInt("tc_pad_brake", (int)PadBind.LT);
+        PadBrakeAlt = (PadBind)PlayerPrefs.GetInt("tc_pad_brake_alt", (int)PadBind.B);
+        PadDrift = (PadBind)PlayerPrefs.GetInt("tc_pad_drift", (int)PadBind.RB);
+        PadDriftAlt = (PadBind)PlayerPrefs.GetInt("tc_pad_drift_alt", (int)PadBind.LB);
+        PadItem = (PadBind)PlayerPrefs.GetInt("tc_pad_item", (int)PadBind.X);
+        PadItemAlt = (PadBind)PlayerPrefs.GetInt("tc_pad_item_alt", (int)PadBind.Y);
+        PadRearView = (PadBind)PlayerPrefs.GetInt("tc_pad_rear", (int)PadBind.RS);
+        PadRearViewAlt = (PadBind)PlayerPrefs.GetInt("tc_pad_rear_alt", (int)PadBind.None);
+
         StickDeadzone = PlayerPrefs.GetFloat("tc_pad_deadzone", 0.15f);
     }
 
@@ -119,6 +179,18 @@ public static class InputSettings
         PlayerPrefs.SetInt("tc_key_drift", (int)KeyDrift);
         PlayerPrefs.SetInt("tc_key_item", (int)KeyItem);
         PlayerPrefs.SetInt("tc_key_rear", (int)KeyRearView);
+
+        PlayerPrefs.SetInt("tc_pad_accel", (int)PadAccel);
+        PlayerPrefs.SetInt("tc_pad_accel_alt", (int)PadAccelAlt);
+        PlayerPrefs.SetInt("tc_pad_brake", (int)PadBrake);
+        PlayerPrefs.SetInt("tc_pad_brake_alt", (int)PadBrakeAlt);
+        PlayerPrefs.SetInt("tc_pad_drift", (int)PadDrift);
+        PlayerPrefs.SetInt("tc_pad_drift_alt", (int)PadDriftAlt);
+        PlayerPrefs.SetInt("tc_pad_item", (int)PadItem);
+        PlayerPrefs.SetInt("tc_pad_item_alt", (int)PadItemAlt);
+        PlayerPrefs.SetInt("tc_pad_rear", (int)PadRearView);
+        PlayerPrefs.SetInt("tc_pad_rear_alt", (int)PadRearViewAlt);
+
         PlayerPrefs.SetFloat("tc_pad_deadzone", StickDeadzone);
         PlayerPrefs.Save();
     }
@@ -138,8 +210,273 @@ public static class InputSettings
         KeySteerRightAlt = KeyCode.RightArrow;
         KeyDriftAlt = KeyCode.LeftShift;
         KeyItemAlt = KeyCode.LeftControl;
+
+        PadAccel = PadBind.RT;
+        PadAccelAlt = PadBind.A;
+        PadBrake = PadBind.LT;
+        PadBrakeAlt = PadBind.B;
+        PadDrift = PadBind.RB;
+        PadDriftAlt = PadBind.LB;
+        PadItem = PadBind.X;
+        PadItemAlt = PadBind.Y;
+        PadRearView = PadBind.RS;
+        PadRearViewAlt = PadBind.None;
+
         StickDeadzone = 0.15f;
         Save();
+    }
+
+    public static string PadBindName(PadBind b) => b switch
+    {
+        PadBind.A => "A",
+        PadBind.B => "B",
+        PadBind.X => "X",
+        PadBind.Y => "Y",
+        PadBind.LB => "LB",
+        PadBind.RB => "RB",
+        PadBind.Back => "BACK",
+        PadBind.Start => "START",
+        PadBind.LS => "L-STICK",
+        PadBind.RS => "R-STICK",
+        PadBind.LT => "LT",
+        PadBind.RT => "RT",
+        _ => "NONE"
+    };
+
+    public static string FormatPadAction(string actionId)
+    {
+        GetActionPadBinds(actionId, out var pri, out var alt);
+        if (pri == PadBind.None) return "[ NONE ]";
+        if (alt != PadBind.None && alt != pri)
+            return $"[ {PadBindName(pri)} / {PadBindName(alt)} ]";
+        return $"[ {PadBindName(pri)} ]";
+    }
+
+    public static void GetActionPadBinds(string actionId, out PadBind pri, out PadBind alt)
+    {
+        switch (actionId)
+        {
+            case "accel": pri = PadAccel; alt = PadAccelAlt; break;
+            case "brake": pri = PadBrake; alt = PadBrakeAlt; break;
+            case "drift": pri = PadDrift; alt = PadDriftAlt; break;
+            case "item":  pri = PadItem;  alt = PadItemAlt;  break;
+            case "rear":  pri = PadRearView; alt = PadRearViewAlt; break;
+            default: pri = PadBind.None; alt = PadBind.None; break;
+        }
+    }
+
+    public static void SetPadBinding(string actionId, PadBind newBind)
+    {
+        if (newBind == PadBind.None || newBind == PadBind.Start) return;
+        GetActionPadBinds(actionId, out var oldPri, out _);
+
+        // 他のアクションのサブ割り当て（Alt）に同じボタンがあればクリアし、プライマリが重複していたら入れ替える
+        string[] all = { "accel", "brake", "drift", "item", "rear" };
+        foreach (var other in all)
+        {
+            if (other == actionId) continue;
+            GetActionPadBinds(other, out var p, out var a);
+            if (a == newBind) a = PadBind.None;
+            if (p == newBind)
+            {
+                if (a != PadBind.None) { p = a; a = PadBind.None; }
+                else p = oldPri;
+            }
+            WriteActionPadBinds(other, p, a);
+        }
+        WriteActionPadBinds(actionId, newBind, PadBind.None);
+        Save();
+    }
+
+    static void WriteActionPadBinds(string actionId, PadBind pri, PadBind alt)
+    {
+        switch (actionId)
+        {
+            case "accel": PadAccel = pri; PadAccelAlt = alt; break;
+            case "brake": PadBrake = pri; PadBrakeAlt = alt; break;
+            case "drift": PadDrift = pri; PadDriftAlt = alt; break;
+            case "item":  PadItem = pri;  PadItemAlt = alt;  break;
+            case "rear":  PadRearView = pri; PadRearViewAlt = alt; break;
+        }
+    }
+
+    static void UpdateUnityTriggerEdges()
+    {
+        if (lastTrigFrame == Time.frameCount) return;
+        lastTrigFrame = Time.frameCount;
+        prevUnityLT = curUnityLT;
+        prevUnityRT = curUnityRT;
+        float lt = 0f, rt = 0f;
+        try
+        {
+            rt = Mathf.Clamp01(Input.GetAxis("RightTrigger"));
+            lt = Mathf.Clamp01(Input.GetAxis("LeftTrigger"));
+        }
+        catch { }
+        curUnityLT = lt > 0.35f;
+        curUnityRT = rt > 0.35f;
+    }
+
+    static ushort ToXInputMask(PadBind b) => b switch
+    {
+        PadBind.A => GamepadHaptics.BtnA,
+        PadBind.B => GamepadHaptics.BtnB,
+        PadBind.X => GamepadHaptics.BtnX,
+        PadBind.Y => GamepadHaptics.BtnY,
+        PadBind.LB => GamepadHaptics.BtnLeftShoulder,
+        PadBind.RB => GamepadHaptics.BtnRightShoulder,
+        PadBind.Back => GamepadHaptics.BtnBack,
+        PadBind.Start => GamepadHaptics.BtnStart,
+        PadBind.LS => GamepadHaptics.BtnLeftThumb,
+        PadBind.RS => GamepadHaptics.BtnRightThumb,
+        _ => 0
+    };
+
+    static KeyCode ToUnityKeyCode(PadBind b) => b switch
+    {
+        PadBind.A => KeyCode.JoystickButton0,
+        PadBind.B => KeyCode.JoystickButton1,
+        PadBind.X => KeyCode.JoystickButton2,
+        PadBind.Y => KeyCode.JoystickButton3,
+        PadBind.LB => KeyCode.JoystickButton4,
+        PadBind.RB => KeyCode.JoystickButton5,
+        PadBind.Back => KeyCode.JoystickButton6,
+        PadBind.Start => KeyCode.JoystickButton7,
+        PadBind.LS => KeyCode.JoystickButton8,
+        PadBind.RS => KeyCode.JoystickButton9,
+        _ => KeyCode.None
+    };
+
+    public static float GetSinglePadAnalog(PadBind b, int playerIndex = 0)
+    {
+        if (b == PadBind.None) return 0f;
+        var snap = GamepadHaptics.GetPad(playerIndex);
+        if (snap.connected)
+        {
+            if (b == PadBind.LT) return snap.current.bLeftTrigger / 255f;
+            if (b == PadBind.RT) return snap.current.bRightTrigger / 255f;
+            ushort mask = ToXInputMask(b);
+            if (mask != 0 && (snap.current.wButtons & mask) != 0) return 1f;
+        }
+        if (playerIndex == 0)
+        {
+            if (b == PadBind.LT)
+            {
+                try { return Mathf.Clamp01(Input.GetAxis("LeftTrigger")); } catch { return 0f; }
+            }
+            if (b == PadBind.RT)
+            {
+                try { return Mathf.Clamp01(Input.GetAxis("RightTrigger")); } catch { return 0f; }
+            }
+            var kc = ToUnityKeyCode(b);
+            if (kc != KeyCode.None && Input.GetKey(kc)) return 1f;
+        }
+        return 0f;
+    }
+
+    public static float GetPadAnalog(PadBind pri, PadBind alt, int playerIndex = 0)
+    {
+        return Mathf.Max(GetSinglePadAnalog(pri, playerIndex), GetSinglePadAnalog(alt, playerIndex));
+    }
+
+    public static bool GetSinglePadHeld(PadBind b, int playerIndex = 0) => GetSinglePadAnalog(b, playerIndex) > 0.25f;
+
+    public static bool GetPadHeld(PadBind pri, PadBind alt, int playerIndex = 0)
+    {
+        return GetSinglePadHeld(pri, playerIndex) || GetSinglePadHeld(alt, playerIndex);
+    }
+
+    public static bool GetSinglePadDown(PadBind b, int playerIndex = 0)
+    {
+        if (b == PadBind.None) return false;
+        UpdateUnityTriggerEdges();
+        var snap = GamepadHaptics.GetPad(playerIndex);
+        if (snap.connected)
+        {
+            if (b == PadBind.LT) return snap.current.bLeftTrigger >= 90 && snap.prev.bLeftTrigger < 90;
+            if (b == PadBind.RT) return snap.current.bRightTrigger >= 90 && snap.prev.bRightTrigger < 90;
+            ushort mask = ToXInputMask(b);
+            if (mask != 0 && (snap.current.wButtons & mask) != 0 && (snap.prev.wButtons & mask) == 0) return true;
+        }
+        if (playerIndex == 0)
+        {
+            if (b == PadBind.LT) return curUnityLT && !prevUnityLT;
+            if (b == PadBind.RT) return curUnityRT && !prevUnityRT;
+            var kc = ToUnityKeyCode(b);
+            if (kc != KeyCode.None && Input.GetKeyDown(kc)) return true;
+        }
+        return false;
+    }
+
+    public static bool GetPadDown(PadBind pri, PadBind alt, int playerIndex = 0)
+    {
+        return GetSinglePadDown(pri, playerIndex) || GetSinglePadDown(alt, playerIndex);
+    }
+
+    public static float GetPadSteer(int playerIndex = 0, bool includeUnityAxis = true)
+    {
+        var snap = GamepadHaptics.GetPad(playerIndex);
+        if (snap.connected)
+        {
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadLeft) != 0) return -1f;
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadRight) != 0) return 1f;
+            float sx = Mathf.Clamp(snap.current.sThumbLX / 32767f, -1f, 1f);
+            if (Mathf.Abs(sx) >= StickDeadzone) return sx;
+        }
+        if (includeUnityAxis && playerIndex == 0)
+        {
+            float ax = Input.GetAxisRaw("Horizontal");
+            if (Mathf.Abs(ax) >= StickDeadzone) return Mathf.Clamp(ax, -1f, 1f);
+        }
+        return 0f;
+    }
+
+    // メニュー操作用：D-Pad および左スティックの入力ベクトルを取得
+    public static Vector2 GetMenuPadVector()
+    {
+        GamepadHaptics.PollPads();
+        for (int i = 0; i < 2; i++)
+        {
+            var snap = GamepadHaptics.GetPad(i);
+            if (!snap.connected) continue;
+            float dx = 0f, dy = 0f;
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadLeft) != 0) dx -= 1f;
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadRight) != 0) dx += 1f;
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadUp) != 0) dy += 1f;
+            if ((snap.current.wButtons & GamepadHaptics.BtnDPadDown) != 0) dy -= 1f;
+            if (Mathf.Abs(dx) > 0.1f || Mathf.Abs(dy) > 0.1f) return new Vector2(dx, dy);
+
+            float sx = Mathf.Clamp(snap.current.sThumbLX / 32767f, -1f, 1f);
+            float sy = Mathf.Clamp(snap.current.sThumbLY / 32767f, -1f, 1f);
+            if (Mathf.Abs(sx) > 0.45f || Mathf.Abs(sy) > 0.45f) return new Vector2(sx, sy);
+        }
+        return Vector2.zero;
+    }
+
+    // コントローラーキーコンフィグ待機中に押されたボタン・トリガーを検出
+    public static bool TryDetectPadBindDown(out PadBind detected, out bool cancelPressed)
+    {
+        GamepadHaptics.PollPads();
+        UpdateUnityTriggerEdges();
+        detected = PadBind.None;
+        cancelPressed = GetSinglePadDown(PadBind.Start, 0) || Input.GetKeyDown(KeyCode.Escape);
+        if (cancelPressed) return false;
+
+        PadBind[] candidates =
+        {
+            PadBind.A, PadBind.B, PadBind.X, PadBind.Y,
+            PadBind.LB, PadBind.RB, PadBind.LT, PadBind.RT,
+            PadBind.Back, PadBind.LS, PadBind.RS
+        };
+        foreach (var c in candidates)
+        {
+            if (GetSinglePadDown(c, 0) || GetSinglePadDown(c, 1))
+            {
+                detected = c;
+                return true;
+            }
+        }
+        return false;
     }
 }
 

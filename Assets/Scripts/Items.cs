@@ -14,6 +14,7 @@ public class ItemBox : MonoBehaviour
 
     Renderer[] faceRends;
     Transform[] questionLabels;
+    static Mesh s_qHookMesh;
 
     public void Init(Vector3 pos, Material mat, Font font)
     {
@@ -132,36 +133,40 @@ public class ItemBox : MonoBehaviour
         labelsRoot.SetParent(root, false);
         label = labelsRoot;
 
-        Vector2[] qHookPts =
+        if (s_qHookMesh == null)
         {
-            new Vector2( 0.105f, 0.095f),
-            new Vector2( 0.095f, 0.205f),
-            new Vector2(-0.005f, 0.245f),
-            new Vector2(-0.110f, 0.190f),
-            new Vector2(-0.110f, 0.085f),
-            new Vector2(-0.015f, 0.005f),
-            new Vector2( 0.000f, -0.085f)
-        };
-        Mesh qHookMesh = Banana.BuildLoftedTube(
-            20, 12,
-            t =>
+            Vector2[] qHookPts =
             {
-                Vector2 p = Banana.EvalSplinePublic(qHookPts, t);
-                return new Vector3(p.x, p.y, 0f);
-            },
-            (t, ang) =>
-            {
-                float endTaper = Mathf.Min(Mathf.Clamp01(t / 0.10f), Mathf.Clamp01((1f - t) / 0.10f));
-                float r = 0.046f * Mathf.Lerp(0.55f, 1.0f, endTaper);
-                // Z方向（厚み）は少しフラットにしてパネルに密着させる
-                float c = Mathf.Cos(ang);
-                float s = Mathf.Sin(ang);
-                float rx = r;
-                float rz = r * 0.45f;
-                return 1f / Mathf.Sqrt((c * c) / (rx * rx) + (s * s) / (rz * rz));
-            },
-            true, true
-        );
+                new Vector2( 0.105f, 0.095f),
+                new Vector2( 0.095f, 0.205f),
+                new Vector2(-0.005f, 0.245f),
+                new Vector2(-0.110f, 0.190f),
+                new Vector2(-0.110f, 0.085f),
+                new Vector2(-0.015f, 0.005f),
+                new Vector2( 0.000f, -0.085f)
+            };
+            s_qHookMesh = Banana.BuildLoftedTube(
+                20, 12,
+                t =>
+                {
+                    Vector2 p = Banana.EvalSplinePublic(qHookPts, t);
+                    return new Vector3(p.x, p.y, 0f);
+                },
+                (t, ang) =>
+                {
+                    float endTaper = Mathf.Min(Mathf.Clamp01(t / 0.10f), Mathf.Clamp01((1f - t) / 0.10f));
+                    float r = 0.046f * Mathf.Lerp(0.55f, 1.0f, endTaper);
+                    // Z方向（厚み）は少しフラットにしてパネルに密着させる
+                    float c = Mathf.Cos(ang);
+                    float s = Mathf.Sin(ang);
+                    float rx = r;
+                    float rz = r * 0.45f;
+                    return 1f / Mathf.Sqrt((c * c) / (rx * rx) + (s * s) / (rz * rz));
+                },
+                true, true
+            );
+        }
+        Mesh qHookMesh = s_qHookMesh;
 
         var whiteMpb = new MaterialPropertyBlock();
         whiteMpb.SetColor("_Color", Color.white);
@@ -474,22 +479,13 @@ public class Banana : MonoBehaviour
         return mesh;
     }
 
-    public void Init(Vector3 pos, Kart owner, Material mat)
+    static Mesh s_coreMesh, s_cupMesh, s_stemMesh, s_leafMesh, s_goldenPeelMesh, s_cuffMesh, s_tipMesh;
+
+    static void EnsureMeshes()
     {
-        Owner = owner;
-        transform.position = pos;
+        if (s_coreMesh != null) return;
 
-        // 2Dアイコン (item_banana_pop.png) に合わせた鮮やかでメリハリのある4色パレット
-        Color peelGold   = new Color(1.00f, 0.76f, 0.04f); // 外皮の鮮やかなゴールデンイエロー
-        Color cuffCream  = new Color(1.00f, 0.89f, 0.36f); // 腰の折り返しカフスのクリームイエロー
-        Color fruitCream = new Color(0.99f, 0.93f, 0.54f); // むき身の実の優しいアイボリークリーム
-        Color stemBrown  = new Color(0.42f, 0.22f, 0.06f); // ヘタ・双葉のチョコレートブラウン
-
-        Color emitGold  = new Color(0.06f, 0.03f, 0.00f);
-        Color emitCream = new Color(0.05f, 0.04f, 0.01f);
-
-        // 1. 中央のむき身バナナ本体（ふっくらとした弾頭ドーム型で、少しだけ優雅に反る）
-        Mesh coreMesh = BuildLoftedTube(
+        s_coreMesh = BuildLoftedTube(
             20, 18,
             t =>
             {
@@ -507,10 +503,8 @@ public class Banana : MonoBehaviour
             },
             true, true
         );
-        CreateMeshPart(transform, "BananaFruitCore", coreMesh, mat, fruitCream, null, emitCream);
 
-        // 2. 下部の黄金色ベースカップ（地面 Y=0.01m から腰 Y=0.30m までしっかり接地し、実を包み込む）
-        Mesh cupMesh = BuildLoftedTube(
+        s_cupMesh = BuildLoftedTube(
             12, 18,
             t => new Vector3(0f, Mathf.Lerp(0.01f, 0.30f, t), 0f),
             (t, ang) =>
@@ -521,10 +515,8 @@ public class Banana : MonoBehaviour
             },
             true, true
         );
-        CreateMeshPart(transform, "BananaBaseCup", cupMesh, mat, peelGold, null, emitGold);
 
-        // 3. 上部の茶色いヘタ＋アイコンと同じ可愛い横の新芽（双葉アクセント）
-        Mesh stemMesh = BuildLoftedTube(
+        s_stemMesh = BuildLoftedTube(
             9, 12,
             t =>
             {
@@ -541,18 +533,14 @@ public class Banana : MonoBehaviour
             },
             false, true
         );
-        CreateMeshPart(transform, "BananaStem", stemMesh, mat, stemBrown);
 
-        // ヘタ横の小さな茶色い芽（item_banana_pop.png の右上にある特徴的な小葉）
-        Mesh leafMesh = BuildLoftedTube(
+        s_leafMesh = BuildLoftedTube(
             7, 10,
             t => new Vector3(Mathf.Lerp(0.055f, 0.145f, t), Mathf.Lerp(0.645f, 0.705f + Mathf.Sin(t * Mathf.PI) * 0.02f, t), 0f),
             (t, ang) => Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI) * 0.032f * (1f + 0.25f * Mathf.Cos(ang * 2f)),
             true, true
         );
-        CreateMeshPart(transform, "BananaStemLeaf", leafMesh, mat, stemBrown);
 
-        // 4. 4枚の黄金色バナナの皮（45°, 135°, 225°, 315° の対角X配置で、正面・側面から見ても美しいシルエット）
         Vector2[] peelSpine =
         {
             new Vector2(0.135f, 0.26f),
@@ -562,10 +550,9 @@ public class Banana : MonoBehaviour
             new Vector2(0.490f, 0.042f),
             new Vector2(0.555f, 0.062f)
         };
-        Mesh goldenPeelMesh = BuildGoldenPeelMesh(peelSpine, 22, 14, 0.162f, 0.044f);
+        s_goldenPeelMesh = BuildGoldenPeelMesh(peelSpine, 22, 14, 0.162f, 0.044f);
 
-        // 腰の折り返し部分にあるぷっくり丸まったクリーム色のカフス（尖りのない滑らかなロール襟）
-        Mesh cuffMesh = BuildLoftedTube(
+        s_cuffMesh = BuildLoftedTube(
             12, 12,
             t =>
             {
@@ -582,20 +569,40 @@ public class Banana : MonoBehaviour
             true, true
         );
 
-        // 皮先端の小さな茶色い石づき
-        Mesh tipMesh = BuildLoftedTube(
+        s_tipMesh = BuildLoftedTube(
             5, 8,
             t => new Vector3(0f, Mathf.Lerp(0.056f, 0.070f, t), Mathf.Lerp(0.540f, 0.580f, t)),
             (t, ang) => Mathf.Lerp(0.034f, 0.012f, t),
             true, true
         );
+    }
+
+    public void Init(Vector3 pos, Kart owner, Material mat)
+    {
+        Owner = owner;
+        transform.position = pos;
+        EnsureMeshes();
+
+        // 2Dアイコン (item_banana_pop.png) に合わせた鮮やかでメリハリのある4色パレット
+        Color peelGold   = new Color(1.00f, 0.76f, 0.04f); // 外皮の鮮やかなゴールデンイエロー
+        Color cuffCream  = new Color(1.00f, 0.89f, 0.36f); // 腰の折り返しカフスのクリームイエロー
+        Color fruitCream = new Color(0.99f, 0.93f, 0.54f); // むき身の実の優しいアイボリークリーム
+        Color stemBrown  = new Color(0.42f, 0.22f, 0.06f); // ヘタ・双葉のチョコレートブラウン
+
+        Color emitGold  = new Color(0.06f, 0.03f, 0.00f);
+        Color emitCream = new Color(0.05f, 0.04f, 0.01f);
+
+        CreateMeshPart(transform, "BananaFruitCore", s_coreMesh, mat, fruitCream, null, emitCream);
+        CreateMeshPart(transform, "BananaBaseCup", s_cupMesh, mat, peelGold, null, emitGold);
+        CreateMeshPart(transform, "BananaStem", s_stemMesh, mat, stemBrown);
+        CreateMeshPart(transform, "BananaStemLeaf", s_leafMesh, mat, stemBrown);
 
         for (int i = 0; i < 4; i++)
         {
             Quaternion rot = Quaternion.Euler(0f, 45f + i * 90f, 0f);
-            CreateMeshPart(transform, "PeelGold_" + i, goldenPeelMesh, mat, peelGold, rot, emitGold);
-            CreateMeshPart(transform, "PeelCuff_" + i, cuffMesh, mat, cuffCream, rot, emitCream);
-            CreateMeshPart(transform, "PeelTip_" + i, tipMesh, mat, stemBrown, rot);
+            CreateMeshPart(transform, "PeelGold_" + i, s_goldenPeelMesh, mat, peelGold, rot, emitGold);
+            CreateMeshPart(transform, "PeelCuff_" + i, s_cuffMesh, mat, cuffCream, rot, emitCream);
+            CreateMeshPart(transform, "PeelTip_" + i, s_tipMesh, mat, stemBrown, rot);
         }
 
         transform.rotation = Quaternion.Euler(0, Random.value * 360f, 0);
@@ -718,6 +725,21 @@ public class Missile : MonoBehaviour
         );
     }
 
+    static Mesh s_fuselageMesh, s_mainFinMesh, s_rimFinMesh;
+
+    static void EnsureMissileMeshes()
+    {
+        if (s_fuselageMesh != null) return;
+        s_fuselageMesh = Banana.BuildLoftedTube(
+            28, 24,
+            t => new Vector3(0f, 0f, Mathf.Lerp(-0.46f, 0.46f, t)),
+            (t, ang) => EvalFuselageRadius(Mathf.Lerp(-0.46f, 0.46f, t)),
+            true, true
+        );
+        s_mainFinMesh = BuildSweptFinMesh(0.18f, 0.43f, -0.14f, -0.42f, -0.24f, -0.45f, 0.068f);
+        s_rimFinMesh  = BuildSweptFinMesh(0.20f, 0.445f, -0.26f, -0.43f, -0.32f, -0.465f, 0.052f);
+    }
+
     public void Init(RaceManager rm, Track track, Kart owner, Kart target, Material mat)
     {
         this.rm = rm;
@@ -728,6 +750,7 @@ public class Missile : MonoBehaviour
         dir = owner != null ? owner.Forward : Vector3.forward;
         lateral = owner != null ? owner.Lateral : 0f;
         transform.position = (owner != null ? owner.transform.position + owner.Forward * 2.2f : Vector3.zero) + Vector3.up * 0.7f;
+        EnsureMissileMeshes();
 
         Material chromeMat = (rm != null && rm.chromeMaterial != null) ? rm.chromeMaterial : mat;
         Material darkMat   = (rm != null && rm.tireMaterial != null) ? rm.tireMaterial : mat;
@@ -742,13 +765,7 @@ public class Missile : MonoBehaviour
         Color finEmit    = new Color(0.06f, 0.03f, 0.00f);
 
         // 1. 継ぎ目ゼロの流線型ロケット胴体メッシュ (Z = -0.46 〜 +0.46)
-        Mesh fuselageMesh = Banana.BuildLoftedTube(
-            28, 24,
-            t => new Vector3(0f, 0f, Mathf.Lerp(-0.46f, 0.46f, t)),
-            (t, ang) => EvalFuselageRadius(Mathf.Lerp(-0.46f, 0.46f, t)),
-            true, true
-        );
-        AddMeshPart(transform, "RocketFuselage", fuselageMesh, mat, redBody, null, redEmit);
+        AddMeshPart(transform, "RocketFuselage", s_fuselageMesh, mat, redBody, null, redEmit);
 
         // 2. クローム金属ベルト＆リベット鋲（アイコン中央の銀色リング帯）
         AddPart(transform, PrimitiveType.Cylinder, new Vector3(0f, 0f, -0.04f), new Vector3(0.555f, 0.068f, 0.555f), chromeMat, new Color(0.84f, 0.89f, 0.96f), Quaternion.Euler(90f, 0f, 0f));
@@ -761,13 +778,11 @@ public class Missile : MonoBehaviour
         }
 
         // 3. 4枚の滑らかなスイープ尾翼（ブロック角の飛び出しがない一体型後退翼メッシュ）
-        Mesh mainFinMesh = BuildSweptFinMesh(0.18f, 0.43f, -0.14f, -0.42f, -0.24f, -0.45f, 0.068f);
-        Mesh rimFinMesh  = BuildSweptFinMesh(0.20f, 0.445f, -0.26f, -0.43f, -0.32f, -0.465f, 0.052f);
         for (int i = 0; i < 4; i++)
         {
             Quaternion finRot = Quaternion.Euler(0f, 0f, i * 90f);
-            AddMeshPart(transform, "FinMain_" + i, mainFinMesh, mat, finYellow, finRot, finEmit);
-            AddMeshPart(transform, "FinRim_" + i, rimFinMesh, mat, finOrange, finRot, finEmit);
+            AddMeshPart(transform, "FinMain_" + i, s_mainFinMesh, mat, finYellow, finRot, finEmit);
+            AddMeshPart(transform, "FinRim_" + i, s_rimFinMesh, mat, finOrange, finRot, finEmit);
         }
 
         // 4. 後部ジェット噴射ノズル＆発光アフターバーナー炎コーン
@@ -875,7 +890,7 @@ public class Missile : MonoBehaviour
         foreach (var k in rm.Karts)
         {
             if (k == Owner) continue;
-            if (k.IsRemote) continue; // オンライン時は被弾する側（ローカル操作者またはホストのCPU）が判定する！
+            if (k.IsRemote || !k.gameObject.activeSelf) continue; // オンライン時は被弾する側（ローカル操作者またはホストのCPU）が判定する！
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
                 if (k.Shielded || k.Spin())

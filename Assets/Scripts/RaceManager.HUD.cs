@@ -290,6 +290,7 @@ public partial class RaceManager
         for (int n = 1; n <= Karts.Count; n++) // プレイヤーを最後（最前面）に描く
         {
             var k = Karts[(playerIdx + n) % Karts.Count];
+            if (!k.gameObject.activeSelf) continue;
             var uv = toMap(k.transform.position);
             var p = new Vector2(mm.x + uv.x * mm.width, mm.y + (1f - uv.y) * mm.height);
             bool isSelf = k == pl;

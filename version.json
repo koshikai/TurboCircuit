@@ -1,8 +1,8 @@
 {
-  "version": "v1.9.2",
-  "name": "Turbo Circuit v1.9.2",
-  "published_at": "2026-10-11T10:40:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.2/TurboCircuit-win64.zip",
+  "version": "v1.9.3",
+  "name": "Turbo Circuit v1.9.3",
+  "published_at": "2026-10-11T11:45:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.3/TurboCircuit-win64.zip",
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "■ What's New in Turbo Circuit v1.9.2\n• Complete Audio Overhaul & New Course BGM\n  - Dedicated BGM tracks for Hokkaido Campus & Skyline Overpass\n  - Remastered engine, drift skid, lap/final lap/finish jingles, and velocity-based collision SFX\n• Crisp SDF UI Rendering & HUD Polish\n  - Dynamic pixel-perfect SDF generation for cards, ribbons, and buttons (no stretching)\n  - Cleaner speedometer & drift gauge with enhanced slipstream wind VFX\n• Bug Fixes\n  - Fixed Pause / Retry countdown transition and audio unpause handling\n\n■ 主なアップデート内容 (v1.9.2)\n• 全6コース専用BGM完備＆サウンド全面刷新\n  - 北海道大学キャンパス・スカイライン高架コースに専用BGMを追加\n  - エンジン音・ドリフトスキール音・ラップ/ファイナルラップ/ゴールジングル・衝突SEを一新\n• UIテクスチャのSDF高精細化＆HUD視認性向上\n  - カード・リボン・ボタンを描画サイズに応じたSDF動的生成に刷新し、引き伸ばしボケを解消\n  - スピードメーター＆スリップストリーム風切りエフェクトを改善\n• ポーズメニューからの再開・リスタート時の挙動を修正"
+  "notes": "■ What's New in Turbo Circuit v1.9.3\n• Full Gamepad Menu Navigation & Custom Controller Binding\n  - Navigate all menus (Title, Settings, Online, Pause, Results) with D-Pad / Left Stick and controller button shortcuts\n  - Customize all controller buttons & triggers (A, B, X, Y, LB, RB, LT, RT, LS, RS, BACK) in KEYS & PAD settings, with dual-pad 2P split-screen support\n• Performance, Memory & Architecture Refinements\n  - Static mesh caching for 3D item boxes and bananas, and file-based Ghost Replay storage\n  - Proper resource cleanup on scene reloads and modularized Track scripts (Scenery, Nature, Animals)\n\n■ 主なアップデート内容 (v1.9.3)\n• 全メニューのゲームパッド操作対応 ＆ コントローラーキーコンフィグ追加\n  - 十字キー・左スティック・各ボタンショートカットでタイトル〜設定〜ポーズ〜リザルトの全メニュー操作に対応\n  - 「KEYS & PAD」設定でゲームパッドの各ボタン・トリガー割り当て変更に完全対応（2P対戦時の2台目パッドにも対応）\n• パフォーマンス・メモリ最適化 ＆ コード整理\n  - 3Dアイテムメッシュの静的キャッシュ化、ゴーストデータのファイル保存化、再生成時のリソース解放を強化"
 }

@@ -120,12 +120,12 @@ public partial class RaceManager
             DrawPopRibbon(new Rect(pr.x + 20, pr.y + 14, pr.width - 40, 36), ribbonDriverTex, "★  PAUSED  ★");
 
             // サブタイトル（白カード上で読みやすい濃紺）
-            GUI.Label(new Rect(pr.x + 20, pr.y + 54, pr.width - 40, 20), "GAME IS PAUSED", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.35f, 0.42f, 0.55f)));
+            GUI.Label(new Rect(pr.x + 20, pr.y + 54, pr.width - 40, 20), "D-PAD / STICK TO SELECT  •  [A / ENTER] CONFIRM", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.35f, 0.42f, 0.55f)));
 
             // 5つのポップなメニューボタン
             float bx = pr.x + 40f, bw = pr.width - 80f, by = pr.y + 82f, bh = 46f, bGap = 12f;
 
-            if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESUME RACE", "[ESC / START]", new Color(0.18f, 0.78f, 0.42f), true))
+            if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESUME RACE", "[ESC / START / B]", new Color(0.18f, 0.78f, 0.42f), true, pauseFocus == 0))
             {
                 paused = false;
                 Time.timeScale = 1f;
@@ -133,7 +133,7 @@ public partial class RaceManager
             }
             by += bh + bGap;
 
-            if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESTART RACE", "[R / X]", new Color(1f, 0.62f, 0.15f)))
+            if (DrawModernButton(new Rect(bx, by, bw, bh), "►  RESTART RACE", "[R / X]", new Color(1f, 0.62f, 0.15f), false, pauseFocus == 1))
             {
                 paused = false;
                 Time.timeScale = 1f;
@@ -142,20 +142,21 @@ public partial class RaceManager
             }
             by += bh + bGap;
 
-            if (DrawModernButton(new Rect(bx, by, bw, bh), "★  SETTINGS & KEYS", "[O]", new Color(0.18f, 0.62f, 0.95f)))
+            if (DrawModernButton(new Rect(bx, by, bw, bh), "★  SETTINGS & KEYS", "[O]", new Color(0.18f, 0.62f, 0.95f), false, pauseFocus == 2))
             {
                 showSettings = true;
+                settingsFocus = 0;
             }
             by += bh + bGap;
 
-            if (DrawModernButton(new Rect(bx, by, bw, bh), "◄  TITLE MENU", "[T / Y]", new Color(0.65f, 0.35f, 0.92f)))
+            if (DrawModernButton(new Rect(bx, by, bw, bh), "◄  TITLE MENU", "[T / Y]", new Color(0.65f, 0.35f, 0.92f), false, pauseFocus == 3))
             {
                 paused = false;
                 ReturnToTitle();
             }
             by += bh + bGap;
 
-            if (DrawModernButton(new Rect(bx, by, bw, bh), "◄  QUIT GAME", "[Q / BACK]", new Color(0.95f, 0.32f, 0.32f)))
+            if (DrawModernButton(new Rect(bx, by, bw, bh), "◄  QUIT GAME", "[Q / BACK]", new Color(0.95f, 0.32f, 0.32f), false, pauseFocus == 4))
             {
                 Application.Quit();
             }
@@ -176,11 +177,19 @@ public partial class RaceManager
         GUI.enabled = true;
     }
 
-    // 現代的なポップ立体角丸ボタン（角丸カードにマッチする丸み、ホバー発光、下部シャドウ、ショートカットキー表記、クリック判定）
-    bool DrawModernButton(Rect r, string label, string shortcut = "", Color? accentColor = null, bool isPrimary = false)
+    void DrawFocusHighlight(Rect r, float radius = 8f)
+    {
+        float pulse = (Mathf.Sin(Time.unscaledTime * 7f) + 1f) * 0.5f;
+        Color borderCol = Color.Lerp(new Color(1f, 0.72f, 0.05f, 0.98f), new Color(0.10f, 0.82f, 1f, 0.98f), pulse);
+        var hr = new Rect(r.x - 3f, r.y - 3f, r.width + 6f, r.height + 6f);
+        DrawFrame(hr, 2.5f, borderCol);
+    }
+
+    // 現代的なポップ立体角丸ボタン（角丸カードにマッチする丸み、ホバー/パッド選択発光、下部シャドウ、ショートカットキー表記、クリック判定）
+    bool DrawModernButton(Rect r, string label, string shortcut = "", Color? accentColor = null, bool isPrimary = false, bool focused = false)
     {
         Vector2 mouse = Event.current.mousePosition;
-        bool hover = GUI.enabled && r.Contains(mouse);
+        bool hover = GUI.enabled && (r.Contains(mouse) || focused);
         Color acc = accentColor ?? (isPrimary ? new Color(1f, 0.62f, 0.1f) : new Color(0.15f, 0.62f, 0.95f));
         float radius = Mathf.Min(12f, r.height * 0.35f);
 
@@ -195,6 +204,11 @@ public partial class RaceManager
         // ボタン本体（プロシージャル立体角丸テクスチャ）
         var btnTex = TextureGen.PopButton(iw, ih, radius, acc, hover);
         GUI.DrawTexture(r, btnTex);
+
+        if (focused && GUI.enabled)
+        {
+            DrawFocusHighlight(r, radius);
+        }
 
         // ラベル描画（白太文字＋黒アウトラインで抜群の視認性）
         float pad = 16f;
@@ -221,12 +235,12 @@ public partial class RaceManager
 
         var r = new Rect((w - 620) * 0.5f, (h - 540) * 0.5f, 620, 540);
         DrawPopCard(r);
-        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 34), ribbonDriverTex, "★ SETTINGS & OPTIONS ★");
+        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 34), ribbonDriverTex, "★ SETTINGS & CONTROLS ★");
 
-        // ──────── セグメントコントロール風タブバー（3タブ） ────────
+        // ──────── セグメントコントロール風タブバー（3タブ + LB/RB対応） ────────
         float tabTrackW = r.width - 60f;
         float tabW = tabTrackW / 3f, tabH = 34f;
-        Rect tabTrack = new Rect(r.x + 30f, r.y + 54, tabTrackW, tabH);
+        Rect tabTrack = new Rect(r.x + 30f, r.y + 52, tabTrackW, tabH);
         int trW = Mathf.RoundToInt(tabTrackW), trH = Mathf.RoundToInt(tabH);
         GUI.DrawTexture(tabTrack, TextureGen.RoundedPanel(trW, trH, 10f, new Color(0.12f, 0.16f, 0.28f, 0.9f), new Color(0.3f, 0.4f, 0.6f, 0.7f), 1.5f));
 
@@ -239,18 +253,24 @@ public partial class RaceManager
         {
             GUI.DrawTexture(tabGen, TextureGen.RoundedPanel(tgw, tgh, 8f, new Color(0.1f, 0.75f, 0.95f, 0.95f), Color.white, 1.5f));
         }
-        if (GUI.Button(tabGen, "★  GENERAL", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, genActive ? Color.white : new Color(0.6f, 0.7f, 0.85f))))
+        if (GUI.Button(tabGen, "◄ [LB]   ★ GENERAL", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, genActive ? Color.white : new Color(0.6f, 0.7f, 0.85f))))
+        {
             settingsTab = 0;
+            settingsFocus = 0;
+        }
 
-        // KEY CONFIG タブ (1)
+        // KEYS & PAD CONFIG タブ (1)
         Rect tabKey = new Rect(tabTrack.x + tabW + 3, tabTrack.y + 3, tabW - 6, tabH - 6);
         bool keyActive = settingsTab == 1;
         if (keyActive)
         {
             GUI.DrawTexture(tabKey, TextureGen.RoundedPanel(tgw, tgh, 8f, new Color(1f, 0.65f, 0.15f, 0.95f), Color.white, 1.5f));
         }
-        if (GUI.Button(tabKey, "►  KEYS", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, keyActive ? Color.white : new Color(0.6f, 0.7f, 0.85f))))
+        if (GUI.Button(tabKey, "► KEYS & PAD", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, keyActive ? Color.white : new Color(0.6f, 0.7f, 0.85f))))
+        {
             settingsTab = 1;
+            settingsFocus = 0;
+        }
 
         // UPDATES タブ (2)
         Rect tabUpd = new Rect(tabTrack.x + tabW * 2 + 3, tabTrack.y + 3, tabW - 6, tabH - 6);
@@ -259,12 +279,15 @@ public partial class RaceManager
         {
             GUI.DrawTexture(tabUpd, TextureGen.RoundedPanel(tgw, tgh, 8f, new Color(0.18f, 0.82f, 0.45f, 0.95f), Color.white, 1.5f));
         }
-        string updTabLabel = (updater != null && updater.State == AppUpdater.UpdateState.UpdateAvailable) ? "★  UPDATES (!)" : "▲  UPDATES";
+        string updTabLabel = (updater != null && updater.State == AppUpdater.UpdateState.UpdateAvailable) ? "★ UPDATES (!)   [RB] ►" : "▲ UPDATES   [RB] ►";
         Color updLabelCol = updActive ? Color.white : (updater != null && updater.State == AppUpdater.UpdateState.UpdateAvailable) ? new Color(1f, 0.75f, 0.2f) : new Color(0.6f, 0.7f, 0.85f);
-        if (GUI.Button(tabUpd, updTabLabel, St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Bold, false, updLabelCol)))
+        if (GUI.Button(tabUpd, updTabLabel, St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold, false, updLabelCol)))
+        {
             settingsTab = 2;
+            settingsFocus = 0;
+        }
 
-        // キー入力待ちの検知
+        // キーボード入力待ちの検知
         if (!string.IsNullOrEmpty(waitingKeyAction))
         {
             var e = Event.current;
@@ -289,29 +312,33 @@ public partial class RaceManager
             }
         }
 
+        int closeFocusIdx = settingsTab == 0 ? 5 : settingsTab == 1 ? 8 : 3;
+
         if (settingsTab == 0)
         {
-            float y = r.y + 102;
+            float y = r.y + 98;
             float lw = 150, sw = 220;
 
-            // BGM 音量
+            // BGM 音量 (Focus 0)
+            if (settingsFocus == 0) DrawFocusHighlight(new Rect(r.x + 24, y - 1, r.width - 48, 30));
             GUI.Label(new Rect(r.x + 30, y, lw, 30), "BGM VOLUME", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
             float newBgm = GUI.HorizontalSlider(new Rect(r.x + 30 + lw, y + 8, sw, 20), RaceAudio.MasterBgmVolume, 0f, 1f);
             if (Mathf.Abs(newBgm - RaceAudio.MasterBgmVolume) > 0.01f) Audio.SetMasterBgm(newBgm);
-            // 数値チップ
             Rect bgmChip = new Rect(r.x + 30 + lw + sw + 16, y + 4, 60, 22);
             DrawPopPill(bgmChip, Mathf.RoundToInt(RaceAudio.MasterBgmVolume * 100f) + "%", new Color(0.12f, 0.25f, 0.5f));
 
-            y += 40;
-            // SFX 音量
+            y += 38;
+            // SFX 音量 (Focus 1)
+            if (settingsFocus == 1) DrawFocusHighlight(new Rect(r.x + 24, y - 1, r.width - 48, 30));
             GUI.Label(new Rect(r.x + 30, y, lw, 30), "SFX VOLUME", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
             float newSfx = GUI.HorizontalSlider(new Rect(r.x + 30 + lw, y + 8, sw, 20), RaceAudio.MasterSfxVolume, 0f, 1f);
             if (Mathf.Abs(newSfx - RaceAudio.MasterSfxVolume) > 0.01f) Audio.SetMasterSfx(newSfx);
             Rect sfxChip = new Rect(r.x + 30 + lw + sw + 16, y + 4, 60, 22);
             DrawPopPill(sfxChip, Mathf.RoundToInt(RaceAudio.MasterSfxVolume * 100f) + "%", new Color(0.12f, 0.25f, 0.5f));
 
-            y += 40;
-            // スティックデッドゾーン
+            y += 38;
+            // スティックデッドゾーン (Focus 2)
+            if (settingsFocus == 2) DrawFocusHighlight(new Rect(r.x + 24, y - 1, r.width - 48, 30));
             GUI.Label(new Rect(r.x + 30, y, lw, 30), "STICK DEADZONE", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
             float newDz = GUI.HorizontalSlider(new Rect(r.x + 30 + lw, y + 8, sw, 20), InputSettings.StickDeadzone, 0.05f, 0.35f);
             if (Mathf.Abs(newDz - InputSettings.StickDeadzone) > 0.01f) { InputSettings.StickDeadzone = newDz; InputSettings.Save(); }
@@ -319,21 +346,21 @@ public partial class RaceManager
             DrawPopPill(dzChip, Mathf.RoundToInt(InputSettings.StickDeadzone * 100f) + "%", new Color(0.12f, 0.25f, 0.5f));
 
             y += 36;
-            // 画面モード（トグルボタン）
+            // 画面モード（トグルボタン） (Focus 3)
             GUI.Label(new Rect(r.x + 30, y, lw, 28), "DISPLAY", St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
-            string dispText = Screen.fullScreen ? "★  FULLSCREEN  [CLICK TO TOGGLE]" : "►  WINDOWED  [CLICK TO TOGGLE]";
+            string dispText = Screen.fullScreen ? "★  FULLSCREEN  [TOGGLE]" : "►  WINDOWED  [TOGGLE]";
             Color dispColor = Screen.fullScreen ? new Color(0.1f, 0.75f, 0.95f) : new Color(0.45f, 0.55f, 0.7f);
-            if (DrawModernButton(new Rect(r.x + 30 + lw, y, 290, 28), dispText, "", dispColor))
+            if (DrawModernButton(new Rect(r.x + 30 + lw, y, 290, 28), dispText, "", dispColor, false, settingsFocus == 3))
             {
                 Screen.fullScreen = !Screen.fullScreen;
                 PlayerPrefs.SetInt("tc_fullscreen", Screen.fullScreen ? 1 : 0);
             }
 
             y += 34;
-            // 解像度セレクター
+            // 解像度セレクター (Focus 4)
             GUI.Label(new Rect(r.x + 30, y, lw, 28), "RESOLUTION", St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
             string curResStr = $"{Screen.width} × {Screen.height}";
-            if (DrawModernButton(new Rect(r.x + 30 + lw, y, 290, 28), $"◄  {curResStr}  ►", "[CYCLE]", new Color(0.18f, 0.55f, 0.92f)))
+            if (DrawModernButton(new Rect(r.x + 30 + lw, y, 290, 28), $"◄  {curResStr}  ►", "[A / ◄►]", new Color(0.18f, 0.55f, 0.92f), false, settingsFocus == 4))
             {
                 CycleResolution(1);
             }
@@ -350,52 +377,88 @@ public partial class RaceManager
             int cbw = Mathf.RoundToInt(cBox.width), cbh = Mathf.RoundToInt(cBox.height);
             GUI.DrawTexture(cBox, TextureGen.RoundedPanel(cbw, cbh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1.2f));
             var cStyle = St(sSmall, 11, TextAnchor.UpperLeft, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f));
-            string cHelp = "QUICK CONTROLS OVERVIEW:\n" +
-                           "• Gas/Brake: Custom Keys or Pad Triggers (RT/LT) / A / B  |  Drift: Space / Shift / Pad Bumpers (RB/LB)\n" +
-                           "• Item: E / Ctrl / Pad X/Y  |  Rear View: C / Pad Right Stick  |  Time Attack Toggle: [M] on Title\n" +
-                           "• Switch to [KEYS] tab to rebind keys, or [UPDATES] tab to check newest releases!";
+            string cHelp = "GAMEPAD & KEYBOARD NAVIGATION:\n" +
+                           "• Menu Navigation: D-Pad / Left Stick  |  Confirm: [A / ENTER]  |  Back/Close: [B / ESC]  |  Switch Tab: [LB / RB]\n" +
+                           "• Switch to [KEYS & PAD] tab to customize both Keyboard keys and Controller buttons/triggers (LT/RT/A/B/X/Y/LB/RB)!";
             GUI.Label(new Rect(cBox.x + 10, cBox.y + 6, cBox.width - 20, cBox.height - 12), cHelp, cStyle);
         }
         else if (settingsTab == 1)
         {
-            // タブ 1: KEY CONFIG
-            float ky = r.y + 98;
+            // タブ 1: KEYS & PAD CONFIG（キーボード＆コントローラー2列コンフィグ）
+            float hdrY = r.y + 90f;
+            var hdrSt = St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.32f, 0.40f, 0.56f));
+            GUI.Label(new Rect(r.x + 36, hdrY, 170, 18), "ACTION", St(sSmall, 12, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.32f, 0.40f, 0.56f)));
+            GUI.Label(new Rect(r.x + 210, hdrY, 180, 18), "KEYBOARD", hdrSt);
+            GUI.Label(new Rect(r.x + 402, hdrY, 186, 18), "CONTROLLER (PAD)", hdrSt);
+
+            float ky = r.y + 110f;
             var keyEntries = new[]
             {
-                ("ACCELERATE", "accel", InputSettings.KeyAccel),
-                ("BRAKE / REVERSE", "brake", InputSettings.KeyBrake),
-                ("STEER LEFT", "left", InputSettings.KeySteerLeft),
-                ("STEER RIGHT", "right", InputSettings.KeySteerRight),
-                ("DRIFT / HOP", "drift", InputSettings.KeyDrift),
-                ("USE ITEM", "item", InputSettings.KeyItem),
-                ("REAR VIEW", "rear", InputSettings.KeyRearView),
+                ("ACCELERATE", "accel", InputSettings.KeyAccel, true),
+                ("BRAKE / REVERSE", "brake", InputSettings.KeyBrake, true),
+                ("STEER LEFT", "left", InputSettings.KeySteerLeft, false),
+                ("STEER RIGHT", "right", InputSettings.KeySteerRight, false),
+                ("DRIFT / HOP", "drift", InputSettings.KeyDrift, true),
+                ("USE ITEM", "item", InputSettings.KeyItem, true),
+                ("REAR VIEW", "rear", InputSettings.KeyRearView, true),
             };
 
             for (int i = 0; i < keyEntries.Length; i++)
             {
-                var (label, id, curKey) = keyEntries[i];
-                GUI.Label(new Rect(r.x + 40, ky, 220, 28), label, St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
-                bool waitingThis = waitingKeyAction == id;
-                string btnText = waitingThis ? "< PRESS KEY >" : $"[ {curKey} ]";
-                Color btnCol = waitingThis ? new Color(1f, 0.85f, 0.2f) : new Color(0.18f, 0.3f, 0.5f);
-                if (DrawModernButton(new Rect(r.x + 280, ky, 210, 28), btnText, "", btnCol, waitingThis))
+                var (label, id, curKey, hasPadRebind) = keyEntries[i];
+                GUI.Label(new Rect(r.x + 36, ky, 170, 27), label, St(sSmall, 14, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
+
+                // 列 0: キーボード割り当てボタン
+                bool waitingKeyThis = waitingKeyAction == id;
+                string keyBtnText = waitingKeyThis ? "< PRESS KEY >" : $"[ {curKey} ]";
+                Color keyBtnCol = waitingKeyThis ? new Color(1f, 0.80f, 0.15f) : new Color(0.18f, 0.34f, 0.58f);
+                bool keyFocused = settingsFocus == i && (settingsCol == 0 || !hasPadRebind);
+                if (DrawModernButton(new Rect(r.x + 210, ky, 180, 27), keyBtnText, "", keyBtnCol, waitingKeyThis, keyFocused))
                 {
-                    waitingKeyAction = waitingThis ? null : id;
+                    settingsFocus = i;
+                    settingsCol = 0;
+                    waitingPadAction = null;
+                    waitingKeyAction = waitingKeyThis ? null : id;
                 }
-                ky += 34;
+
+                // 列 1: コントローラー割り当てボタン（ステアリングは L-STICK / D-PAD 固定ピル表示）
+                var padRect = new Rect(r.x + 402, ky, 186, 27);
+                if (hasPadRebind)
+                {
+                    bool waitingPadThis = waitingPadAction == id;
+                    string padBtnText = waitingPadThis ? "< PRESS PAD >" : InputSettings.FormatPadAction(id);
+                    Color padBtnCol = waitingPadThis ? new Color(1f, 0.72f, 0.12f) : new Color(0.14f, 0.52f, 0.78f);
+                    bool padFocused = settingsFocus == i && settingsCol == 1;
+                    if (DrawModernButton(padRect, padBtnText, "", padBtnCol, waitingPadThis, padFocused))
+                    {
+                        settingsFocus = i;
+                        settingsCol = 1;
+                        waitingKeyAction = null;
+                        waitingPadAction = waitingPadThis ? null : id;
+                        waitingPadSkipFrame = Time.frameCount;
+                    }
+                }
+                else
+                {
+                    DrawPopPill(new Rect(padRect.x + 8, padRect.y + 2, padRect.width - 16, 23), "L-STICK / D-PAD", new Color(0.42f, 0.50f, 0.65f));
+                }
+
+                ky += 32f;
             }
 
-            var kBox = new Rect(r.x + 40, ky + 8, r.width - 80, 44);
+            var kBox = new Rect(r.x + 36, ky + 4, r.width - 72, 38);
             int kbw = Mathf.RoundToInt(kBox.width), kbh = Mathf.RoundToInt(kBox.height);
             GUI.DrawTexture(kBox, TextureGen.RoundedPanel(kbw, kbh, 8f, new Color(0.12f, 0.16f, 0.28f, 0.08f), new Color(0.7f, 0.75f, 0.85f), 1.2f));
-            string kHelp = "Click any button above then press any key to rebind.\nPress ESC to cancel rebind. Settings save automatically.";
-            GUI.Label(new Rect(kBox.x + 10, kBox.y + 4, kBox.width - 20, kBox.height - 8), kHelp, St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
+            string kHelp = "Select a slot with Mouse or D-Pad/Stick + [A], then press any Key or Controller Button/Trigger (LT/RT).\nPress [ESC / START] to cancel. Both Keyboard and Controller bindings save automatically.";
+            GUI.Label(new Rect(kBox.x + 10, kBox.y + 2, kBox.width - 20, kBox.height - 4), kHelp, St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
 
-            // デフォルトに戻すボタン（中央配置）
-            if (DrawModernButton(new Rect(r.x + (r.width - 240) * 0.5f, ky + 60, 240, 32), "◄  RESET TO DEFAULTS", "", new Color(1f, 0.45f, 0.35f)))
+            // デフォルトに戻すボタン（Focus 7）
+            if (DrawModernButton(new Rect(r.x + (r.width - 250) * 0.5f, ky + 48, 250, 30), "◄  RESET TO DEFAULTS", "", new Color(1f, 0.45f, 0.35f), false, settingsFocus == 7))
             {
                 InputSettings.ResetDefaults();
                 waitingKeyAction = null;
+                waitingPadAction = null;
+                if (Audio != null) Audio.Select();
             }
         }
         else if (settingsTab == 2)
@@ -436,7 +499,7 @@ public partial class RaceManager
 
             bool isChecking = updater != null && (updater.State == AppUpdater.UpdateState.Checking || updater.State == AppUpdater.UpdateState.Downloading);
             string checkBtnLabel = isChecking ? "►  CHECKING GITHUB..." : "►  CHECK FOR UPDATES";
-            if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), checkBtnLabel, "[C]", new Color(0.18f, 0.65f, 0.95f), true) && !isChecking)
+            if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), checkBtnLabel, "[C]", new Color(0.18f, 0.65f, 0.95f), true, settingsFocus == 0) && !isChecking)
             {
                 if (updater != null) updater.CheckForUpdates(openModalIfNew: true);
             }
@@ -445,29 +508,30 @@ public partial class RaceManager
             if (updater != null && (updater.State == AppUpdater.UpdateState.UpdateAvailable || updater.State == AppUpdater.UpdateState.Downloaded))
             {
                 string actionLabel = updater.State == AppUpdater.UpdateState.Downloaded ? "►  RESTART & INSTALL NOW" : "►  OPEN UPDATE WIDGET";
-                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), actionLabel, "[U]", new Color(0.18f, 0.85f, 0.45f), true))
+                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), actionLabel, "[U]", new Color(0.18f, 0.85f, 0.45f), true, settingsFocus == 1))
                 {
                     updater.ShowModal = true;
+                    updateModalFocus = 0;
                 }
                 by += bh + gap;
             }
             else
             {
-                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), "►  VIEW ON GITHUB", "", new Color(0.45f, 0.35f, 0.85f)))
+                if (DrawModernButton(new Rect(ux + (uw - bw) * 0.5f, by, bw, bh), "►  VIEW ON GITHUB", "", new Color(0.45f, 0.35f, 0.85f), false, settingsFocus == 1))
                 {
                     Application.OpenURL(AppUpdater.ReleasesPageUrl);
                 }
                 by += bh + gap;
             }
 
-            if (DrawModernButton(new Rect(ux + (uw - 230) * 0.5f, by, 230, 28), "★  SIMULATE UPDATE TEST", "", new Color(0.55f, 0.6f, 0.7f)))
+            if (DrawModernButton(new Rect(ux + (uw - 230) * 0.5f, by, 230, 28), "★  SIMULATE UPDATE TEST", "", new Color(0.55f, 0.6f, 0.7f), false, settingsFocus == 2))
             {
                 if (updater != null) updater.SimulateUpdateAvailableForTesting();
             }
         }
 
         // 閉じるボタン（モダンピルボタン）
-        if (DrawModernButton(new Rect(r.x + (r.width - 200) * 0.5f, r.yMax - 48, 200, 38), "►  CLOSE", "[ESC]", new Color(0.2f, 0.85f, 0.45f)))
+        if (DrawModernButton(new Rect(r.x + (r.width - 200) * 0.5f, r.yMax - 46, 200, 36), "►  CLOSE", "[ESC / B]", new Color(0.2f, 0.85f, 0.45f), false, settingsFocus == closeFocusIdx))
         {
             CloseSettings();
         }
@@ -480,9 +544,10 @@ public partial class RaceManager
         // 1. トップ：TURBO CIRCUIT ポップロゴ ＆ バージョン ＆ アップデート ＆ オプションボタン
         DrawPopPill(new Rect(24, 16, 96, 26), AppUpdater.CurrentVersion, new Color(0.18f, 0.28f, 0.5f));
 
-        if (!Net.Busy && DrawModernButton(new Rect(w - 180, 16, 155, 36), "★ OPTIONS", "[P]", new Color(0.18f, 0.55f, 0.92f)))
+        if (!Net.Busy && DrawModernButton(new Rect(w - 180, 16, 155, 36), "★ OPTIONS", "[P]", new Color(0.18f, 0.55f, 0.92f), false, titleFocus == 9))
         {
             showSettings = true;
+            settingsFocus = 0;
         }
 
         if (updater != null && !Net.Busy)
@@ -494,16 +559,18 @@ public partial class RaceManager
                 string verStr = updater.LatestVersion;
                 if (!string.IsNullOrEmpty(verStr) && verStr.Length > 7) verStr = verStr.Substring(0, 6) + "..";
                 string btnTxt = updater.State == AppUpdater.UpdateState.Downloaded ? "★ INSTALL NOW" : $"★ UPDATE {verStr}";
-                if (DrawModernButton(new Rect(w - 390, 16, 200, 36), btnTxt, "[U]", updBtnCol, true))
+                if (DrawModernButton(new Rect(w - 390, 16, 200, 36), btnTxt, "[U]", updBtnCol, true, titleFocus == 10))
                 {
                     updater.ShowModal = true;
+                    updateModalFocus = 0;
                 }
             }
             else
             {
-                if (DrawModernButton(new Rect(w - 355, 16, 165, 36), "▲ UPDATES", "[U]", new Color(0.28f, 0.4f, 0.6f)))
+                if (DrawModernButton(new Rect(w - 355, 16, 165, 36), "▲ UPDATES", "[U]", new Color(0.28f, 0.4f, 0.6f), false, titleFocus == 10))
                 {
                     updater.ShowModal = true;
+                    updateModalFocus = 0;
                 }
             }
         }
@@ -529,7 +596,7 @@ public partial class RaceManager
         // 2. 左カード：コースセレクター（TRACK SELECTION）
         float leftX = 35f;
         DrawPopCard(new Rect(leftX, cardY, cardW, cardH));
-        DrawPopRibbon(new Rect(leftX + 15, cardY + 12, cardW - 30, 32), ribbonTrackTex, "◄ TRACK SELECT [A][D] ►");
+        DrawPopRibbon(new Rect(leftX + 15, cardY + 12, cardW - 30, 32), ribbonTrackTex, "◄ TRACK SELECT [A/D / LB/RB] ►");
 
         var curDef = Track.Courses[SelectedCourse];
         if (trackBadgeTex[SelectedCourse] != null)
@@ -538,6 +605,8 @@ public partial class RaceManager
             GUI.DrawTexture(new Rect(leftX + (cardW - bSize) * 0.5f, cardY + 46, bSize, bSize), trackBadgeTex[SelectedCourse], ScaleMode.ScaleToFit);
         }
 
+        if (titleFocus == 5)
+            DrawFocusHighlight(new Rect(leftX + 14, cardY + 179, cardW - 28, 32), 8f);
         var courseTitleStyle = St(sSmall, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.12f, 0.18f, 0.35f));
         GUI.Label(new Rect(leftX + 8, cardY + 182, cardW - 16, 26), $"< {curDef.Name.ToUpper()} >", courseTitleStyle);
 
@@ -556,8 +625,9 @@ public partial class RaceManager
 
         string modeLabel = IsTimeAttack ? "★  TIME ATTACK" : $"★  {totalLaps} LAPS GP";
         Color modeCol = IsTimeAttack ? new Color(1f, 0.45f, 0.15f) : new Color(0.12f, 0.58f, 0.95f);
-        if (DrawModernButton(new Rect(leftX + (cardW - 260) * 0.5f, cardY + 326, 260, 30), modeLabel, "[M]", modeCol, true))
+        if (DrawModernButton(new Rect(leftX + (cardW - 260) * 0.5f, cardY + 326, 260, 30), modeLabel, "[M]", modeCol, true, titleFocus == 6))
         {
+            if (TwoPlayer) SetTwoPlayer(false);
             IsTimeAttack = !IsTimeAttack;
             if (Audio != null) Audio.Select();
         }
@@ -583,6 +653,8 @@ public partial class RaceManager
             GUI.Label(new Rect(rightX + 22, cardY + 46, 200, 16), "DRIVER  [W / S]", secLabelStyle);
             GUI.Label(new Rect(rightX + cardW - 92, cardY + 46, 70, 16), $"{drvIdx + 1}/{KartCharacters.Length}", idxLabelStyle);
 
+            if (titleFocus == 1)
+                DrawFocusHighlight(new Rect(rightX + 16, cardY + 62, cardW - 32, 32), 8f);
             if (DrawModernButton(new Rect(rightX + 18, cardY + 64, 32, 28), "◄", "", curDriver.color))
                 SwitchDriver(0, -1);
             var charTitleStyle = St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
@@ -596,6 +668,8 @@ public partial class RaceManager
             GUI.Label(new Rect(rightX + 22, cardY + 122, 200, 16), "KART MACHINE  [Q / E]", secLabelStyle);
             GUI.Label(new Rect(rightX + cardW - 92, cardY + 122, 70, 16), $"{krtIdx + 1}/{KartMachines.Length}", idxLabelStyle);
 
+            if (titleFocus == 2)
+                DrawFocusHighlight(new Rect(rightX + 16, cardY + 138, cardW - 32, 32), 8f);
             if (DrawModernButton(new Rect(rightX + 18, cardY + 140, 32, 28), "◄", "", curKart.color))
                 SwitchKart(0, -1);
             var kartTitleStyle = St(sSmall, 18, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
@@ -625,10 +699,14 @@ public partial class RaceManager
             var m1 = KartMachines[k1Idx];
             GetCombinedStats(d1Idx, k1Idx, out int spd1, out int acc1, out int hdl1, out int wgt1);
 
+            if (titleFocus == 1)
+                DrawFocusHighlight(new Rect(rightX + 14, cardY + 46, cardW - 28, 28), 7f);
             if (DrawModernButton(new Rect(rightX + 16, cardY + 48, 28, 24), "◄", "", d1.color)) SwitchDriver(0, -1);
             Outlined(new Rect(rightX + 46, cardY + 47, cardW - 92, 26), $"P1 DRV: {d1.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), d1.color, 1.5f);
             if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 48, 28, 24), "►", "", d1.color)) SwitchDriver(0, 1);
 
+            if (titleFocus == 2)
+                DrawFocusHighlight(new Rect(rightX + 14, cardY + 74, cardW - 28, 28), 7f);
             if (DrawModernButton(new Rect(rightX + 16, cardY + 76, 28, 24), "◄", "", m1.color)) SwitchKart(0, -1);
             Outlined(new Rect(rightX + 46, cardY + 75, cardW - 92, 26), $"P1 KRT: {m1.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), m1.color, 1.5f);
             if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 76, 28, 24), "►", "", m1.color)) SwitchKart(0, 1);
@@ -645,10 +723,14 @@ public partial class RaceManager
             var m2 = KartMachines[k2Idx];
             GetCombinedStats(d2Idx, k2Idx, out int spd2, out int acc2, out int hdl2, out int wgt2);
 
+            if (titleFocus == 3)
+                DrawFocusHighlight(new Rect(rightX + 14, cardY + 194, cardW - 28, 28), 7f);
             if (DrawModernButton(new Rect(rightX + 16, cardY + 196, 28, 24), "◄", "", d2.color)) SwitchDriver(1, -1);
             Outlined(new Rect(rightX + 46, cardY + 195, cardW - 92, 26), $"P2 DRV: {d2.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), d2.color, 1.5f);
             if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 196, 28, 24), "►", "", d2.color)) SwitchDriver(1, 1);
 
+            if (titleFocus == 4)
+                DrawFocusHighlight(new Rect(rightX + 14, cardY + 222, cardW - 28, 28), 7f);
             if (DrawModernButton(new Rect(rightX + 16, cardY + 224, 28, 24), "◄", "", m2.color)) SwitchKart(1, -1);
             Outlined(new Rect(rightX + 46, cardY + 223, cardW - 92, 26), $"P2 KRT: {m2.name}", St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), m2.color, 1.5f);
             if (DrawModernButton(new Rect(rightX + cardW - 44, cardY + 224, 28, 24), "►", "", m2.color)) SwitchKart(1, 1);
@@ -663,7 +745,7 @@ public partial class RaceManager
             GUI.Label(new Rect(rightX + 8, cardY + 365, cardW - 16, 20), "P1: [W/S] Drv [Q/E] Kart • P2: [↑/↓] Drv [←/→] Kart", switchGuide);
         }
 
-        // プレイ人数の切り替え（モダンボタン）
+        // プレイ人数 ＆ オンライン対戦の切り替え（モダンボタン）
         var modeBg = TwoPlayer ? new Color(0.95f, 0.3f, 0.5f) : new Color(0.18f, 0.52f, 0.88f);
         if (Online)
         {
@@ -675,10 +757,19 @@ public partial class RaceManager
         }
         else
         {
-            string pCountLabel = TwoPlayer ? "★  2 PLAYERS (SPLIT SCREEN)" : "★  1 PLAYER SOLO";
-            if (DrawModernButton(new Rect((w - 320) * 0.5f, 554f, 320, 32), pCountLabel, "[TAB / Y]", modeBg, TwoPlayer))
+            float rowW = 456f;
+            float rowX = (w - rowW) * 0.5f;
+            string pCountLabel = TwoPlayer ? "★ 2P SPLIT" : "★ 1P SOLO";
+            if (DrawModernButton(new Rect(rowX, 554f, 232f, 32), pCountLabel, "[TAB / Y]", modeBg, TwoPlayer, titleFocus == 7))
             {
+                if (IsTimeAttack) IsTimeAttack = false;
                 SetTwoPlayer(!TwoPlayer);
+                if (Audio != null) Audio.Select();
+            }
+            if (DrawModernButton(new Rect(rowX + 242f, 554f, 214f, 32), "★ ONLINE", "[O / X]", new Color(0.15f, 0.72f, 0.52f), false, titleFocus == 8))
+            {
+                netMenu = true;
+                netFocus = 0;
                 if (Audio != null) Audio.Select();
             }
         }
@@ -700,9 +791,13 @@ public partial class RaceManager
         GUI.DrawTexture(new Rect(btnX, btnY + 4f, btnW, btnH), raceShTex);
         var raceBtnTex = TextureGen.RaceStartButton(rbw, rbh);
         GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), raceBtnTex);
+        if (titleFocus == 0)
+            DrawFocusHighlight(new Rect(btnX, btnY, btnW, btnH), baseBtnH * 0.5f);
 
         var startStyle = St(sMid, (int)(24 + pulse * 2), TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
-        Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
+        Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER / [A] TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
+        if (!titleShotRequested && GUI.Button(new Rect(btnX, btnY, btnW, btnH), GUIContent.none, GUIStyle.none))
+            StartRaceFromTitle();
 
 
         // 5. 画面最下部：コントロールガイドバー
@@ -713,8 +808,8 @@ public partial class RaceManager
 
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = TwoPlayer
-            ? "P1: [W/S] Drv [Q/E] Kart  •  P2: [↑/↓] Drv [←/→] Kart  •  [A/D] Track  •  [TAB/Y] 1P/2P  •  [ESC/START] Pause"
-            : "[W][S] Driver  •  [Q][E] Kart  •  [A][D/LB/RB] Track  •  [SPACE/RB] Drift  •  [E/LB/X] Item  •  [TAB/Y] 2P  •  [O/X] Net  •  [ESC] Pause";
+            ? "P1: [W/S] Drv [Q/E] Kart  •  P2: [↑/↓] Drv [←/→] Kart  •  [A/D / LB/RB] Track  •  [TAB/Y] 1P/2P  •  [ESC/START] Pause"
+            : "[D-Pad/Stick] Select  •  [A/Enter] OK  •  [LB/RB] Track  •  [TAB/Y] 2P  •  [O/X] Online  •  [P/Back] Options";
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 
@@ -864,10 +959,12 @@ public partial class RaceManager
         float rowH = 36f;
         float firstTime = order.Count > 0 && order[0].Finished ? order[0].FinishTime : 0f;
 
+        int drawnRows = 0;
         for (int i = 0; i < order.Count; i++)
         {
             var k = order[i];
-            var row = new Rect(hx, rowStartY + i * (rowH + 2f), hw, rowH);
+            if (!k.gameObject.activeSelf) continue;
+            var row = new Rect(hx, rowStartY + drawnRows * (rowH + 2f), hw, rowH);
             bool isMe = k.IsPlayer || (Online && playerKarts.ContainsKey(Karts.IndexOf(k)));
 
             // 行背景（プレイヤー行は鮮やかなシアンブルー、他行は爽やかなゼブラストライプ）
@@ -880,17 +977,17 @@ public partial class RaceManager
             }
             else
             {
-                Color bgCol = i % 2 == 0 ? new Color(0.96f, 0.97f, 0.99f, 0.9f) : new Color(0.91f, 0.93f, 0.97f, 0.6f);
+                Color bgCol = drawnRows % 2 == 0 ? new Color(0.96f, 0.97f, 0.99f, 0.9f) : new Color(0.91f, 0.93f, 0.97f, 0.6f);
                 var rowTex = TextureGen.RoundedPanel(rw, rh, 6f, bgCol, new Color(0.82f, 0.86f, 0.92f, 0.8f), 1f);
                 GUI.DrawTexture(row, rowTex);
             }
 
             // 順位メダルピルバッジ（1ST=ゴールド、2ND=シルバー、3RD=ブロンズ）
-            Color medalBg = i == 0 ? new Color(0.96f, 0.72f, 0.08f)
-                : i == 1 ? new Color(0.55f, 0.65f, 0.78f)
-                : i == 2 ? new Color(0.85f, 0.50f, 0.22f)
+            Color medalBg = drawnRows == 0 ? new Color(0.96f, 0.72f, 0.08f)
+                : drawnRows == 1 ? new Color(0.55f, 0.65f, 0.78f)
+                : drawnRows == 2 ? new Color(0.85f, 0.50f, 0.22f)
                 : new Color(0.32f, 0.38f, 0.52f);
-            string posLabel = i < 3 ? $"★ {Ordinal(k.Place)}" : Ordinal(k.Place);
+            string posLabel = drawnRows < 3 ? $"★ {Ordinal(k.Place)}" : Ordinal(k.Place);
             DrawPopPill(new Rect(row.x + 8, row.y + 6, 68, 24), posLabel, medalBg);
 
             // カートカラーピル
@@ -908,13 +1005,14 @@ public partial class RaceManager
             GUI.Label(new Rect(row.x + hw - 180, row.y, 90, rowH), timeStr, St(sMono, 16, TextAnchor.MiddleRight, FontStyle.Bold, false, timeColor));
 
             // タイム差 (DIFF)
-            string diffStr = i == 0 ? "WINNER" : (k.Finished && firstTime > 0 ? $"+{k.FinishTime - firstTime:0.00}" : "-");
-            Color diffColor = i == 0 ? new Color(0.85f, 0.55f, 0.05f) : new Color(0.25f, 0.55f, 0.85f);
+            string diffStr = drawnRows == 0 ? "WINNER" : (k.Finished && firstTime > 0 ? $"+{k.FinishTime - firstTime:0.00}" : "-");
+            Color diffColor = drawnRows == 0 ? new Color(0.85f, 0.55f, 0.05f) : new Color(0.25f, 0.55f, 0.85f);
             GUI.Label(new Rect(row.x + hw - 85, row.y, 75, rowH), diffStr, St(sMono, 14, TextAnchor.MiddleRight, FontStyle.Bold, false, diffColor));
+            drawnRows++;
         }
 
         // ──────── レースサマリー＆ベストラップ統計ボックス（6台以下のとき下部の余白をリッチに活用） ────────
-        float tableBottom = rowStartY + order.Count * (rowH + 2f);
+        float tableBottom = rowStartY + drawnRows * (rowH + 2f);
         float btnY = panel.yMax - 54f;
         if (btnY - tableBottom >= 66f)
         {
@@ -947,14 +1045,15 @@ public partial class RaceManager
         // ──────── 最下部のアクションボタン (RACE AGAIN / TITLE) ────────
         float halfW = (hw - 16f) * 0.5f;
 
-        if (DrawModernButton(new Rect(hx, btnY, halfW, 44), "►  RACE AGAIN", "[ENTER / A]", new Color(1f, 0.62f, 0.1f), true))
+        if (DrawModernButton(new Rect(hx, btnY, halfW, 44), "►  RACE AGAIN", "[ENTER / A]", new Color(1f, 0.62f, 0.1f), true, resultsFocus == 0))
         {
             StartRaceFromTitle();
         }
 
-        if (DrawModernButton(new Rect(hx + halfW + 16f, btnY, halfW, 44), "◄  BACK TO TITLE", "[ESC / B]", new Color(0.18f, 0.62f, 0.95f)))
+        if (DrawModernButton(new Rect(hx + halfW + 16f, btnY, halfW, 44), "◄  BACK TO TITLE", "[ESC / B]", new Color(0.18f, 0.62f, 0.95f), false, resultsFocus == 1))
         {
-            ReturnToTitle();
+            if (Online) LeaveOnline();
+            else ReturnToTitle();
         }
     }
 
@@ -1100,11 +1199,11 @@ public partial class RaceManager
                 float bYUp = r.yMax - 54;
                 float bW1Up = 220f, bW2Up = 180f, spUp = 16f;
                 float sXUp = cx + (cw - (bW1Up + bW2Up + spUp)) * 0.5f;
-                if (DrawModernButton(new Rect(sXUp, bYUp, bW1Up, 36), "►  CHECK AGAIN", "", new Color(0.18f, 0.65f, 0.95f)))
+                if (DrawModernButton(new Rect(sXUp, bYUp, bW1Up, 36), "►  CHECK AGAIN", "[A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
                 {
                     updater.CheckForUpdates(openModalIfNew: true);
                 }
-                if (DrawModernButton(new Rect(sXUp + bW1Up + spUp, bYUp, bW2Up, 36), "◄  CLOSE", "[ESC]", new Color(0.2f, 0.82f, 0.45f)))
+                if (DrawModernButton(new Rect(sXUp + bW1Up + spUp, bYUp, bW2Up, 36), "◄  CLOSE", "[ESC / B]", new Color(0.2f, 0.82f, 0.45f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1131,11 +1230,11 @@ public partial class RaceManager
                 float bY = r.yMax - 54;
                 float bW1 = 280f, bW2 = 160f, sp = 16f;
                 float sX = cx + (cw - (bW1 + bW2 + sp)) * 0.5f;
-                if (DrawModernButton(new Rect(sX, bY, bW1, 38), "►  UPDATE NOW (AUTO)", "[ENTER]", new Color(0.18f, 0.85f, 0.45f), true))
+                if (DrawModernButton(new Rect(sX, bY, bW1, 38), "►  UPDATE NOW (AUTO)", "[ENTER / A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
                 {
                     updater.StartDownload();
                 }
-                if (DrawModernButton(new Rect(sX + bW1 + sp, bY, bW2, 38), "◄  LATER", "[ESC]", new Color(0.55f, 0.6f, 0.7f)))
+                if (DrawModernButton(new Rect(sX + bW1 + sp, bY, bW2, 38), "◄  LATER", "[ESC / B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1164,7 +1263,7 @@ public partial class RaceManager
                 string pctText = $"{Mathf.RoundToInt(updater.DownloadProgress * 100f)}%";
                 Outlined(pbRect, pctText, St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.Bold), Color.white, 1.5f);
 
-                if (DrawModernButton(new Rect(cx + (cw - 180) * 0.5f, r.yMax - 54, 180, 36), "◄  CANCEL", "[ESC]", new Color(0.95f, 0.35f, 0.35f)))
+                if (DrawModernButton(new Rect(cx + (cw - 180) * 0.5f, r.yMax - 54, 180, 36), "◄  CANCEL", "[ESC / B]", new Color(0.95f, 0.35f, 0.35f), false, true))
                 {
                     updater.CancelDownload();
                 }
@@ -1177,11 +1276,11 @@ public partial class RaceManager
 
                 float bW1Done = 280f, bW2Done = 160f, spDone = 16f;
                 float sXDone = cx + (cw - (bW1Done + bW2Done + spDone)) * 0.5f;
-                if (DrawModernButton(new Rect(sXDone, r.yMax - 54, bW1Done, 38), "►  RESTART & INSTALL NOW", "[ENTER]", new Color(0.18f, 0.85f, 0.45f), true))
+                if (DrawModernButton(new Rect(sXDone, r.yMax - 54, bW1Done, 38), "►  RESTART & INSTALL NOW", "[ENTER / A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
                 {
                     updater.ApplyUpdateAndRestart();
                 }
-                if (DrawModernButton(new Rect(sXDone + bW1Done + spDone, r.yMax - 54, bW2Done, 38), "◄  LATER", "[ESC]", new Color(0.55f, 0.6f, 0.7f)))
+                if (DrawModernButton(new Rect(sXDone + bW1Done + spDone, r.yMax - 54, bW2Done, 38), "◄  LATER", "[ESC / B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1197,11 +1296,11 @@ public partial class RaceManager
                 GUI.Label(new Rect(cx, cy + 20, cw, 28), "!  UPDATE FAILED  !", St(sSmall, 17, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.95f, 0.35f, 0.35f)));
                 GUI.Label(new Rect(cx, cy + 60, cw, 50), updater.ErrorMessage, St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.45f, 0.3f, 0.3f)));
 
-                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f, r.yMax - 54, 170, 36), "►  RETRY", "[ENTER]", new Color(0.18f, 0.65f, 0.95f)))
+                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f, r.yMax - 54, 170, 36), "►  RETRY", "[ENTER / A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
                 {
                     updater.CheckForUpdates(openModalIfNew: true);
                 }
-                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f + 190, r.yMax - 54, 170, 36), "◄  CLOSE", "[ESC]", new Color(0.6f, 0.65f, 0.75f)))
+                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f + 190, r.yMax - 54, 170, 36), "◄  CLOSE", "[ESC / B]", new Color(0.6f, 0.65f, 0.75f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }

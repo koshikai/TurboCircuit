@@ -86,9 +86,9 @@ public partial class RaceManager
             if (Player.Finished)
             {
                 if (spectateIndex < 0) spectateIndex = MyKartIndex;
-                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.JoystickButton4))
+                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || InputSettings.GetSinglePadDown(PadBind.LB, 0))
                     CycleSpectate(-1);
-                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.JoystickButton5))
+                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || InputSettings.GetSinglePadDown(PadBind.RB, 0))
                     CycleSpectate(1);
 
                 if (spectateIndex >= 0 && spectateIndex < Karts.Count)
@@ -108,7 +108,11 @@ public partial class RaceManager
     {
         if (Karts.Count <= 1) return;
         if (spectateIndex < 0) spectateIndex = MyKartIndex;
-        spectateIndex = (spectateIndex + dir + Karts.Count) % Karts.Count;
+        for (int step = 0; step < Karts.Count; step++)
+        {
+            spectateIndex = (spectateIndex + dir + Karts.Count) % Karts.Count;
+            if (Karts[spectateIndex].gameObject.activeSelf) break;
+        }
         if (Audio != null) Audio.Tick();
     }
 
@@ -124,10 +128,11 @@ public partial class RaceManager
         bool lookBehind = false;
         if (!pl.Finished && !spectating)
         {
+            bool padRear = InputSettings.GetPadHeld(InputSettings.PadRearView, InputSettings.PadRearViewAlt, p);
             if (p == 0)
-                lookBehind = Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.B) || Input.GetKey(KeyCode.JoystickButton9);
+                lookBehind = Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.B) || padRear;
             else if (p == 1)
-                lookBehind = Input.GetKey(KeyCode.Comma) || Input.GetKey(KeyCode.Backslash) || Input.GetKey(KeyCode.End);
+                lookBehind = Input.GetKey(KeyCode.Comma) || Input.GetKey(KeyCode.Backslash) || Input.GetKey(KeyCode.End) || padRear;
         }
         isLookingBehind[p] = lookBehind;
 

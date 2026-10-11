@@ -19,10 +19,10 @@ public class RaceAudio : MonoBehaviour
     float lastExplodeTime = -10f;
     float lastTickTime = -10f;
 
-    static AudioClip Load(string name, AudioClip fallback)
+    static AudioClip Load(string name, System.Func<AudioClip> fallback)
     {
         var clip = Resources.Load<AudioClip>("Audio/" + name);
-        return clip != null ? clip : fallback;
+        return clip != null ? clip : fallback();
     }
 
     public static float MasterBgmVolume { get; private set; } = 0.7f;
@@ -59,41 +59,25 @@ public class RaceAudio : MonoBehaviour
             pool[i].playOnAwake = false;
         }
 
-        // フォールバック用の柔らかい倍音合成音（通常はすべて Resources/Audio の実素材がロードされる）
-        beep = Make(0.28f, (t, d) => WarmTone(523.25f, t) * 0.35f * Env(t, d));
-        go = Make(0.60f, (t, d) => (WarmTone(783.99f, t) * 0.28f + WarmTone(1046.5f, t) * 0.22f) * Env(t, d));
-        pickup = Make(0.30f, (t, d) => WarmTone(Arp(t, 0.06f, 523, 659, 784, 1047), t) * 0.3f * Env(t, d));
-        tick = Make(0.06f, (t, d) => WarmTone(740, t) * 0.25f * Env(t, d));
-        gotItem = Make(0.35f, (t, d) => (WarmTone(659.25f, t) + WarmTone(987.77f, t)) * 0.22f * Env(t, d));
-        boost = Make(0.8f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(140, 320, t / d), t) * 0.35f) * Mathf.Sin(Mathf.PI * t / d) * 0.5f);
-        hit = Make(0.45f, (t, d) => (WarmTone(Mathf.Lerp(260, 95, t / d), t) * 0.35f + Noise() * 0.15f) * Env(t, d));
-        bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d));
-        missile = Make(0.5f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(220, 520, t / d), t) * 0.25f) * Env(t, d));
-        drop = Make(0.2f, (t, d) => WarmTone(Mathf.Lerp(420, 190, t / d), t) * 0.4f * Env(t, d));
-        lap = Make(0.6f, (t, d) => WarmTone(Arp(t, 0.14f, 587, 659, 784, 988), t) * 0.28f * Env(t, d));
-        finalLap = Make(1.0f, (t, d) => WarmTone(Arp(t, 0.14f, 523, 659, 784, 988, 1047, 1319), t) * 0.28f * Env(t, d));
-        finish = Make(1.8f, (t, d) => WarmTone(Arp(t, 0.16f, 523, 659, 784, 1047, 784, 1047, 1319, 1568), t) * 0.3f * Env(t, d));
-        pop = Make(0.28f, (t, d) => (Noise() * 0.2f + WarmTone(Mathf.Lerp(260, 620, t / d), t) * 0.3f) * Env(t, d));
-        shield = Make(0.85f, (t, d) => WarmTone(Arp(t, 0.12f, 440, 554, 659, 880), t) * 0.25f * Env(t, d));
-
-        // Resources/Audio の実素材（CC0 楽器ジングル・物理フォーリー効果音）を読み込む
-        beep = Load("sfx_beep", beep);
-        go = Load("sfx_go", go);
-        pickup = Load("sfx_pickup", pickup);
-        tick = Load("sfx_tick", tick);
-        gotItem = Load("sfx_gotitem", gotItem);
-        boost = Load("sfx_boost", boost);
-        hit = Load("sfx_hit", hit);
-        missile = Load("sfx_missile", missile);
-        drop = Load("sfx_drop", drop);
-        lap = Load("sfx_lap", lap);
-        finalLap = Load("sfx_finallap", finalLap);
-        finish = Load("sfx_finish", finish);
-        pop = Load("sfx_pop", pop);
-        shield = Load("sfx_shield", shield);
-        select = Load("sfx_select", beep);
-        explosion = Load("sfx_explosion", hit);
-        bumps = new[] { Load("sfx_bump_0", bump), Load("sfx_bump_1", bump), Load("sfx_bump_2", bump) };
+        // Resources/Audio の実素材（CC0 楽器ジングル・物理フォーリー効果音）を読み込み、欠けている場合のみ合成音を生成
+        beep = Load("sfx_beep", () => Make(0.28f, (t, d) => WarmTone(523.25f, t) * 0.35f * Env(t, d)));
+        go = Load("sfx_go", () => Make(0.60f, (t, d) => (WarmTone(783.99f, t) * 0.28f + WarmTone(1046.5f, t) * 0.22f) * Env(t, d)));
+        pickup = Load("sfx_pickup", () => Make(0.30f, (t, d) => WarmTone(Arp(t, 0.06f, 523, 659, 784, 1047), t) * 0.3f * Env(t, d)));
+        tick = Load("sfx_tick", () => Make(0.06f, (t, d) => WarmTone(740, t) * 0.25f * Env(t, d)));
+        gotItem = Load("sfx_gotitem", () => Make(0.35f, (t, d) => (WarmTone(659.25f, t) + WarmTone(987.77f, t)) * 0.22f * Env(t, d)));
+        boost = Load("sfx_boost", () => Make(0.8f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(140, 320, t / d), t) * 0.35f) * Mathf.Sin(Mathf.PI * t / d) * 0.5f));
+        hit = Load("sfx_hit", () => Make(0.45f, (t, d) => (WarmTone(Mathf.Lerp(260, 95, t / d), t) * 0.35f + Noise() * 0.15f) * Env(t, d)));
+        missile = Load("sfx_missile", () => Make(0.5f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(220, 520, t / d), t) * 0.25f) * Env(t, d)));
+        drop = Load("sfx_drop", () => Make(0.2f, (t, d) => WarmTone(Mathf.Lerp(420, 190, t / d), t) * 0.4f * Env(t, d)));
+        lap = Load("sfx_lap", () => Make(0.6f, (t, d) => WarmTone(Arp(t, 0.14f, 587, 659, 784, 988), t) * 0.28f * Env(t, d)));
+        finalLap = Load("sfx_finallap", () => Make(1.0f, (t, d) => WarmTone(Arp(t, 0.14f, 523, 659, 784, 988, 1047, 1319), t) * 0.28f * Env(t, d)));
+        finish = Load("sfx_finish", () => Make(1.8f, (t, d) => WarmTone(Arp(t, 0.16f, 523, 659, 784, 1047, 784, 1047, 1319, 1568), t) * 0.3f * Env(t, d)));
+        pop = Load("sfx_pop", () => Make(0.28f, (t, d) => (Noise() * 0.2f + WarmTone(Mathf.Lerp(260, 620, t / d), t) * 0.3f) * Env(t, d)));
+        shield = Load("sfx_shield", () => Make(0.85f, (t, d) => WarmTone(Arp(t, 0.12f, 440, 554, 659, 880), t) * 0.25f * Env(t, d)));
+        select = Load("sfx_select", () => beep);
+        explosion = Load("sfx_explosion", () => hit);
+        System.Func<AudioClip> bumpFallback = () => bump != null ? bump : (bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d)));
+        bumps = new[] { Load("sfx_bump_0", bumpFallback), Load("sfx_bump_1", bumpFallback), Load("sfx_bump_2", bumpFallback) };
 
         var engineClip = Resources.Load<AudioClip>("Audio/sfx_engine");
         useRealEngine = engineClip != null;
@@ -275,8 +259,22 @@ public class RaceAudio : MonoBehaviour
     void Play(AudioClip clip, float vol, float pitch = 1f)
     {
         if (clip == null) return;
-        var s = pool[next];
-        next = (next + 1) % pool.Length;
+        AudioSource s = null;
+        for (int i = 0; i < pool.Length; i++)
+        {
+            int idx = (next + i) % pool.Length;
+            if (!pool[idx].isPlaying)
+            {
+                s = pool[idx];
+                next = (idx + 1) % pool.Length;
+                break;
+            }
+        }
+        if (s == null)
+        {
+            s = pool[next];
+            next = (next + 1) % pool.Length;
+        }
         s.pitch = pitch;
         s.PlayOneShot(clip, vol * MasterSfxVolume);
     }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // パーティクル（火花・煙・爆発など）をまとめて出す
@@ -6,12 +7,24 @@ public static class Fx
     static ParticleSystem ps;
     static ParticleSystem smokePs;
     static ParticleSystem sparkPs;
+    static readonly List<Material> createdMats = new List<Material>();
 
     public static void Init(Material glow)
     {
+        Shutdown();
         ps = CreateSystem("Fx", glow, 8000, false, false);
         smokePs = CreateSystem("Fx_Smoke", glow, 3000, true, false);
         sparkPs = CreateSystem("Fx_Sparks", glow, 6000, false, true);
+    }
+
+    public static void Shutdown()
+    {
+        foreach (var m in createdMats)
+            if (m != null) Object.Destroy(m);
+        createdMats.Clear();
+        if (ps != null) { Object.Destroy(ps.gameObject); ps = null; }
+        if (smokePs != null) { Object.Destroy(smokePs.gameObject); smokePs = null; }
+        if (sparkPs != null) { Object.Destroy(sparkPs.gameObject); sparkPs = null; }
     }
 
     public static void Clear()
@@ -57,6 +70,7 @@ public static class Fx
         {
             mainTexture = TextureGen.SoftDot()
         };
+        createdMats.Add(mat);
         // 色飛び（白飛び）を防ぎつつ鮮やかな発色を維持するティント設定
         Color tint = stretchedSpark
             ? new Color(0.65f, 0.65f, 0.65f, 0.85f)
@@ -68,7 +82,7 @@ public static class Fx
         mat.SetColor("_BaseColor", tint);
 
         var psr = sys.GetComponent<ParticleSystemRenderer>();
-        psr.material = mat;
+        psr.sharedMaterial = mat;
         if (stretchedSpark)
         {
             psr.renderMode = ParticleSystemRenderMode.Stretch;

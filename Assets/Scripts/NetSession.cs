@@ -233,6 +233,12 @@ public class NetSession : MonoBehaviour
                 NetworkConnection accepted;
                 while (driver.IsCreated && (accepted = driver.Accept()) != default && accepted.IsCreated)
                 {
+                    if (hostConnections.Count >= MaxClients)
+                    {
+                        Debug.LogWarning("[Net] Room full, rejecting client");
+                        driver.Disconnect(accepted);
+                        continue;
+                    }
                     Debug.Log($"[Net] Accepted a client (#{hostConnections.Count + 1})");
                     hostConnections.Add(accepted);
                     State = Phase.Connected;
@@ -303,7 +309,19 @@ public class NetSession : MonoBehaviour
 
     void Handle(NetworkConnection sourceConn, ref DataStreamReader r)
     {
+        if (r.Length - r.GetBytesRead() < 1) return;
         var type = (Msg)r.ReadByte();
+        int remain = r.Length - r.GetBytesRead();
+        int need;
+        switch (type)
+        {
+            case Msg.Hello: case Msg.LobbySync: case Msg.Course: case Msg.Start: case Msg.State: need = 1; break;
+            case Msg.Welcome: case Msg.MissileSpawn: need = 2; break;
+            case Msg.BananaGone: need = 4; break;
+            case Msg.BananaSpawn: need = 17; break;
+            default: return;
+        }
+        if (remain < need) return; // 壊れた/途中で切れたパケットは破棄
         switch (type)
         {
             case Msg.Hello:
@@ -322,6 +340,7 @@ public class NetSession : MonoBehaviour
                 var pList = new List<(int slot, int kartChar, string name)>(pCount);
                 for (int i = 0; i < pCount; i++)
                 {
+                    if (r.Length - r.GetBytesRead() < 3) break; // slot + kart + name長
                     int slot = r.ReadByte();
                     int kIdx = r.ReadByte();
                     string pNick = ReadString(ref r);
@@ -340,6 +359,7 @@ public class NetSession : MonoBehaviour
                 var states = new List<(int id, NetKartState s)>(n);
                 for (int i = 0; i < n; i++)
                 {
+                    if (r.Length - r.GetBytesRead() < 37) break; // 1(id) + 36(state)
                     int id = r.ReadByte();
                     var s = ReadState(ref r);
                     states.Add((id, s));

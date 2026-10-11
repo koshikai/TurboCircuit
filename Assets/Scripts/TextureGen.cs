@@ -10,7 +10,11 @@ public static class TextureGen
     {
         foreach (var t in cache.Values)
         {
-            if (t != null) Object.Destroy(t);
+            if (t != null)
+            {
+                if (Application.isPlaying) Object.Destroy(t);
+                else Object.DestroyImmediate(t);
+            }
         }
         cache.Clear();
     }
@@ -195,6 +199,8 @@ public static class TextureGen
     // ビルの外壁（窓の明かり付き）。1タイル = 窓4列 x 8階
     public static Texture2D Windows(Color wall, Color lit, int seed)
     {
+        string key = $"windows_{wall.r:F2}_{wall.g:F2}_{wall.b:F2}_{lit.r:F2}_{lit.g:F2}_{lit.b:F2}_{seed}";
+        if (cache.TryGetValue(key, out var t) && t != null) return t;
         const int w = 64, h = 128;
         var px = new Color[w * h];
         var rng = new System.Random(seed);
@@ -212,7 +218,7 @@ public static class TextureGen
             c.a = 1;
             px[y * w + x] = c;
         }
-        return New(w, h, px);
+        return cache[key] = New(w, h, px);
     }
 
     // タイトル画面用の都市コースバッジ（夜景スカイライン）
@@ -459,14 +465,16 @@ public static class TextureGen
 
     public static Texture2D Checker()
     {
+        if (cache.TryGetValue("checker", out var cached) && cached != null) return cached;
         var px = new[] { Color.white, new Color(0.08f, 0.08f, 0.08f), new Color(0.08f, 0.08f, 0.08f), Color.white };
         var t = New(2, 2, px, false);
         t.filterMode = FilterMode.Point;
-        return t;
+        return cache["checker"] = t;
     }
 
     public static Texture2D Chevrons()
     {
+        if (cache.TryGetValue("chevrons", out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         for (int y = 0; y < n; y++)
@@ -477,7 +485,7 @@ public static class TextureGen
             bool border = Mathf.Abs(u) > 0.9f;
             px[y * n + x] = border ? new Color(0.15f, 0.15f, 0.15f) : stripe ? new Color(1f, 0.95f, 0.3f) : new Color(1f, 0.45f, 0.05f);
         }
-        return New(n, n, px);
+        return cache["chevrons"] = New(n, n, px);
     }
 
     // ジャンプ台スロープ（カタパルトランプ）用テクスチャ (256x256)
@@ -719,10 +727,13 @@ public static class TextureGen
     // コース脇のスポンサー看板用テクスチャ
     public static Texture2D SponsorBanner(int variant)
     {
+        int vMod = ((variant % 4) + 4) % 4;
+        string key = $"sponsor_banner_{vMod}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int w = 256, h = 64;
         var px = new Color[w * h];
         Color bg, accent, textCol;
-        switch (variant % 4)
+        switch (vMod)
         {
             case 0: // TURBO (赤 & 白 & 黄)
                 bg = new Color(0.85f, 0.12f, 0.12f);
@@ -764,7 +775,7 @@ public static class TextureGen
         }
         var t = New(w, h, px, true);
         t.wrapMode = TextureWrapMode.Clamp;
-        return t;
+        return cache[key] = t;
     }
 
     // UI 2x スーパーサンプリング倍率（1080p/1440p/4K でも角丸や枠線がジャギーにならないよう2倍解像度で生成）

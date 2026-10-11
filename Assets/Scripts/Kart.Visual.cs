@@ -196,7 +196,7 @@ public partial class Kart
             tr.time = 4.5f;
             tr.startWidth = 0.28f;
             tr.endWidth = 0.26f;
-            tr.material = rm.skidmarkMaterial;
+            tr.sharedMaterial = rm.skidmarkMaterial;
             tr.alignment = LineAlignment.TransformZ;
             tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             tr.receiveShadows = false;
@@ -220,8 +220,9 @@ public partial class Kart
 
     bool TryBuildKenneyModel()
     {
-        int driverIdx = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedDriver : 0) : (Mathf.Abs(Index + 1) % 10);
-        int kartIdx = KartVariant >= 0 ? KartVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : (Mathf.Abs(Index + 2) % 8);
+        int slotFallback = (rm != null && rm.Karts != null) ? Mathf.Max(0, rm.Karts.IndexOf(this)) : 0;
+        int driverIdx = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedDriver : 0) : ((slotFallback + 1) % 10);
+        int kartIdx = KartVariant >= 0 ? KartVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : ((slotFallback + 2) % 8);
 
         var baseKartPrefab = Resources.Load<GameObject>("Karts/kart-oobi");
         if (baseKartPrefab == null) return false;

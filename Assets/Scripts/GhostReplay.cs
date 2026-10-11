@@ -26,28 +26,39 @@ public class GhostReplay : MonoBehaviour
     GameObject ghostObj;
     Transform ghostTransform;
     int currentIndex;
+    Material ghostMatInstance;
 
     public bool HasGhost => playbackData != null && playbackData.frames.Count > 1;
 
+    static string GhostPath(int course) => System.IO.Path.Combine(Application.persistentDataPath, $"ghost_{course}.json");
+
     public static GhostData LoadGhost(int course)
     {
-        string key = $"tc_ghost_{course}";
-        if (!PlayerPrefs.HasKey(key)) return null;
         try
         {
-            string json = PlayerPrefs.GetString(key);
-            return JsonUtility.FromJson<GhostData>(json);
+            string path = GhostPath(course);
+            if (System.IO.File.Exists(path))
+                return JsonUtility.FromJson<GhostData>(System.IO.File.ReadAllText(path));
+
+            // 旧バージョン（PlayerPrefs 保存）からの移行読み込み
+            string key = $"tc_ghost_{course}";
+            if (PlayerPrefs.HasKey(key))
+                return JsonUtility.FromJson<GhostData>(PlayerPrefs.GetString(key));
         }
-        catch { return null; }
+        catch { }
+        return null;
     }
 
     public static void SaveGhost(int course, GhostData data)
     {
         if (data == null || data.frames.Count == 0) return;
-        string key = $"tc_ghost_{course}";
-        string json = JsonUtility.ToJson(data);
-        PlayerPrefs.SetString(key, json);
-        PlayerPrefs.Save();
+        try
+        {
+            System.IO.File.WriteAllText(GhostPath(course), JsonUtility.ToJson(data));
+            string key = $"tc_ghost_{course}";
+            if (PlayerPrefs.HasKey(key)) { PlayerPrefs.DeleteKey(key); PlayerPrefs.Save(); }
+        }
+        catch (Exception e) { Debug.LogWarning("[Ghost] save failed: " + e.Message); }
     }
 
     // タイムアタック開始時にゴーストカーを生成して準備
@@ -84,6 +95,7 @@ public class GhostReplay : MonoBehaviour
         {
             color = new Color(0.3f, 0.85f, 1f, 0.42f)
         };
+        ghostMatInstance = mat;
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", new Color(0.15f, 0.5f, 0.8f) * 0.6f);
 
@@ -134,6 +146,7 @@ public class GhostReplay : MonoBehaviour
             ghostObj = null;
         }
         playbackData = null;
+        if (ghostMatInstance != null) { Destroy(ghostMatInstance); ghostMatInstance = null; }
         currentIndex = 0;
     }
 
