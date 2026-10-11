@@ -244,6 +244,14 @@ public class AppUpdater : MonoBehaviour
                 }
             }
 
+            // アセットのバイトサイズ ("size": 60883218 等) を取得（リダイレクト時に downloadProgress が進まない対策）
+            TotalBytes = 0;
+            var sizeMatches = Regex.Matches(json, "\"size\"\\s*:\\s*(\\d+)");
+            if (sizeMatches.Count > 0)
+            {
+                ulong.TryParse(sizeMatches[sizeMatches.Count - 1].Groups[1].Value, out TotalBytes);
+            }
+
             // フォールバック URL
             if (string.IsNullOrEmpty(DownloadUrl) && !string.IsNullOrEmpty(LatestVersion))
             {
@@ -330,7 +338,6 @@ public class AppUpdater : MonoBehaviour
         State = UpdateState.Downloading;
         DownloadProgress = 0f;
         DownloadedBytes = 0;
-        TotalBytes = 0;
         StatusMessage = "Starting download...";
         ErrorMessage = "";
 
@@ -356,9 +363,49 @@ public class AppUpdater : MonoBehaviour
 
             while (!currentDownloadReq.isDone)
             {
-                DownloadProgress = currentDownloadReq.downloadProgress;
                 DownloadedBytes = currentDownloadReq.downloadedBytes;
-                StatusMessage = $"Downloading: {DownloadedBytes / (1024f * 1024f):F1} MB ({Mathf.RoundToInt(DownloadProgress * 100f)}%)";
+
+                // レスポンスヘッダーの Content-Length が取得できれば TotalBytes を更新
+                if (TotalBytes == 0)
+                {
+                    string clHeader = currentDownloadReq.GetResponseHeader("Content-Length");
+                    if (!string.IsNullOrEmpty(clHeader) && ulong.TryParse(clHeader, out ulong parsedCl) && parsedCl > 0)
+                    {
+                        TotalBytes = parsedCl;
+                    }
+                }
+
+                float rawProg = currentDownloadReq.downloadProgress;
+                if (TotalBytes > 0 && DownloadedBytes > 0)
+                {
+                    float calcProg = Mathf.Clamp01((float)((double)DownloadedBytes / (double)TotalBytes));
+                    DownloadProgress = rawProg > calcProg ? rawProg : calcProg;
+                }
+                else if (rawProg > 0f)
+                {
+                    DownloadProgress = Mathf.Clamp01(rawProg);
+                }
+                else if (DownloadedBytes > 0)
+                {
+                    // Content-Length も API size も不明な場合の推定値（約60MB基準、最大99%まで）
+                    const double estimatedTotal = 61.0 * 1024.0 * 1024.0;
+                    DownloadProgress = Mathf.Clamp((float)(DownloadedBytes / estimatedTotal), 0f, 0.99f);
+                }
+                else
+                {
+                    DownloadProgress = 0f;
+                }
+
+                float dlMb = DownloadedBytes / (1024f * 1024f);
+                if (TotalBytes > 0)
+                {
+                    float totalMb = TotalBytes / (1024f * 1024f);
+                    StatusMessage = $"Downloading: {dlMb:F1} / {totalMb:F1} MB ({Mathf.RoundToInt(DownloadProgress * 100f)}%)";
+                }
+                else
+                {
+                    StatusMessage = $"Downloading: {dlMb:F1} MB ({Mathf.RoundToInt(DownloadProgress * 100f)}%)";
+                }
                 yield return null;
             }
 
@@ -546,7 +593,8 @@ exit
             "- ドライバー10名 × カートマシン8種の自由なセッティングに対応\n" +
             "- アイテム3Dモデル・ポップアイコン・白煙エフェクトを全面刷新\n" +
             "- アップデート画面の日本語表示およびボタンクリック判定を改善");
-        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.1/TurboCircuit-win64.zip";
+        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.3/TurboCircuit-win64.zip";
+        TotalBytes = 60883218UL;
         State = UpdateState.UpdateAvailable;
         StatusMessage = "New update available: v2.0.0-preview";
         ShowModal = true;

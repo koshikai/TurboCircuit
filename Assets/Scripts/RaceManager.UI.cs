@@ -1197,13 +1197,13 @@ public partial class RaceManager
                 }
 
                 float bYUp = r.yMax - 54;
-                float bW1Up = 220f, bW2Up = 180f, spUp = 16f;
+                float bW1Up = 240f, bW2Up = 210f, spUp = 16f;
                 float sXUp = cx + (cw - (bW1Up + bW2Up + spUp)) * 0.5f;
-                if (DrawModernButton(new Rect(sXUp, bYUp, bW1Up, 36), "►  CHECK AGAIN", "[A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
+                if (DrawModernButton(new Rect(sXUp, bYUp, bW1Up, 36), "► CHECK AGAIN", "[A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
                 {
                     updater.CheckForUpdates(openModalIfNew: true);
                 }
-                if (DrawModernButton(new Rect(sXUp + bW1Up + spUp, bYUp, bW2Up, 36), "◄  CLOSE", "[ESC / B]", new Color(0.2f, 0.82f, 0.45f), false, updateModalFocus == 1))
+                if (DrawModernButton(new Rect(sXUp + bW1Up + spUp, bYUp, bW2Up, 36), "◄ CLOSE", "[ESC/B]", new Color(0.2f, 0.82f, 0.45f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1228,13 +1228,13 @@ public partial class RaceManager
                 GUI.EndScrollView();
 
                 float bY = r.yMax - 54;
-                float bW1 = 280f, bW2 = 160f, sp = 16f;
+                float bW1 = 290f, bW2 = 200f, sp = 16f;
                 float sX = cx + (cw - (bW1 + bW2 + sp)) * 0.5f;
-                if (DrawModernButton(new Rect(sX, bY, bW1, 38), "►  UPDATE NOW (AUTO)", "[ENTER / A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
+                if (DrawModernButton(new Rect(sX, bY, bW1, 38), "► UPDATE NOW", "[ENTER/A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
                 {
                     updater.StartDownload();
                 }
-                if (DrawModernButton(new Rect(sX + bW1 + sp, bY, bW2, 38), "◄  LATER", "[ESC / B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
+                if (DrawModernButton(new Rect(sX + bW1 + sp, bY, bW2, 38), "◄ LATER", "[ESC/B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1247,23 +1247,33 @@ public partial class RaceManager
 
                 // プログレスバー
                 float pbW = cw - 40f;
-                float pbH = 32f;
+                float pbH = 34f;
                 var pbRect = new Rect(cx + 20f, cy + 96f, pbW, pbH);
 
-                GUI.color = new Color(0.12f, 0.16f, 0.28f, 0.9f);
-                GUI.DrawTexture(pbRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.15f, 0.2f, 0.35f), 2f, 10f);
-                float fillW = Mathf.Clamp01(updater.DownloadProgress) * pbRect.width;
-                if (fillW > 0)
+                // 背景トラック（ダークネイビー＋枠線）
+                GUI.color = Color.white;
+                GUI.DrawTexture(pbRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.14f, 0.18f, 0.30f, 0.95f), 0f, 10f);
+
+                // 進捗フィル（グリーン＋ハイライト）
+                float prog = Mathf.Clamp01(updater.DownloadProgress);
+                float innerMaxW = pbRect.width - 6f;
+                float fillW = prog * innerMaxW;
+                if (fillW > 2f)
                 {
-                    GUI.color = new Color(0.18f, 0.82f, 0.45f);
-                    GUI.DrawTexture(new Rect(pbRect.x, pbRect.y, fillW, pbRect.height), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Color.clear, 0f, 10f);
+                    var fillRect = new Rect(pbRect.x + 3f, pbRect.y + 3f, Mathf.Max(12f, fillW), pbRect.height - 6f);
+                    GUI.DrawTexture(fillRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.18f, 0.85f, 0.45f, 1f), 0f, 8f);
+                    var glossRect = new Rect(fillRect.x + 2f, fillRect.y + 1f, Mathf.Max(8f, fillRect.width - 4f), (fillRect.height - 2f) * 0.45f);
+                    GUI.DrawTexture(glossRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(1f, 1f, 1f, 0.28f), 0f, 6f);
                 }
+
+                // 外枠ボーダー
+                GUI.DrawTexture(pbRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, new Color(0.12f, 0.16f, 0.28f, 1f), 2.5f, 10f);
                 GUI.color = Color.white;
 
-                string pctText = $"{Mathf.RoundToInt(updater.DownloadProgress * 100f)}%";
+                string pctText = $"{Mathf.RoundToInt(prog * 100f)}%";
                 Outlined(pbRect, pctText, St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.Bold), Color.white, 1.5f);
 
-                if (DrawModernButton(new Rect(cx + (cw - 180) * 0.5f, r.yMax - 54, 180, 36), "◄  CANCEL", "[ESC / B]", new Color(0.95f, 0.35f, 0.35f), false, true))
+                if (DrawModernButton(new Rect(cx + (cw - 220f) * 0.5f, r.yMax - 54, 220f, 36), "◄ CANCEL", "[ESC/B]", new Color(0.95f, 0.35f, 0.35f), false, true))
                 {
                     updater.CancelDownload();
                 }
@@ -1274,13 +1284,13 @@ public partial class RaceManager
                 GUI.Label(new Rect(cx, cy + 25, cw, 30), "★ DOWNLOAD COMPLETE! ★", St(sSmall, 20, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic, false, new Color(0.18f, 0.85f, 0.45f)));
                 GUI.Label(new Rect(cx, cy + 70, cw, 50), "Update package is downloaded and verified.\nClick below to install and relaunch Turbo Circuit!", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.25f, 0.3f, 0.45f)));
 
-                float bW1Done = 280f, bW2Done = 160f, spDone = 16f;
+                float bW1Done = 295f, bW2Done = 195f, spDone = 16f;
                 float sXDone = cx + (cw - (bW1Done + bW2Done + spDone)) * 0.5f;
-                if (DrawModernButton(new Rect(sXDone, r.yMax - 54, bW1Done, 38), "►  RESTART & INSTALL NOW", "[ENTER / A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
+                if (DrawModernButton(new Rect(sXDone, r.yMax - 54, bW1Done, 38), "► INSTALL & RESTART", "[ENTER/A]", new Color(0.18f, 0.85f, 0.45f), true, updateModalFocus == 0))
                 {
                     updater.ApplyUpdateAndRestart();
                 }
-                if (DrawModernButton(new Rect(sXDone + bW1Done + spDone, r.yMax - 54, bW2Done, 38), "◄  LATER", "[ESC / B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
+                if (DrawModernButton(new Rect(sXDone + bW1Done + spDone, r.yMax - 54, bW2Done, 38), "◄ LATER", "[ESC/B]", new Color(0.55f, 0.6f, 0.7f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }
@@ -1296,11 +1306,11 @@ public partial class RaceManager
                 GUI.Label(new Rect(cx, cy + 20, cw, 28), "!  UPDATE FAILED  !", St(sSmall, 17, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.95f, 0.35f, 0.35f)));
                 GUI.Label(new Rect(cx, cy + 60, cw, 50), updater.ErrorMessage, St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.45f, 0.3f, 0.3f)));
 
-                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f, r.yMax - 54, 170, 36), "►  RETRY", "[ENTER / A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
+                if (DrawModernButton(new Rect(cx + (cw - 416f) * 0.5f, r.yMax - 54, 200f, 36), "► RETRY", "[ENTER/A]", new Color(0.18f, 0.65f, 0.95f), false, updateModalFocus == 0))
                 {
                     updater.CheckForUpdates(openModalIfNew: true);
                 }
-                if (DrawModernButton(new Rect(cx + (cw - 360) * 0.5f + 190, r.yMax - 54, 170, 36), "◄  CLOSE", "[ESC / B]", new Color(0.6f, 0.65f, 0.75f), false, updateModalFocus == 1))
+                if (DrawModernButton(new Rect(cx + (cw - 416f) * 0.5f + 216f, r.yMax - 54, 200f, 36), "◄ CLOSE", "[ESC/B]", new Color(0.6f, 0.65f, 0.75f), false, updateModalFocus == 1))
                 {
                     updater.ShowModal = false;
                 }

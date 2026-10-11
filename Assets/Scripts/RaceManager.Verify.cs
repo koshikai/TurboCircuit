@@ -204,6 +204,19 @@ public partial class RaceManager
                     state = State.Title;
                     if (updater != null) updater.SimulateUpdateAvailableForTesting();
                     break;
+                case "updatedownloading":
+                case "update_downloading":
+                    state = State.Title;
+                    if (updater != null)
+                    {
+                        updater.SimulateUpdateAvailableForTesting();
+                        updater.State = AppUpdater.UpdateState.Downloading;
+                        updater.DownloadedBytes = 38356427UL;
+                        updater.TotalBytes = 60883218UL;
+                        updater.DownloadProgress = (float)((double)updater.DownloadedBytes / (double)updater.TotalBytes);
+                        updater.StatusMessage = $"Downloading: {updater.DownloadedBytes / (1024f * 1024f):F1} / {updater.TotalBytes / (1024f * 1024f):F1} MB ({Mathf.RoundToInt(updater.DownloadProgress * 100f)}%)";
+                    }
+                    break;
                 case "netmenu":
                     state = State.Title;
                     netMenu = true;
