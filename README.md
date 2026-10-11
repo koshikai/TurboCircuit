@@ -72,7 +72,7 @@
 |:---:|:---:|
 | <img src="Screenshots/online_lobby.png" width="450"> | <img src="Screenshots/gameplay_items.png" width="450"> |
 
-| レース結果・リザルト表 | キーコンフィグ・設定画面 |
+| レース結果・リザルト表 | キーボード＆パッドコンフィグ画面 |
 |:---:|:---:|
 | <img src="Screenshots/results.png" width="450"> | <img src="Screenshots/settings_keys.png" width="450"> |
 
@@ -172,14 +172,14 @@
 
 ## 🎁 アイテム一覧 (Items)
 
-コース上に点在するレインボーの「？アイテムボックス」を通過するとランダムでアイテムを獲得！`[E]` / `[Ctrl]` キーで使用できます。
+コース上に点在するレインボーの「？アイテムボックス」を通過するとランダムでアイテムを獲得！`[E]` / `[Ctrl]` キー（パッド: `[X]` / `[Y]` ボタン）で使用できます。
 
 | アイコン | アイテム名 | 効果・使い方 |
 |:---:|:---:|:---|
-| <img src="Screenshots/item_banana.jpg" width="64"> | **バナナ (Banana)** | 後方にトラップとして投下。後続車が踏むとスピンして大きく減速します。自分の後方を走るライバルの走行ラインに仕掛けよう！ |
-| <img src="Screenshots/item_missile.jpg" width="64"> | **ホーミングミサイル (Missile)** | 前方を走るライバルカートを自動追尾して発射！直撃すると大爆発を起こし、相手をクラッシュさせます。前方の逆転に最適！ |
-| <img src="Screenshots/item_shield.jpg" width="64"> | **シールド (Shield)** | カートの周囲に防御バリアを展開。敵のミサイル攻撃やバナナの罠から1回だけ身を守ることができます。トップ独走時の守りの要！ |
-| <img src="Screenshots/item_turbo.jpg" width="64"> | **ターボ (Turbo / Nitro)** | 強烈なニトロパワーを噴射して瞬間急加速！直線での追い抜きや、芝生・ダートなどのオフロードを強引にショートカットする時に有効！ |
+| <img src="Screenshots/item_banana_pop.png" width="64"> | **バナナ (Banana)** | 後方にトラップとして投下。後続車が踏むとスピンして大きく減速します。自分の後方を走るライバルの走行ラインに仕掛けよう！ |
+| <img src="Screenshots/item_missile_pop.png" width="64"> | **ホーミングミサイル (Missile)** | 前方を走るライバルカートを自動追尾して発射！直撃すると大爆発を起こし、相手をクラッシュさせます。前方の逆転に最適！ |
+| <img src="Screenshots/item_shield_pop.png" width="64"> | **シールド (Shield)** | カートの周囲に防御バリアを展開。敵のミサイル攻撃やバナナの罠から1回だけ身を守ることができます。トップ独走時の守りの要！ |
+| <img src="Screenshots/item_turbo_pop.png" width="64"> | **ターボ (Turbo / Nitro)** | 強烈なニトロパワーを噴射して瞬間急加速！直線での追い抜きや、芝生・ダートなどのオフロードを強引にショートカットする時に有効！ |
 
 ---
 
