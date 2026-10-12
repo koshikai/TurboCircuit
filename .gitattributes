@@ -1,0 +1,81 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Scripts & Code
+*.cs text diff=csharp
+*.shader text
+*.cginc text
+*.hlsl text
+*.compute text
+*.ps1 text eol=crlf
+*.sh text eol=lf
+*.py text eol=lf
+*.md text
+*.json text
+*.yml text
+*.yaml text
+*.xml text
+*.txt text
+
+# Unity YAML files (keep LF to avoid noisy diffs across environments)
+*.meta text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.mat text eol=lf
+*.anim text eol=lf
+*.controller text eol=lf
+*.overrideController text eol=lf
+*.physicMaterial text eol=lf
+*.physicsMaterial2D text eol=lf
+*.mask text eol=lf
+*.lighting text eol=lf
+*.renderTexture text eol=lf
+
+# 3D Models & Binary Assets (prevent line-ending conversion)
+*.fbx binary
+*.obj binary
+*.blend binary
+*.dae binary
+*.3ds binary
+
+# Images & Textures
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.tga binary
+*.psd binary
+*.gif binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.exr binary
+*.hdr binary
+*.cubemap binary
+*.ico binary
+
+# Audio & Video
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.aif binary
+*.aiff binary
+*.mod binary
+*.it binary
+*.s3m binary
+*.xm binary
+*.mp4 binary
+*.mov binary
+*.webm binary
+
+# Fonts & Binaries
+*.ttf binary
+*.otf binary
+*.TTC binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.exe binary
+*.pdb binary
+*.zip binary

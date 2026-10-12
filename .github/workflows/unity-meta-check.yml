@@ -1,0 +1,69 @@
+name: Unity Project Integrity Check
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  integrity-check:
+    name: Check .meta files & Conflict markers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for unresolved merge conflict markers
+        shell: bash
+        run: |
+          echo "Checking for conflict markers in Assets/ and ProjectSettings/..."
+          if grep -rnIE '^(<<<<<<<|=======|>>>>>>>)' Assets/ ProjectSettings/ 2>/dev/null; then
+            echo "❌ Error: Unresolved merge conflict markers found!"
+            exit 1
+          fi
+          echo "✅ No conflict markers found."
+
+      - name: Check for broken ScriptableObject references (m_Script fileID 0)
+        shell: bash
+        run: |
+          echo "Checking .asset files in Assets/Resources/ for missing m_Script..."
+          if grep -rnI 'm_Script: {fileID: 0}' Assets/Resources/ 2>/dev/null; then
+            echo "❌ Error: Found .asset file with broken m_Script ({fileID: 0}). Ensure ScriptableObject class names match their .cs filenames!"
+            exit 1
+          fi
+          echo "✅ All .asset files have valid m_Script references."
+
+      - name: Check Unity .meta files sync
+        shell: bash
+        run: |
+          missing_meta=0
+          orphan_meta=0
+
+          # 1. Check every file and directory in Assets has a .meta file
+          while IFS= read -r -d '' item; do
+            # Skip hidden files/folders
+            base=$(basename "$item")
+            if [[ "$base" == .* ]]; then
+              continue
+            fi
+            if [[ ! -f "${item}.meta" ]]; then
+              echo "❌ Missing .meta file for: $item"
+              missing_meta=1
+            fi
+          done < <(find Assets -mindepth 1 -not -name "*.meta" -print0)
+
+          # 2. Check every .meta file in Assets has a corresponding file or directory
+          while IFS= read -r -d '' meta; do
+            target="${meta%.meta}"
+            if [[ ! -e "$target" ]]; then
+              echo "❌ Orphaned .meta file (target deleted without deleting .meta): $meta"
+              orphan_meta=1
+            fi
+          done < <(find Assets -mindepth 1 -name "*.meta" -print0)
+
+          if [[ $missing_meta -ne 0 || $orphan_meta -ne 0 ]]; then
+            echo "❌ Unity .meta check failed! Please commit all matching .meta files."
+            exit 1
+          fi
+          echo "✅ All Unity .meta files are properly paired."

@@ -264,6 +264,7 @@ Turbo Circuit は**アプリ内からのワンクリック自動アップデー�
 ## 🛠️ 開発者向け情報 (Building from Source)
 
 ソースコードから自身でビルドを行う場合の手順です。
+複数人でのチーム開発・ブランチ運用ルール・ファイル分担については **[CONTRIBUTING.md](CONTRIBUTING.md)** をご覧ください。
 
 ### 動作環境
 - **Unity**: `6000.6.5f1` (Universal Render Pipeline / URP)
