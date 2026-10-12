@@ -1389,7 +1389,7 @@ public partial class RaceManager : MonoBehaviour
             return;
         }
 
-        if (netMenu && !LobbyActive)
+        if (state == State.Title && netMenu && !LobbyActive)
         {
             if (Net.Busy)
             {
@@ -1716,6 +1716,8 @@ public partial class RaceManager : MonoBehaviour
 
     void StartCountdown()
     {
+        // 接続メニューが残ると Update が早期 return し、カウントダウンが進まない。
+        netMenu = false;
         if (!Online) RestoreRoles();
         if (IsTimeAttack)
         {

@@ -80,5 +80,15 @@ pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -AutoShot
 
 ## 2. 注意事項（トラブルシューティング）
 
+### オンライン開始の回帰検証
+
+`verify.ps1 -Build` 後に `pwsh -File .agents/skills/build-and-verify/scripts/verify-online-start.ps1` を実行する。
+別コピーでビルドした場合は `-ProjectRoot <コピー先>` を指定する。
+Direct IP のホストとクライアントを起動し、接続メニューを開いた状態から通常の開始処理を通す。
+両者が Racing に進み、自カートがローカル操作で、カメラが進行方向を向くことを検証する。
+結果は `Logs/verify_online_{host,client}.log`、画像は `Build/Windows/TurboCircuit_Data/verify_online_{host,client}.png`。
+Relay サービスへの接続自体はこの検証の対象外。
+Unity Editor で本プロジェクトが開いている場合、追跡ファイルを一時ディレクトリへコピーしてそこでビルドすれば、シーン生成による未保存・既存編集の上書きを避けられる。
+
 * PowerShell から `Unity.exe` を直接 `&` で呼ぶと非同期プロセスとして即座に制御が返る場合があるため、必ず `verify.ps1` 経由（または `cmd.exe /c` 経由）で実行すること。
 * `view_file` で画像を確認する際は、個別画像を何枚も開く前にまず `*_sheet.png`（コンタクトシート）と `verify_model_bounds.txt` を確認するとコンテキスト消費を最小化できる。

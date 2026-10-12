@@ -26,11 +26,13 @@ public partial class RaceManager
     float shotSpotYawOffset;
     bool shotSpotNoHud;
     string shotModelArg;
+    bool verifyOnlineStart;
 
     void ParseVerifyArgs(string[] args)
     {
         for (int i = 0; i < args.Length; i++)
         {
+            if (args[i] == "-verify-online-start") verifyOnlineStart = true;
             if (args[i] == "-shot-ui" && i + 1 < args.Length)
             {
                 shotUiArg = args[i + 1];
@@ -61,6 +63,11 @@ public partial class RaceManager
 
     bool TryStartVerifyCoroutine()
     {
+        if (verifyOnlineStart)
+        {
+            StartCoroutine(RunOnlineStartVerification());
+            return true;
+        }
         if (!string.IsNullOrEmpty(shotModelArg))
         {
             StartCoroutine(RunShotModelCoroutine(shotModelArg));
@@ -77,6 +84,54 @@ public partial class RaceManager
             return true;
         }
         return false;
+    }
+
+    // 実際の Transport 接続と通常の Update/LateUpdate を使う開始回帰検証。
+    IEnumerator RunOnlineStartVerification()
+    {
+        netMenu = true; // UI から入室した場合と同じ状態を再現する。
+        float deadline = Time.realtimeSinceStartup + 60f;
+        while (playerKarts.Count < 2 && Time.realtimeSinceStartup < deadline) yield return null;
+        if (playerKarts.Count < 2)
+        {
+            Debug.LogError("[VerifyOnline] FAIL: lobby connection timed out");
+            Application.Quit(1);
+            yield break;
+        }
+        // Hello/Welcome/LobbySync が全員へ届くまで待つ。
+        yield return new WaitForSecondsRealtime(1f);
+        if (Net.IsHost) StartRaceFromTitle();
+        while (state != State.Racing && Time.realtimeSinceStartup < deadline) yield return null;
+        if (state != State.Racing)
+        {
+            Debug.LogError($"[VerifyOnline] FAIL: state={state}, stateTime={stateTime}, netMenu={netMenu}");
+            Application.Quit(1);
+            yield break;
+        }
+        yield return new WaitForSecondsRealtime(0.5f);
+        yield return new WaitForEndOfFrame();
+        float cameraForward = Vector3.Dot(cam.transform.forward, Player.Forward);
+        bool passed = !netMenu && !Player.IsRemote && cameraForward > 0.5f;
+        string role = Net.IsHost ? "host" : "client";
+        Debug.Log($"[VerifyOnline] {(passed ? "PASS" : "FAIL")}: {role}, state={state}, slot={MyKartIndex}, cameraForward={cameraForward:F3}");
+        // 非表示ウィンドウでもカメラ描画を検証できるよう、直接 RenderTexture に撮影する。
+        var output = new RenderTexture(1280, 720, 24);
+        var previousTarget = cam.targetTexture;
+        var previousActive = RenderTexture.active;
+        cam.targetTexture = output;
+        cam.Render();
+        RenderTexture.active = output;
+        var screenshot = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+        screenshot.Apply();
+        SaveVerifyPng(screenshot, $"verify_online_{role}.png");
+        cam.targetTexture = previousTarget;
+        RenderTexture.active = previousActive;
+        output.Release();
+        Destroy(output);
+        Destroy(screenshot);
+        yield return new WaitForSecondsRealtime(1f);
+        Application.Quit(passed ? 0 : 1);
     }
 
     static string VerifyOutputDir
