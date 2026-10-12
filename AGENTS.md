@@ -134,11 +134,15 @@ pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -AutoShot
 
 ## 6. コントリビューション・作業時の留意事項
 
-1. **既存ロジックの保護**:
+1. **GitHub フロー（Issue → ブランチ → PR）の徹底**:
+   * **バグ修正を行う際は、必ず先に GitHub Issue を作成（`gh issue create`）し、原因・再現状況を整理してから作業に入ること**。
+   * `main` ブランチへ直接コミット・直接 Push せず、作業ブランチ（`fix/〇〇`, `feat/〇〇`, `docs/〇〇` 等）を切って修正・検証し、Issue を紐付けた **Pull Request (`Closes #<番号>`)** を作成すること（詳細は [`CONTRIBUTING.md`](file:///c:/Users/kaito/UnityProjects/TurboCircuit/CONTRIBUTING.md) を参照）。
+2. **既存ロジックの保護**:
    * カートのドリフト物理挙動、壁との衝突反発計算、オンラインパケット同期の基本構造を安易に変更・破壊しないこと。
-2. **ドキュメンテーション**:
+3. **ドキュメンテーション**:
    * 新しい機能追加やキーバインド変更時は、[`README.md`](file:///c:/Users/kaito/UnityProjects/TurboCircuit/README.md) の操作説明表もあわせて更新すること。
-3. **スキル（Skills）への知識・手順の切り出し**:
+4. **スキル（Skills）への知識・手順の切り出し**:
    * 新たな作業・検証手順・アセット生成フロー・コース/キャラ追加手順・トラブルシューティングなどを行った際は、次回以降も高い再現性で実行できるよう、積極的に **`.agents/skills/<skill-name>/SKILL.md`** へスキルとして切り出し・更新を行うこと。
    * スキルは YAML フロントマター（`name`, `description`）を記載し、再利用可能なスクリプトがある場合は `.agents/skills/<skill-name>/scripts/` に格納すること。
+
 

@@ -20,7 +20,22 @@ public static class BuildTool
         Directory.CreateDirectory(SceneDir);
         Directory.CreateDirectory(MatDir);
 
-        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        UnityEngine.SceneManagement.Scene scene;
+        RaceManager rm = null;
+        if (File.Exists(ScenePath))
+        {
+            scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            rm = Object.FindFirstObjectByType<RaceManager>();
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (rm == null || root != rm.gameObject)
+                    Object.DestroyImmediate(root);
+            }
+        }
+        else
+        {
+            scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        }
 
         var sky = LoadOrCreate("Sky", Shader.Find("Skybox/Procedural"));
         sky.SetFloat("_SunSize", 0.05f);
@@ -41,7 +56,10 @@ public static class BuildTool
         RenderSettings.fogEndDistance = 900f;
         RenderSettings.fogColor = new Color(0.72f, 0.82f, 0.95f);
 
-        var rm = new GameObject("Race").AddComponent<RaceManager>();
+        if (rm == null)
+            rm = new GameObject("Race").AddComponent<RaceManager>();
+        else
+            rm.gameObject.name = "Race";
         rm.roadMaterial = Lit("Road", Color.white, 0.25f);
         rm.curbMaterial = Lit("Curb", Color.white, 0.3f);
         rm.wallMaterial = Lit("Wall", Color.white, 0.4f);
@@ -110,26 +128,28 @@ public static class BuildTool
             mat.SetColor("_BaseColor", albedo);
             mat.SetFloat("_Smoothness", smoothness);
             mat.SetFloat("_Metallic", metallic);
-            if (emission.HasValue)
-            {
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", emission.Value);
-            }
-            else mat.DisableKeyword("_EMISSION");
         }
         else
         {
             mat.SetColor("_Color", albedo);
             mat.SetFloat("_Glossiness", smoothness);
             mat.SetFloat("_Metallic", metallic);
-            if (emission.HasValue)
-            {
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", emission.Value);
-            }
-            else mat.DisableKeyword("_EMISSION");
         }
-        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+
+        if (emission.HasValue)
+        {
+            mat.SetColor("_EmissionColor", emission.Value);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            MaterialEditor.FixupEmissiveFlag(mat);
+            mat.EnableKeyword("_EMISSION");
+        }
+        else
+        {
+            mat.SetColor("_EmissionColor", Color.black);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            MaterialEditor.FixupEmissiveFlag(mat);
+            mat.DisableKeyword("_EMISSION");
+        }
         mat.enableInstancing = true;
         EditorUtility.SetDirty(mat);
         return mat;
