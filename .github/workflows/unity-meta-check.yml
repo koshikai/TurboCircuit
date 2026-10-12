@@ -1,4 +1,4 @@
-name: Unity Project Integrity Check
+name: Unity Project Integrity & C# CI
 
 on:
   pull_request:
@@ -14,6 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check Unity Editor Version Lock (6000.6.5f1)
+        shell: bash
+        run: |
+          expected="m_EditorVersion: 6000.6.5f1"
+          actual=$(grep "^m_EditorVersion:" ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          if [[ "$actual" != "$expected" ]]; then
+            echo "❌ Error: Unity version mismatch in ProjectSettings/ProjectVersion.txt!"
+            echo "   Expected: $expected"
+            echo "   Actual:   $actual"
+            exit 1
+          fi
+          echo "✅ Unity Editor version locked at 6000.6.5f1."
+
       - name: Check for unresolved merge conflict markers
         shell: bash
         run: |
@@ -24,15 +37,30 @@ jobs:
           fi
           echo "✅ No conflict markers found."
 
-      - name: Check for broken ScriptableObject references (m_Script fileID 0)
+      - name: Check ScriptableObject references & filename convention
         shell: bash
         run: |
-          echo "Checking .asset files in Assets/Resources/ for missing m_Script..."
+          echo "1. Checking .asset files in Assets/Resources/ for missing m_Script..."
           if grep -rnI 'm_Script: {fileID: 0}' Assets/Resources/ 2>/dev/null; then
             echo "❌ Error: Found .asset file with broken m_Script ({fileID: 0}). Ensure ScriptableObject class names match their .cs filenames!"
             exit 1
           fi
-          echo "✅ All .asset files have valid m_Script references."
+
+          echo "2. Checking that every ': ScriptableObject' class matches its .cs filename..."
+          so_error=0
+          while IFS=: read -r file line content; do
+            class_name=$(echo "$content" | sed -E 's/.*class[[:space:]]+([A-Za-z0-9_]+)[[:space:]]*:[[:space:]]*ScriptableObject.*/\1/' | tr -d '\r')
+            base_name=$(basename "$file" .cs)
+            if [[ "$class_name" != "$base_name" ]]; then
+              echo "❌ Error: ScriptableObject class '$class_name' is in '$file' (must be in '${class_name}.cs')"
+              so_error=1
+            fi
+          done < <(grep -rnE 'class[[:space:]]+[A-Za-z0-9_]+[[:space:]]*:[[:space:]]*ScriptableObject' Assets/Scripts/)
+
+          if [[ $so_error -ne 0 ]]; then
+            exit 1
+          fi
+          echo "✅ All ScriptableObject classes and .asset references are valid."
 
       - name: Check Unity .meta files sync
         shell: bash
@@ -42,7 +70,6 @@ jobs:
 
           # 1. Check every file and directory in Assets has a .meta file
           while IFS= read -r -d '' item; do
-            # Skip hidden files/folders
             base=$(basename "$item")
             if [[ "$base" == .* ]]; then
               continue
@@ -67,3 +94,68 @@ jobs:
             exit 1
           fi
           echo "✅ All Unity .meta files are properly paired."
+
+      - name: Check Material _EMISSION keyword & LightmapFlags sync
+        shell: bash
+        run: |
+          mat_err=0
+          for mat in Assets/Materials/*.mat; do
+            if grep -q -- "- _EMISSION" "$mat" && grep -q "m_LightmapFlags: 0" "$mat"; then
+              echo "❌ Error: $mat has _EMISSION enabled but m_LightmapFlags: 0 (causes Editor/BuildTool flip-flop)."
+              mat_err=1
+            fi
+          done
+          if [[ $mat_err -ne 0 ]]; then
+            exit 1
+          fi
+          echo "✅ All Materials have consistent _EMISSION and m_LightmapFlags."
+
+      - name: Check IMGUI & Track SafeDestroy conventions
+        shell: bash
+        run: |
+          # 1. new GUIStyle is only allowed inside RaceManager.UI.cs style cache setup (lines 1-80)
+          bad_style=$(grep -rn "new GUIStyle" Assets/Scripts/ | grep -v "^Assets/Scripts/RaceManager.UI.cs:[1-7][0-9]:" || true)
+          if [[ -n "$bad_style" ]]; then
+            echo "❌ Error: 'new GUIStyle' found outside style cache setup! Use St(...) cache in OnGUI instead:"
+            echo "$bad_style"
+            exit 1
+          fi
+          echo "✅ IMGUI GUIStyle cache rule passed."
+
+          # 2. Direct Object.Destroy in Track*.cs is only allowed inside SafeDestroy (Track.Visuals.cs)
+          bad_destroy=$(grep -rn "Object\.Destroy(" Assets/Scripts/Track*.cs | grep -v "Assets/Scripts/Track.Visuals.cs:" || true)
+          if [[ -n "$bad_destroy" ]]; then
+            echo "❌ Error: Direct 'Object.Destroy(' found in Track*.cs! Use Destroy(...) / SafeDestroy(...) for Edit Mode preview compatibility:"
+            echo "$bad_destroy"
+            exit 1
+          fi
+          echo "✅ Track SafeDestroy rule passed."
+
+      - name: Roslyn C# Syntax & Partial Class Verification
+        shell: bash
+        run: |
+          CSC_DLL=$(find /usr/share/dotnet/sdk -name "csc.dll" | sort -V | tail -n 1)
+          if [[ -z "$CSC_DLL" ]]; then
+            echo "⚠️ Warning: csc.dll not found on runner, skipping Roslyn check."
+            exit 0
+          fi
+          echo "Using Roslyn compiler: $CSC_DLL"
+          mapfile -t CS_FILES < <(find Assets/Scripts Assets/Editor -name "*.cs")
+          mapfile -t PLAYER_CS_FILES < <(find Assets/Scripts -name "*.cs")
+
+          # 1. Check Editor compilation symbols (UNITY_EDITOR)
+          OUT_EDITOR=$(dotnet "$CSC_DLL" -nologo -t:library -nostdlib -noconfig -d:UNITY_EDITOR,UNITY_6000_0_OR_NEWER "${CS_FILES[@]}" 2>&1 || true)
+          ERR_EDITOR=$(echo "$OUT_EDITOR" | grep -E "error (CS1[0-9]{3}|CS0101|CS0102|CS0106|CS0111|CS0260):" || true)
+
+          # 2. Check Player compilation symbols (without UNITY_EDITOR)
+          OUT_PLAYER=$(dotnet "$CSC_DLL" -nologo -t:library -nostdlib -noconfig -d:UNITY_6000_0_OR_NEWER "${PLAYER_CS_FILES[@]}" 2>&1 || true)
+          ERR_PLAYER=$(echo "$OUT_PLAYER" | grep -E "error (CS1[0-9]{3}|CS0101|CS0102|CS0106|CS0111|CS0260):" || true)
+
+          if [[ -n "$ERR_EDITOR" || -n "$ERR_PLAYER" ]]; then
+            echo "❌ C# Syntax or Partial Class Structural Errors detected:"
+            [[ -n "$ERR_EDITOR" ]] && echo "$ERR_EDITOR"
+            [[ -n "$ERR_PLAYER" ]] && echo "$ERR_PLAYER"
+            exit 1
+          fi
+          echo "✅ All ${#CS_FILES[@]} C# files passed Roslyn syntax & partial-class verification (Editor & Player modes)."
+
