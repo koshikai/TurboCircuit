@@ -435,7 +435,15 @@ public partial class RaceManager
         if (Net.IsHost)
         {
             float pulse = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
-            var br = new Rect(cx - 190, py + 40, 380, 64 + pulse * 4f);
+            float btnScale = 1f + pulse * 0.04f;
+            var br = new Rect(Mathf.Round(cx - 190f), Mathf.Round(py + 40f), 380f, 64f);
+            Matrix4x4 prevMat = GUI.matrix;
+            Vector3 btnPivot = new Vector3(br.center.x, br.center.y, 0f);
+            GUI.matrix = prevMat
+                * Matrix4x4.Translate(btnPivot)
+                * Matrix4x4.Scale(new Vector3(btnScale, btnScale, 1f))
+                * Matrix4x4.Translate(-btnPivot);
+
             var raceSh = TextureGen.RoundedShadow(380, 64, 32f);
             GUI.DrawTexture(new Rect(br.x, br.y + 4f, br.width, br.height), raceSh);
             var raceBtn = TextureGen.RaceStartButton(380, 64);
@@ -443,7 +451,9 @@ public partial class RaceManager
             if (lobbyFocus == 2)
                 DrawFocusHighlight(br, 32f);
             Outlined(br, "►► START RACE ◄◄", St(sMid, 26, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), Color.white, 2.5f);
-            if (GUI.Button(br, GUIContent.none, GUIStyle.none)) StartRaceFromTitle();
+            bool startClicked = GUI.Button(br, GUIContent.none, GUIStyle.none);
+            GUI.matrix = prevMat;
+            if (startClicked) StartRaceFromTitle();
             GUI.Label(new Rect(cx - 190, py + 118, 380, 24), "[ENTER / A / START] to start for everyone", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
         }
         else
