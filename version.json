@@ -1,9 +1,9 @@
 {
-  "version": "v1.9.3",
-  "name": "Turbo Circuit v1.9.3",
-  "published_at": "2026-10-11T11:45:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.3/TurboCircuit-win64.zip",
-  "size": 60883218,
+  "version": "v1.9.4",
+  "name": "Turbo Circuit v1.9.4",
+  "published_at": "2026-10-13T05:00:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.4/TurboCircuit-win64.zip",
+  "size": 61357380,
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "■ What's New in Turbo Circuit v1.9.3\n• Full Gamepad Menu Navigation & Custom Controller Binding\n  - Navigate all menus (Title, Settings, Online, Pause, Results) with D-Pad / Left Stick and controller button shortcuts\n  - Customize all controller buttons & triggers (A, B, X, Y, LB, RB, LT, RT, LS, RS, BACK) in KEYS & PAD settings, with dual-pad 2P split-screen support\n• Performance, Memory & Architecture Refinements\n  - Static mesh caching for 3D item boxes and bananas, and file-based Ghost Replay storage\n  - Proper resource cleanup on scene reloads and modularized Track scripts (Scenery, Nature, Animals)\n\n■ 主なアップデート内容 (v1.9.3)\n• 全メニューのゲームパッド操作対応 ＆ コントローラーキーコンフィグ追加\n  - 十字キー・左スティック・各ボタンショートカットでタイトル〜設定〜ポーズ〜リザルトの全メニュー操作に対応\n  - 「KEYS & PAD」設定でゲームパッドの各ボタン・トリガー割り当て変更に完全対応（2P対戦時の2台目パッドにも対応）\n• パフォーマンス・メモリ最適化 ＆ コード整理\n  - 3Dアイテムメッシュの静的キャッシュ化、ゴーストデータのファイル保存化、再生成時のリソース解放を強化"
+  "notes": "■ What's New in Turbo Circuit v1.9.4\n• Course Decor Editor & Flyover Bridge / Campus Scenery Enhancements\n  - Added Course Decor Editor (Turbo Circuit > Course Decor Editor) for non-destructive prop customization\n  - Generated supporting bridge pillars under Course 0's flyover bridge with globally continuous terrain\n  - Grounded Hokkaido Campus pasture cows, northern forest trees, and buildings accurately to sloped terrain\n• Gameplay, 2P Split-Screen, Online Multiplayer & Stability Fixes\n  - Smooth landing trick rotation, 1-roll-per-jump AI trick probability, and wall-pinning anti-stuck recovery\n  - Eliminated 2P split-screen input cross-talk, online dead-reckoning 85ms snap, and phantom missiles on remote karts\n  - Fixed Results finish-time tracking, ESC/Start shortcut handling, keybind KeyUp capture, and procedural texture/mesh memory leaks\n\n■ 主なアップデート内容 (v1.9.4)\n• コース装飾エディタ追加 ＆ 高架橋脚・北大キャンパス景観の改善\n  - コース装飾を手動調整・差分保存できる「Course Decor Editor」を追加\n  - コース0の立体交差高架橋に橋脚を生成し、北大キャンパスの放牧牛・北側森林・建物の接地高さを改善\n• 挙動・2P対戦・オンライン同期・UI安定性の大幅向上\n  - ジャンプ着地時の滑らかな姿勢補間、AIの壁スタック復帰、坂道・空中でのバナナ接地投影を改善\n  - 2P操作の入力混線解消、オンライン補間ワープ・ミサイル爆発同期の修正、リザルト進行およびメモリ解放処理を強化"
 }
