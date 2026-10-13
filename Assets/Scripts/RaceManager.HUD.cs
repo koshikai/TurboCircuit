@@ -98,10 +98,10 @@ public partial class RaceManager
             Color ic; string label;
             switch (shown)
             {
-                case ItemType.Turbo: icon = iconTurbo; ic = new Color(1f, 0.55f, 0.1f); label = "TURBO"; break;
-                case ItemType.Banana: icon = iconBanana; ic = new Color(1f, 0.9f, 0.2f); label = "BANANA"; break;
-                case ItemType.Missile: icon = iconMissile; ic = new Color(1f, 0.2f, 0.2f); label = "MISSILE"; break;
-                default: icon = iconShield; ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = "SHIELD"; break;
+                case ItemType.Turbo: icon = iconTurbo; ic = new Color(1f, 0.55f, 0.1f); label = Loc.T("TURBO", "ターボ"); break;
+                case ItemType.Banana: icon = iconBanana; ic = new Color(1f, 0.9f, 0.2f); label = Loc.T("BANANA", "バナナ"); break;
+                case ItemType.Missile: icon = iconMissile; ic = new Color(1f, 0.2f, 0.2f); label = Loc.T("MISSILE", "ミサイル"); break;
+                default: icon = iconShield; ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = Loc.T("SHIELD", "シールド"); break;
             }
 
             if (icon != null)
@@ -120,7 +120,9 @@ public partial class RaceManager
             if (pl.RouletteTimer <= 0)
             {
                 var usePill = new Rect(slot.x + 15, slot.yMax - 20, slot.width - 30, 22);
-                string useLabel = pi == 1 ? "[R-CTRL] USE" : $"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] USE";
+                string useLabel = pi == 1
+                    ? Loc.T("[R-CTRL] USE", "[R-CTRL] 使用")
+                    : Loc.T($"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] USE", $"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] 使用");
                 DrawPopPill(usePill, useLabel, new Color(1.0f, 0.78f, 0.12f));
             }
         }
@@ -128,7 +130,7 @@ public partial class RaceManager
         {
             // 未所持時はポップな「?」ウォーターマークとラベルを表示
             Outlined(new Rect(slot.x, slot.y + 8, slot.width, slot.height - 28), "?", St(sBig, 54, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 1f, 1f, 0.55f), 2);
-            Outlined(new Rect(slot.x, slot.yMax - 28, slot.width, 18), "ITEM", St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 0.95f, 0.55f, 0.85f), 1.5f);
+            Outlined(new Rect(slot.x, slot.yMax - 28, slot.width, 18), Loc.T("ITEM", "アイテム"), St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Bold), new Color(1f, 0.95f, 0.55f, 0.85f), 1.5f);
         }
 
         // ──────────────── ドリフトミニターボゲージ（文字なし・カラーバーのみ） ────────────────
@@ -163,7 +165,7 @@ public partial class RaceManager
         }
 
         int lap = Mathf.Clamp(pl.MaxLap, 1, totalLaps);
-        Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 22, 36), GetLapString(lap, totalLaps), St(sMid, compact ? 25 : 28, TextAnchor.MiddleRight), Color.white, 2);
+        Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 22, 36), GetLapString(lap, totalLaps), St(sNum, compact ? 25 : 28, TextAnchor.MiddleRight), Color.white, 2);
         Outlined(new Rect(tr.x + 10, tr.y + 40, tr.width - 22, 26), FormatTime(pl.Finished ? pl.FinishTime : raceTime), St(sMono, compact ? 22 : 24, TextAnchor.MiddleRight), new Color(1f, 0.95f, 0.4f), 2);
         if (pl == HumanKart(pi) && bestLap[pi] > 0)
             Outlined(new Rect(tr.x + 10, tr.y + 66, tr.width - 22, 20), "BEST " + FormatTime(bestLap[pi]), St(sMono, compact ? 13 : 15, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
@@ -171,13 +173,13 @@ public partial class RaceManager
         // ──────────────── 後方確認 / 観戦バナー ────────────────
         if (isLookingBehind[pi])
         {
-            DrawPopPill(new Rect(w / 2 - 95, 20, 190, 28), "◄ REAR VIEW ►", new Color(0.95f, 0.22f, 0.22f));
+            DrawPopPill(new Rect(w / 2 - 95, 20, 190, 28), Loc.T("◄ REAR VIEW ►", "◄ 後方ミラー ►"), new Color(0.95f, 0.22f, 0.22f));
         }
         else if (Spectating && pi == 0)
         {
             var sk = Karts[spectateIndex];
-            Outlined(new Rect(0, 16, w, 32), $"► SPECTATING: {sk.Name} ({Ordinal(sk.Place)}) ◄", St(sMid, 24), new Color(1f, 0.85f, 0.2f), 2);
-            GUI.Label(new Rect(0, 48, w, 22), "[A] / [D]  Switch Driver", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
+            Outlined(new Rect(0, 16, w, 32), Loc.T($"► SPECTATING: {sk.Name} ({Ordinal(sk.Place)}) ◄", $"► 観戦中: {sk.Name} ({Loc.PlaceText(sk.Place)}) ◄"), St(sMid, 24), new Color(1f, 0.85f, 0.2f), 2);
+            GUI.Label(new Rect(0, 48, w, 22), Loc.T("[A] / [D]  Switch Driver", "[A] / [D]  観戦ドライバー切替"), St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
         }
 
         // ──────────────── ミサイル接近警告アラート ────────────────
@@ -191,7 +193,7 @@ public partial class RaceManager
                 GUI.DrawTexture(warnRect, Texture2D.whiteTexture);
                 GUI.color = Color.white;
                 DrawFrame(warnRect, 3, Color.yellow);
-                Outlined(warnRect, $"! DANGER: MISSILE {Mathf.RoundToInt(mDist)}m !", St(sMid, 22, TextAnchor.MiddleCenter), Color.yellow, 3);
+                Outlined(warnRect, Loc.T($"! DANGER: MISSILE {Mathf.RoundToInt(mDist)}m !", $"！ ミサイル接近 {Mathf.RoundToInt(mDist)}m ！"), St(sMid, 22, TextAnchor.MiddleCenter), Color.yellow, 3);
             }
         }
 
@@ -200,9 +202,9 @@ public partial class RaceManager
         {
             var pr = compact ? new Rect(w - 195, h - 90, 180, 75) : new Rect(w - 240, h - 110, 225, 95);
             if (rankPlateTex != null) GUI.DrawTexture(pr, rankPlateTex);
-            Outlined(new Rect(pr.x, pr.y + 10, pr.width, 30), "TIME ATTACK", St(sSmall, compact ? 16 : 20, TextAnchor.MiddleCenter), new Color(0.3f, 0.9f, 1f), 2);
+            Outlined(new Rect(pr.x, pr.y + 10, pr.width, 30), Loc.T("TIME ATTACK", "タイムアタック"), St(sSmall, compact ? 16 : 20, TextAnchor.MiddleCenter), new Color(0.3f, 0.9f, 1f), 2);
             float bestC = GetBestTime(SelectedCourse);
-            string splitStr = bestC > 0 ? (raceTime < bestC ? $"-{FormatTime(bestC - raceTime)}" : $"+{FormatTime(raceTime - bestC)}") : "RECORD RUN";
+            string splitStr = bestC > 0 ? (raceTime < bestC ? $"-{FormatTime(bestC - raceTime)}" : $"+{FormatTime(raceTime - bestC)}") : Loc.T("RECORD RUN", "記録挑戦中");
             Color splitCol = bestC > 0 && raceTime < bestC ? new Color(0.2f, 1f, 0.4f) : new Color(1f, 0.85f, 0.2f);
             Outlined(new Rect(pr.x, pr.y + 42, pr.width, 28), splitStr, St(sMono, compact ? 18 : 22, TextAnchor.MiddleCenter), splitCol, 2);
         }
@@ -311,7 +313,7 @@ public partial class RaceManager
 
         // ──────────────── 逆走警告 ────────────────
         if (RaceRunning && !pl.Finished && Vector3.Dot(pl.Forward, track.Dirs[pl.Index]) < -0.3f && pl.Speed > 3f && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
-            Outlined(new Rect(0, h * 0.42f, w, 80), "WRONG WAY!", St(sBig, compact ? 44 : 60), new Color(1f, 0.3f, 0.3f));
+            Outlined(new Rect(0, h * 0.42f, w, 80), Loc.T("WRONG WAY!", "逆走！"), St(sBig, compact ? 44 : 60), new Color(1f, 0.3f, 0.3f));
     }
 
     void DrawVignette(Kart pl, float w, float h)

@@ -196,7 +196,8 @@
 - **カートマシン選択 (8種)**: `Q` / `E` または `D-Pad ↑↓` でKART項目を選び `←→` （2P時は P1: `Q`/`E`、P2: `←`/`→`）
 - **プレイモード切替 (1P / 2P / タイムアタック)**: `Tab` / `M` （パッド: `Yボタン`）
 - **オンラインメニュー**: `O` （パッド: `Xボタン`）
-- **アップデート確認・実行**: `U` または画面上部 `[UPDATES]` ボタン
+- **表示言語切替 (日本語 / 英語)**: `L` または画面左上 `[言語: 日本語]` ボタン・設定画面
+- **アップデート確認・実行**: `U` または画面上部 `[更新確認]` ボタン
 - **設定（キーコンフィグ ＆ パッドコンフィグ）**: `P` （パッド: `BACK / Viewボタン`）またはポーズメニューから
 
 ### レース中操作
@@ -311,6 +312,8 @@ popd
 - **BGM (Music)**:
   - OpenGameArt CC0 楽曲（cynicmusic、Julie Damsgaard、Centurion_of_war、wipics）
   - 詳細な曲名および配信元リンクは [Assets/Resources/Audio/CREDITS.md](Assets/Resources/Audio/CREDITS.md) をご覧ください。
+- **フォント (Fonts - SIL Open Font License 1.1)**:
+  - [Mochiy Pop One](https://fonts.google.com/specimen/Mochiy+Pop+One) / [M PLUS Rounded 1c](https://fonts.google.com/specimen/M+PLUS+Rounded+1c) / [Lilita One](https://fonts.google.com/specimen/Lilita+One) / [Russo One](https://fonts.google.com/specimen/Russo+One) / [Share Tech Mono](https://fonts.google.com/specimen/Share+Tech+Mono)
 
 ---
 

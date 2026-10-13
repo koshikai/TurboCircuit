@@ -85,6 +85,7 @@ public partial class RaceManager : MonoBehaviour
     readonly List<Missile> missiles = new List<Missile>();
     Font font;
     Font fontMain, fontNum, fontMono, fontSys;
+    Font fontEnMain, fontJpPop, fontJpRound;
 
     float stateTime, raceTime, shake, finishAt;
     int lastCountdownBeep;
@@ -124,7 +125,7 @@ public partial class RaceManager : MonoBehaviour
     string waitingPadAction = null;
     int waitingKeySkipFrame = -1;
     int waitingPadSkipFrame = -1;
-    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates
+    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates, 11=Language
     int pauseFocus = 0;
     int settingsFocus = 0;
     int settingsCol = 0; // 0=Keyboard, 1=Controller
@@ -159,7 +160,45 @@ public partial class RaceManager : MonoBehaviour
         playerName = n;
         PlayerPrefs.SetString("tc_player_name", playerName);
         if (Player != null && !TwoPlayer)
-            Player.Name = $"{DisplayName} ({KartCharacters[SelectedDriver].name}/{KartMachines[SelectedKart].name})";
+            Player.Name = $"{DisplayName} ({Loc.DriverName(SelectedDriver, KartCharacters[SelectedDriver].name)})";
+    }
+
+    public void ToggleLanguage()
+    {
+        Loc.Toggle();
+        ApplyLanguageFonts();
+        RefreshKartNames();
+        if (Audio != null) Audio.Select();
+    }
+
+    public void RefreshKartNames()
+    {
+        if (Online)
+        {
+            ApplyLobbyKarts();
+            return;
+        }
+        for (int i = 0; i < Karts.Count; i++)
+        {
+            var k = Karts[i];
+            if (k == null) continue;
+            if (i == playerGridSlot)
+            {
+                int drv = Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1);
+                k.Name = TwoPlayer ? $"P1 ({Loc.DriverName(drv, KartCharacters[drv].name)})" : $"{DisplayName} ({Loc.DriverName(drv, KartCharacters[drv].name)})";
+            }
+            else if (TwoPlayer && i == P2Slot)
+            {
+                int drv = Mathf.Clamp(SelectedDriver2, 0, KartCharacters.Length - 1);
+                k.Name = $"P2 ({Loc.DriverName(drv, KartCharacters[drv].name)})";
+            }
+            else
+            {
+                int ai = i < playerGridSlot ? i : i - 1;
+                int aiDrv = Mathf.Clamp(k.ModelVariant, 0, KartCharacters.Length - 1);
+                k.Name = $"{Loc.AiName(ai, AiNames[ai])} ({Loc.DriverName(aiDrv, KartCharacters[aiDrv].name)})";
+            }
+        }
     }
 
     void CloseSettings()
@@ -360,6 +399,7 @@ public partial class RaceManager : MonoBehaviour
     void Awake()
     {
         var args = System.Environment.GetCommandLineArgs();
+        Loc.Init(args);
         Demo = args.Contains("-demo") || args.Contains("-screenshot");
         screenshotRequested = args.Contains("-screenshot");
         titleShotRequested = args.Contains("-titleshot");
@@ -456,8 +496,8 @@ public partial class RaceManager : MonoBehaviour
             k.KartVariant = mIdx;
             k.DriverColor = KartCharacters[dIdx].color;
             string kName = isPlayer
-                ? $"{DisplayName} ({KartCharacters[dIdx].name}/{KartMachines[mIdx].name})"
-                : $"{AiNames[ai]} ({KartCharacters[dIdx].name})";
+                ? $"{DisplayName} ({Loc.DriverName(dIdx, KartCharacters[dIdx].name)})"
+                : $"{Loc.AiName(ai, AiNames[ai])} ({Loc.DriverName(dIdx, KartCharacters[dIdx].name)})";
             Color kCol = isPlayer ? KartMachines[mIdx].color : AiColors[ai];
             float skill = isPlayer ? 1f : Mathf.Lerp(1.02f, 0.94f, (float)i / 7f);
             k.Init(this, track, kName, kCol, isPlayer, idx, lat, skill);
@@ -959,7 +999,7 @@ public partial class RaceManager : MonoBehaviour
             k.PlayerIndex = p;
             k.ModelVariant = drv;
             k.KartVariant = krt;
-            k.Name = TwoPlayer ? $"P{p + 1} ({d.name})" : $"{DisplayName} ({d.name})";
+            k.Name = TwoPlayer ? $"P{p + 1} ({Loc.DriverName(drv, d.name)})" : $"{DisplayName} ({Loc.DriverName(drv, d.name)})";
             k.DriverColor = d.color;
             k.Color = m.color;
             GetCombinedStats(drv, krt, out int spd, out int acc, out int hdl, out int wgt);
@@ -974,7 +1014,7 @@ public partial class RaceManager : MonoBehaviour
             int aiKrt = (ai + 1) % KartMachines.Length;
             k.ModelVariant = aiDrv;
             k.KartVariant = aiKrt;
-            k.Name = $"{AiNames[ai]} ({KartCharacters[aiDrv].name})";
+            k.Name = $"{Loc.AiName(ai, AiNames[ai])} ({Loc.DriverName(aiDrv, KartCharacters[aiDrv].name)})";
             k.DriverColor = KartCharacters[aiDrv].color;
             k.Color = AiColors[ai];
             GetCombinedStats(aiDrv, aiKrt, out int spd, out int acc, out int hdl, out int wgt);
@@ -1214,8 +1254,8 @@ public partial class RaceManager : MonoBehaviour
         tabNext = InputSettings.GetSinglePadDown(PadBind.RB, 0) || InputSettings.GetSinglePadDown(PadBind.RB, 1);
     }
 
-    static readonly int[] TitleFocusOrder1P = { 1, 2, 7, 8, 0, 6, 5, 9, 10 };
-    static readonly int[] TitleFocusOrder2P = { 1, 2, 3, 4, 7, 8, 0, 6, 5, 9, 10 };
+    static readonly int[] TitleFocusOrder1P = { 1, 2, 7, 8, 0, 6, 5, 9, 10, 11 };
+    static readonly int[] TitleFocusOrder2P = { 1, 2, 3, 4, 7, 8, 0, 6, 5, 9, 10, 11 };
 
     // メニュー操作の入力スナップショット（Update の先頭で1フレームに1回だけ取得する）
     struct MenuNav
@@ -1364,13 +1404,14 @@ public partial class RaceManager : MonoBehaviour
 
         if (settingsTab == 0)
         {
-            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 6) % 6; GUIUtility.keyboardControl = 0; if (Audio != null) Audio.Tick(); }
+            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 7) % 7; GUIUtility.keyboardControl = 0; if (Audio != null) Audio.Tick(); }
             if (settingsFocus == 0 && nav.moveX != 0) { Audio.SetMasterBgm(Mathf.Clamp01(RaceAudio.MasterBgmVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
             else if (settingsFocus == 1 && nav.moveX != 0) { Audio.SetMasterSfx(Mathf.Clamp01(RaceAudio.MasterSfxVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
             else if (settingsFocus == 2 && nav.moveX != 0) { InputSettings.StickDeadzone = Mathf.Clamp(InputSettings.StickDeadzone + nav.moveX * 0.02f, 0.05f, 0.35f); InputSettings.Save(); if (Audio != null) Audio.Tick(); }
             else if (settingsFocus == 3 && (nav.confirm || nav.moveX != 0)) { Screen.fullScreen = !Screen.fullScreen; PlayerPrefs.SetInt("tc_fullscreen", Screen.fullScreen ? 1 : 0); if (Audio != null) Audio.Select(); }
             else if (settingsFocus == 4 && (nav.confirm || nav.moveX != 0)) { CycleResolution(nav.moveX < 0 ? -1 : 1); }
-            else if (settingsFocus == 5 && nav.confirm) { CloseSettings(); if (Audio != null) Audio.Select(); }
+            else if (settingsFocus == 5 && (nav.confirm || nav.moveX != 0)) { ToggleLanguage(); }
+            else if (settingsFocus == 6 && nav.confirm) { CloseSettings(); if (Audio != null) Audio.Select(); }
         }
         else if (settingsTab == 1)
         {
@@ -1581,6 +1622,8 @@ public partial class RaceManager : MonoBehaviour
 
         if (((!editTxt && Input.GetKeyDown(KeyCode.P)) || nav.padBack) && !Net.Busy)
             { showSettings = !showSettings; settingsFocus = 0; if (Audio != null) Audio.Select(); return; }
+        if (!editTxt && Input.GetKeyDown(KeyCode.L) && !Net.Busy)
+            { ToggleLanguage(); return; }
         if (!editTxt && Input.GetKeyDown(KeyCode.U) && !Net.Busy)
             { if (updater != null) { updater.ShowModal = !updater.ShowModal; updateModalFocus = 0; if (Audio != null) Audio.Select(); } return; }
         if (((!editTxt && Input.GetKeyDown(KeyCode.O)) || nav.padX) && !Net.Busy)
@@ -1622,7 +1665,13 @@ public partial class RaceManager : MonoBehaviour
             else if (titleFocus == 5 || titleFocus == 0) SwitchCourse(nav.moveX);
             else if (titleFocus == 6) { if (TwoPlayer) SetTwoPlayer(false); IsTimeAttack = !IsTimeAttack; if (Audio != null) Audio.Select(); }
             else if (titleFocus == 7 || titleFocus == 8) { titleFocus = titleFocus == 7 ? 8 : 7; if (Audio != null) Audio.Tick(); }
-            else if (titleFocus == 9 || titleFocus == 10) { titleFocus = titleFocus == 9 ? 10 : 9; if (Audio != null) Audio.Tick(); }
+            else if (titleFocus == 9 || titleFocus == 10 || titleFocus == 11)
+            {
+                int[] topBar = { 11, 10, 9 };
+                int ti = System.Array.IndexOf(topBar, titleFocus);
+                titleFocus = topBar[(ti + (nav.moveX > 0 ? 1 : 2)) % 3];
+                if (Audio != null) Audio.Tick();
+            }
         }
         else if (!editTxt && Input.GetKeyDown(KeyCode.W))
             SwitchDriver(0, -1);
@@ -1654,6 +1703,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (titleFocus == 8 && !Net.Busy) { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 9 && !Net.Busy) { showSettings = true; settingsFocus = 0; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 10 && !Net.Busy) { if (updater != null) { updater.ShowModal = true; updateModalFocus = 0; if (Audio != null) Audio.Select(); } }
+                else if (titleFocus == 11 && !Net.Busy) { ToggleLanguage(); }
                 else StartRaceFromTitle();
             }
         }
@@ -1844,7 +1894,7 @@ public partial class RaceManager : MonoBehaviour
             if (k.IsPlayer)
             {
                 Audio.Finish();
-                Banner("FINISH!", Color.white, k.PlayerIndex);
+                Banner(Loc.T("FINISH!", "ゴール！"), Color.white, k.PlayerIndex);
                 RecordLap(k.PlayerIndex);
 
                 if (!Demo)
@@ -1854,7 +1904,7 @@ public partial class RaceManager : MonoBehaviour
                     {
                         SetBestTime(SelectedCourse, k.FinishTime);
                         newRecordTime = true;
-                        Banner("NEW COURSE RECORD!", new Color(1f, 0.85f, 0.2f), k.PlayerIndex);
+                        Banner(Loc.T("NEW COURSE RECORD!", "コース新記録！"), new Color(1f, 0.85f, 0.2f), k.PlayerIndex);
                     }
                     if (k.PlayerIndex == 0 && IsTimeAttack && currentRunGhost.Count > 1)
                     {
@@ -1883,13 +1933,13 @@ public partial class RaceManager : MonoBehaviour
         RecordLap(k.PlayerIndex);
         if (k.Lap == totalLaps)
         {
-            Banner("FINAL LAP!", new Color(1f, 0.3f, 0.3f), k.PlayerIndex);
+            Banner(Loc.T("FINAL LAP!", "ファイナルラップ！"), new Color(1f, 0.3f, 0.3f), k.PlayerIndex);
             Audio.FinalLap();
             Audio.SetMusicTempo(1.1f);
         }
         else
         {
-            Banner("LAP " + k.Lap + "/" + totalLaps, Color.white, k.PlayerIndex);
+            Banner(Loc.T("LAP " + k.Lap + "/" + totalLaps, $"ラップ {k.Lap}/{totalLaps}"), Color.white, k.PlayerIndex);
             Audio.Lap();
         }
     }
@@ -1908,7 +1958,7 @@ public partial class RaceManager : MonoBehaviour
                 {
                     SetBestLap(SelectedCourse, lap);
                     newRecordLap = true;
-                    Banner("NEW LAP RECORD!", new Color(1f, 0.85f, 0.2f), p);
+                    Banner(Loc.T("NEW LAP RECORD!", "ベストラップ更新！"), new Color(1f, 0.85f, 0.2f), p);
                 }
             }
         }

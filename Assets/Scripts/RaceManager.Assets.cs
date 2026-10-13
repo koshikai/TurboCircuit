@@ -74,19 +74,21 @@ public partial class RaceManager
 
     void LoadUIAssets()
     {
-        // フォントの読み込み：Lilita One (メインポップ) & Russo One (計器・数字)
-        fontMain = Resources.Load<Font>("Fonts/LilitaOne-Regular");
-        if (fontMain == null)
+        // フォントの読み込み：英語 (Lilita One) / 日本語ポップ (Mochiy Pop One & M PLUS Rounded 1c) / 計器・数字 (Russo One & Share Tech Mono)
+        fontEnMain = Resources.Load<Font>("Fonts/LilitaOne-Regular");
+        if (fontEnMain == null)
         {
-            fontMain = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                     ?? Resources.GetBuiltinResource<Font>("Arial.ttf")
-                     ?? Resources.FindObjectsOfTypeAll<Font>().FirstOrDefault();
+            fontEnMain = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                       ?? Resources.GetBuiltinResource<Font>("Arial.ttf")
+                       ?? Resources.FindObjectsOfTypeAll<Font>().FirstOrDefault();
         }
 
-        fontNum = Resources.Load<Font>("Fonts/RussoOne-Regular") ?? fontMain;
-        fontMono = Resources.Load<Font>("Fonts/ShareTechMono-Regular") ?? fontNum ?? fontMain;
-        fontSys = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo", "MS Gothic", "Segoe UI", "Arial" }, 15) ?? fontMain;
-        font = fontMain;
+        fontJpPop = Resources.Load<Font>("Fonts/MochiyPopOne-Regular") ?? fontEnMain;
+        fontJpRound = Resources.Load<Font>("Fonts/MPLUSRounded1c-ExtraBold") ?? fontJpPop ?? fontEnMain;
+        fontNum = Resources.Load<Font>("Fonts/RussoOne-Regular") ?? fontEnMain;
+        fontMono = Resources.Load<Font>("Fonts/ShareTechMono-Regular") ?? fontNum ?? fontEnMain;
+        font = fontEnMain;
+        ApplyLanguageFonts();
 
         string iconDir = Application.dataPath + "/Resources/Icons/";
         iconTurbo = LoadTexture("Icons/item_turbo_pop", iconDir + "item_turbo_pop.png") ?? LoadTexture("Icons/item_turbo", iconDir + "item_turbo.jpg");
@@ -138,5 +140,21 @@ public partial class RaceManager
             else DestroyImmediate(t);
         }
         return null;
+    }
+
+    public void ApplyLanguageFonts()
+    {
+        if (Loc.IsJa)
+        {
+            fontMain = fontJpPop ?? fontJpRound ?? fontEnMain;
+            fontSys = fontJpRound ?? fontJpPop ?? fontEnMain;
+        }
+        else
+        {
+            fontMain = fontEnMain ?? fontJpPop;
+            fontSys = fontJpRound ?? fontMain;
+        }
+        sBig = null;
+        styleCache.Clear();
     }
 }
