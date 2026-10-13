@@ -377,6 +377,7 @@ public partial class Track : MonoBehaviour
         {
             Vector3 cur = dense[k % dense.Count];
             float seg = (cur - prev).magnitude;
+            if (seg < 1e-5f) continue;
             while (acc + seg >= Spacing)
             {
                 float t = (Spacing - acc) / seg;
@@ -384,6 +385,7 @@ public partial class Track : MonoBehaviour
                 res.Add(prev);
                 seg = (cur - prev).magnitude;
                 acc = 0;
+                if (seg < 1e-5f) break;
             }
             acc += seg;
             prev = cur;
@@ -444,17 +446,34 @@ public partial class Track : MonoBehaviour
     public void Locate(Vector3 pos, ref int index, out float lateral, out float progress)
     {
         if (Count == 0 || Pts == null) { lateral = 0; progress = 0; return; }
-        int best = index; float bd = float.MaxValue;
+        int best = index;
+        int bestOffset = 0;
+        float bd = float.MaxValue;
         for (int o = -14; o <= 14; o++)
         {
             int j = Wrap(index + o);
             float d = (Pts[j] - pos).sqrMagnitude;
-            if (d < bd) { bd = d; best = j; }
+            if (d < bd) { bd = d; best = j; bestOffset = o; }
+        }
+        if (bd > 900f || bestOffset == -14 || bestOffset == 14)
+        {
+            best = FindNearest(pos);
         }
         index = best;
         var rel = pos - Pts[best];
         lateral = Vector3.Dot(rel, Rights[best]);
-        progress = Mathf.Repeat(Dist[best] + Vector3.Dot(rel, Dirs[best]), Length);
+
+        Vector3 segFwd = Pts[(best + 1) % Count] - Pts[best];
+        Vector3 segBack = Pts[best] - Pts[(best - 1 + Count) % Count];
+        float fwdLen = segFwd.magnitude;
+        float backLen = segBack.magnitude;
+        float along = 0f;
+        if (fwdLen > 1e-5f && Vector3.Dot(rel, segFwd) >= 0f)
+            along = Mathf.Clamp(Vector3.Dot(rel, segFwd) / fwdLen, 0f, fwdLen);
+        else if (backLen > 1e-5f && Vector3.Dot(rel, segBack) < 0f)
+            along = Mathf.Clamp(Vector3.Dot(rel, segBack) / backLen, -backLen, 0f);
+
+        progress = Mathf.Repeat(Dist[best] + along, Length);
     }
 
     public Vector3 PointAt(int index, float lateral)

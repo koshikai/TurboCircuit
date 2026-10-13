@@ -100,6 +100,8 @@ public static class GamepadHaptics
                 padSnapshots[i].current = default;
                 continue;
             }
+            if (padSnapshots[i].nextProbeTime > now + 5f)
+                padSnapshots[i].nextProbeTime = now;
             if (!padSnapshots[i].connected && now < padSnapshots[i].nextProbeTime)
                 continue;
 

@@ -134,6 +134,8 @@ public partial class RaceManager
             var bytes = System.IO.File.ReadAllBytes(diskPath);
             var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             if (t.LoadImage(bytes)) return t;
+            if (Application.isPlaying) Destroy(t);
+            else DestroyImmediate(t);
         }
         return null;
     }

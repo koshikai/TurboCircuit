@@ -19,6 +19,8 @@ public partial class Track
         else DestroyImmediate(obj);
     }
 
+    void OnDestroy() => ClearVisuals();
+
     public void ClearVisuals()
     {
         for (int i = transform.childCount - 1; i >= 0; i--)
@@ -796,7 +798,7 @@ public partial class Track
                 int row = rng.Next(5);
                 float along = (float)rng.NextDouble() * (standLen - 4f) - (standLen * 0.5f - 2f);
                 var basePos = PointAt(12, -(WallOffset + 4.8f + row * 2.2f)) + Dirs[12] * along;
-                basePos.y = 1.4f + row * 2.1f + 0.36f; // ベンチシートの上にピッタリ接地
+                basePos.y = Pts[12].y + 1.4f + row * 2.1f + 0.36f; // ベンチシートの上にピッタリ接地
 
                 SpectatorFan.CreateFan(
                     transform,

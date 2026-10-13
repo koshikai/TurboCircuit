@@ -96,6 +96,7 @@ public class GhostReplay : MonoBehaviour
             color = new Color(0.3f, 0.85f, 1f, 0.42f)
         };
         ghostMatInstance = mat;
+        mat.SetColor("_BaseColor", mat.color);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", new Color(0.15f, 0.5f, 0.8f) * 0.6f);
 

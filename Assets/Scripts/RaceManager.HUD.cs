@@ -120,7 +120,8 @@ public partial class RaceManager
             if (pl.RouletteTimer <= 0)
             {
                 var usePill = new Rect(slot.x + 15, slot.yMax - 20, slot.width - 30, 22);
-                DrawPopPill(usePill, "[E] USE", new Color(1.0f, 0.78f, 0.12f));
+                string useLabel = pi == 1 ? "[R-CTRL] USE" : $"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] USE";
+                DrawPopPill(usePill, useLabel, new Color(1.0f, 0.78f, 0.12f));
             }
         }
         else

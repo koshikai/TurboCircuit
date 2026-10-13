@@ -69,7 +69,7 @@ public partial class Kart
         int p = PlayerIndex;
         float padAccel = InputSettings.GetPadAnalog(InputSettings.PadAccel, InputSettings.PadAccelAlt, p);
         float padBrake = InputSettings.GetPadAnalog(InputSettings.PadBrake, InputSettings.PadBrakeAlt, p);
-        float padSteer = InputSettings.GetPadSteer(p, includeUnityAxis: p == 0);
+        float padSteer = InputSettings.GetPadSteer(p, includeUnityAxis: false);
         bool padDrift = InputSettings.GetPadHeld(InputSettings.PadDrift, InputSettings.PadDriftAlt, p);
         bool padDriftDown = InputSettings.GetPadDown(InputSettings.PadDrift, InputSettings.PadDriftAlt, p);
         bool padItem = InputSettings.GetPadDown(InputSettings.PadItem, InputSettings.PadItemAlt, p);
@@ -268,7 +268,7 @@ public static class InputSettings
     public static void SetPadBinding(string actionId, PadBind newBind)
     {
         if (newBind == PadBind.None || newBind == PadBind.Start) return;
-        GetActionPadBinds(actionId, out var oldPri, out _);
+        GetActionPadBinds(actionId, out var oldPri, out var oldAlt);
 
         // 他のアクションのサブ割り当て（Alt）に同じボタンがあればクリアし、プライマリが重複していたら入れ替える
         string[] all = { "accel", "brake", "drift", "item", "rear" };
@@ -284,7 +284,7 @@ public static class InputSettings
             }
             WriteActionPadBinds(other, p, a);
         }
-        WriteActionPadBinds(actionId, newBind, PadBind.None);
+        WriteActionPadBinds(actionId, newBind, newBind == oldPri ? oldAlt : PadBind.None);
         Save();
     }
 
@@ -357,6 +357,7 @@ public static class InputSettings
             if (b == PadBind.RT) return snap.current.bRightTrigger / 255f;
             ushort mask = ToXInputMask(b);
             if (mask != 0 && (snap.current.wButtons & mask) != 0) return 1f;
+            return 0f;
         }
         if (playerIndex == 0)
         {
@@ -397,6 +398,7 @@ public static class InputSettings
             if (b == PadBind.RT) return snap.current.bRightTrigger >= 90 && snap.prev.bRightTrigger < 90;
             ushort mask = ToXInputMask(b);
             if (mask != 0 && (snap.current.wButtons & mask) != 0 && (snap.prev.wButtons & mask) == 0) return true;
+            return false;
         }
         if (playerIndex == 0)
         {
@@ -422,8 +424,11 @@ public static class InputSettings
             if ((snap.current.wButtons & GamepadHaptics.BtnDPadRight) != 0) return 1f;
             float sx = Mathf.Clamp(snap.current.sThumbLX / 32767f, -1f, 1f);
             if (Mathf.Abs(sx) >= StickDeadzone) return sx;
+            return 0f;
         }
-        if (includeUnityAxis && playerIndex == 0)
+        if (includeUnityAxis && playerIndex == 0
+            && !Input.GetKey(KeyCode.LeftArrow) && !Input.GetKey(KeyCode.RightArrow)
+            && !Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D))
         {
             float ax = Input.GetAxisRaw("Horizontal");
             if (Mathf.Abs(ax) >= StickDeadzone) return Mathf.Clamp(ax, -1f, 1f);

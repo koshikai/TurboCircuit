@@ -75,6 +75,17 @@ public class AppUpdater : MonoBehaviour
         StartCoroutine(AutoCheckOnStartupRoutine());
     }
 
+    void OnDestroy()
+    {
+        if (currentDownloadReq != null)
+        {
+            if (!currentDownloadReq.isDone)
+                currentDownloadReq.Abort();
+            currentDownloadReq.Dispose();
+            currentDownloadReq = null;
+        }
+    }
+
     static void CleanupTempUpdateDir()
     {
         try
@@ -117,6 +128,7 @@ public class AppUpdater : MonoBehaviour
         State = UpdateState.Checking;
         StatusMessage = "Checking for updates...";
         ErrorMessage = "";
+        TotalBytes = 0;
 
         string json = null;
 
@@ -219,10 +231,13 @@ public class AppUpdater : MonoBehaviour
             }
 
             // download_url (assets 内の .zip または "download_url")
+            DownloadUrl = "";
+            int targetUrlIndex = -1;
             var directDownloadMatch = Regex.Match(json, "\"download_url\"\\s*:\\s*\"([^\"]+)\"");
             if (directDownloadMatch.Success)
             {
                 DownloadUrl = directDownloadMatch.Groups[1].Value;
+                targetUrlIndex = directDownloadMatch.Index;
             }
             else
             {
@@ -231,25 +246,39 @@ public class AppUpdater : MonoBehaviour
                 if (zipMatches.Count > 0)
                 {
                     // "TurboCircuit" を含むものを優先、なければ最初のzip
-                    string bestUrl = zipMatches[0].Groups[1].Value;
+                    Match bestMatch = zipMatches[0];
                     foreach (Match m in zipMatches)
                     {
                         if (m.Groups[1].Value.IndexOf("TurboCircuit", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
-                            bestUrl = m.Groups[1].Value;
+                            bestMatch = m;
                             break;
                         }
                     }
-                    DownloadUrl = bestUrl;
+                    DownloadUrl = bestMatch.Groups[1].Value;
+                    targetUrlIndex = bestMatch.Index;
                 }
             }
 
-            // アセットのバイトサイズ ("size": 60883218 等) を取得（リダイレクト時に downloadProgress が進まない対策）
+            // アセットのバイトサイズ ("size": 60883218 等) を取得（マッチしたアセットの "size" を優先）
             TotalBytes = 0;
             var sizeMatches = Regex.Matches(json, "\"size\"\\s*:\\s*(\\d+)");
             if (sizeMatches.Count > 0)
             {
-                ulong.TryParse(sizeMatches[sizeMatches.Count - 1].Groups[1].Value, out TotalBytes);
+                Match chosenSize = sizeMatches[sizeMatches.Count - 1];
+                if (targetUrlIndex >= 0)
+                {
+                    Match preceding = null;
+                    foreach (Match sm in sizeMatches)
+                    {
+                        if (sm.Index < targetUrlIndex)
+                            preceding = sm;
+                        else
+                            break;
+                    }
+                    chosenSize = preceding ?? sizeMatches[0];
+                }
+                ulong.TryParse(chosenSize.Groups[1].Value, out TotalBytes);
             }
 
             // フォールバック URL
@@ -272,11 +301,19 @@ public class AppUpdater : MonoBehaviour
         if (string.IsNullOrEmpty(vA)) return -1;
         if (string.IsNullOrEmpty(vB)) return 1;
 
-        string cleanA = vA.TrimStart('v', 'V');
-        string cleanB = vB.TrimStart('v', 'V');
+        string cleanA = vA.Trim().TrimStart('v', 'V');
+        string cleanB = vB.Trim().TrimStart('v', 'V');
 
-        string[] partsA = cleanA.Split(new[] { '.', '-', '_' });
-        string[] partsB = cleanB.Split(new[] { '.', '-', '_' });
+        int dashA = cleanA.IndexOfAny(new[] { '-', '_' });
+        int dashB = cleanB.IndexOfAny(new[] { '-', '_' });
+
+        string coreA = dashA >= 0 ? cleanA.Substring(0, dashA) : cleanA;
+        string coreB = dashB >= 0 ? cleanB.Substring(0, dashB) : cleanB;
+        string suffixA = dashA >= 0 ? cleanA.Substring(dashA + 1) : "";
+        string suffixB = dashB >= 0 ? cleanB.Substring(dashB + 1) : "";
+
+        string[] partsA = coreA.Split('.');
+        string[] partsB = coreB.Split('.');
 
         int maxLen = Mathf.Max(partsA.Length, partsB.Length);
         for (int i = 0; i < maxLen; i++)
@@ -288,6 +325,13 @@ public class AppUpdater : MonoBehaviour
             if (numA != numB)
                 return numA.CompareTo(numB);
         }
+
+        bool hasSuffixA = !string.IsNullOrEmpty(suffixA);
+        bool hasSuffixB = !string.IsNullOrEmpty(suffixB);
+        if (hasSuffixA && !hasSuffixB) return -1;
+        if (!hasSuffixA && hasSuffixB) return 1;
+        if (hasSuffixA && hasSuffixB)
+            return string.Compare(suffixA, suffixB, StringComparison.OrdinalIgnoreCase);
 
         return 0;
     }
