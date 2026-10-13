@@ -1,9 +1,9 @@
 {
-  "version": "v1.9.4",
-  "name": "Turbo Circuit v1.9.4",
-  "published_at": "2026-10-13T05:00:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.4/TurboCircuit-win64.zip",
-  "size": 61357380,
+  "version": "v1.9.5",
+  "name": "Turbo Circuit v1.9.5",
+  "published_at": "2026-10-13T07:15:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v1.9.5/TurboCircuit-win64.zip",
+  "size": 66147240,
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "■ What's New in Turbo Circuit v1.9.4\n• Course Decor Editor & Flyover Bridge / Campus Scenery Enhancements\n  - Added Course Decor Editor (Turbo Circuit > Course Decor Editor) for non-destructive prop customization\n  - Generated supporting bridge pillars under Course 0's flyover bridge with globally continuous terrain\n  - Grounded Hokkaido Campus pasture cows, northern forest trees, and buildings accurately to sloped terrain\n• Gameplay, 2P Split-Screen, Online Multiplayer & Stability Fixes\n  - Smooth landing trick rotation, 1-roll-per-jump AI trick probability, and wall-pinning anti-stuck recovery\n  - Eliminated 2P split-screen input cross-talk, online dead-reckoning 85ms snap, and phantom missiles on remote karts\n  - Fixed Results finish-time tracking, ESC/Start shortcut handling, keybind KeyUp capture, and procedural texture/mesh memory leaks\n\n■ 主なアップデート内容 (v1.9.4)\n• コース装飾エディタ追加 ＆ 高架橋脚・北大キャンパス景観の改善\n  - コース装飾を手動調整・差分保存できる「Course Decor Editor」を追加\n  - コース0の立体交差高架橋に橋脚を生成し、北大キャンパスの放牧牛・北側森林・建物の接地高さを改善\n• 挙動・2P対戦・オンライン同期・UI安定性の大幅向上\n  - ジャンプ着地時の滑らかな姿勢補間、AIの壁スタック復帰、坂道・空中でのバナナ接地投影を改善\n  - 2P操作の入力混線解消、オンライン補間ワープ・ミサイル爆発同期の修正、リザルト進行およびメモリ解放処理を強化"
+  "notes": "■ What's New in Turbo Circuit v1.9.5\n• Full Japanese Localization & Pop Toy-Arcade Japanese Fonts (#21, #22)\n  - Full Japanese & English bilingual localization across all screens: Title, 2P Split-Screen, Pause, Settings, Key & Pad Config, Updates, Online Menus, Lobby, HUD, Banners, and Results\n  - Integrated Mochiy Pop One (headlines, ribbons, buttons, course/driver/kart names) and M PLUS Rounded 1c ExtraBold (descriptions, tables, settings, pills, and symbol fallbacks)\n  - One-click language switching via the Title screen [L] button or Settings > General, persisted in PlayerPrefs and configurable via -lang ja / -lang en CLI flags\n  - Polished Japanese layout across all screens to ensure clean spacing, balanced ribbon banners, and no text truncation\n\n■ 主なアップデート内容 (v1.9.5)\n• 完全日本語ローカライズ ＆ ポップアーケード日本語フォントの導入 (#21, #22)\n  - 全画面（タイトル、2P画面分割、ポーズ、設定、キー＆パッド設定、アップデート確認、オンラインメニュー、待機ロビー、レース中HUD、ラップバナー、リザルト）の日本語／英語バイリンガル対応\n  - 見出し・リボン・大ボタンに「モッチーポップ One」、説明文・設定・テーブルに「M PLUS Rounded 1c ExtraBold」を採用し、ポップな世界観を維持しつつ視認性を確保\n  - タイトル画面左上の [L] ボタンや設定画面からワンクリックで即座に日英切替可能（PlayerPrefs保存、-lang ja / -lang en コマンドライン引数対応）\n  - 全11画面でレイアウト調整を行い、文字被りやはみ出しのないクリーンな表示を実現"
 }
