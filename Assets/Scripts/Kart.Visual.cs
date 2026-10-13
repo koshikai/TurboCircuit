@@ -21,8 +21,9 @@ public partial class Kart
 
     Material GetAnimalDriverMaterial()
     {
-        if (sharedAnimalDriverMat == null && rm != null && rm.wallMaterial != null)
+        if ((sharedAnimalDriverMat == null || sharedAnimalDriverMat.mainTexture == null) && rm != null && rm.wallMaterial != null)
         {
+            if (sharedAnimalDriverMat != null) Destroy(sharedAnimalDriverMat);
             sharedAnimalDriverMat = new Material(rm.wallMaterial);
             string animalTexPath = Application.dataPath + "/Resources/Animals/Textures/colormap.png";
             var colormapTex = RaceManager.LoadTexture("Animals/Textures/colormap", animalTexPath);
@@ -89,8 +90,9 @@ public partial class Kart
         }
 
         // 車体直下の接地ブロブシャドウ（路面の密着感と立体感を大幅に強化）
-        if (sharedBlobShadowMat == null && rm.skidmarkMaterial != null)
+        if ((sharedBlobShadowMat == null || sharedBlobShadowMat.mainTexture == null) && rm.skidmarkMaterial != null)
         {
+            if (sharedBlobShadowMat != null) Destroy(sharedBlobShadowMat);
             sharedBlobShadowMat = new Material(rm.skidmarkMaterial);
             var blobTex = TextureGen.BlobShadow();
             sharedBlobShadowMat.mainTexture = blobTex;

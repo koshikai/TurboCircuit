@@ -230,7 +230,7 @@ public partial class Kart
         }
 
         // 8. 戦略的アイテム使用 (Strategic Item Usage)
-        if (Item != ItemType.None && RouletteTimer <= 0)
+        if (!Finished && Item != ItemType.None && RouletteTimer <= 0)
         {
             aiItemTimer -= dt;
             bool canUse = false;

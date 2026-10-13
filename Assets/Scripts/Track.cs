@@ -463,15 +463,26 @@ public partial class Track : MonoBehaviour
         var rel = pos - Pts[best];
         lateral = Vector3.Dot(rel, Rights[best]);
 
-        Vector3 segFwd = Pts[(best + 1) % Count] - Pts[best];
-        Vector3 segBack = Pts[best] - Pts[(best - 1 + Count) % Count];
-        float fwdLen = segFwd.magnitude;
-        float backLen = segBack.magnitude;
+        float d0 = Vector3.Dot(rel, Dirs[best]);
         float along = 0f;
-        if (fwdLen > 1e-5f && Vector3.Dot(rel, segFwd) >= 0f)
-            along = Mathf.Clamp(Vector3.Dot(rel, segFwd) / fwdLen, 0f, fwdLen);
-        else if (backLen > 1e-5f && Vector3.Dot(rel, segBack) < 0f)
-            along = Mathf.Clamp(Vector3.Dot(rel, segBack) / backLen, -backLen, 0f);
+        if (d0 >= 0f)
+        {
+            int next = (best + 1) % Count;
+            float d1 = Vector3.Dot(pos - Pts[next], Dirs[next]);
+            float denom = d0 - d1;
+            float t = denom > 1e-5f ? Mathf.Clamp01(d0 / denom) : 0f;
+            float segLen = (Pts[next] - Pts[best]).magnitude;
+            along = t * segLen;
+        }
+        else
+        {
+            int prev = (best - 1 + Count) % Count;
+            float dPrev = Vector3.Dot(pos - Pts[prev], Dirs[prev]);
+            float denom = dPrev - d0;
+            float t = denom > 1e-5f ? Mathf.Clamp01(-d0 / denom) : 0f;
+            float segLen = (Pts[best] - Pts[prev]).magnitude;
+            along = -t * segLen;
+        }
 
         progress = Mathf.Repeat(Dist[best] + along, Length);
     }

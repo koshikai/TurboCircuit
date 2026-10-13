@@ -81,15 +81,18 @@ public partial class RaceManager
         }
 
         Kart targetKart1 = Player;
-        if (!TwoPlayer && (state == State.Racing || state == State.Results))
+        if (!TwoPlayer && state == State.Racing)
         {
             if (Player.Finished)
             {
                 if (spectateIndex < 0) spectateIndex = MyKartIndex;
-                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || InputSettings.GetSinglePadDown(PadBind.LB, 0))
-                    CycleSpectate(-1);
-                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || InputSettings.GetSinglePadDown(PadBind.RB, 0))
-                    CycleSpectate(1);
+                if (!paused && !showSettings && (updater == null || !updater.ShowModal))
+                {
+                    if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || InputSettings.GetSinglePadDown(PadBind.LB, 0))
+                        CycleSpectate(-1);
+                    else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || InputSettings.GetSinglePadDown(PadBind.RB, 0))
+                        CycleSpectate(1);
+                }
 
                 if (spectateIndex >= 0 && spectateIndex < Karts.Count)
                     targetKart1 = Karts[spectateIndex];
@@ -98,6 +101,10 @@ public partial class RaceManager
             {
                 spectateIndex = -1;
             }
+        }
+        else if (state == State.Results)
+        {
+            spectateIndex = -1;
         }
 
         UpdateChaseCamera(cam, targetKart1, 0, dt);
