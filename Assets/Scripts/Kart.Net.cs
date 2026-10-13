@@ -102,7 +102,8 @@ public partial class Kart
             VelDir = Forward;
 
             byte f = net.Flags;
-            drifting = (f & NetKartState.FDrift) != 0;
+            isAirborne = (f & NetKartState.FAir) != 0;
+            drifting = !isAirborne && (f & NetKartState.FDrift) != 0;
             driftDir = net.DriftDir == 0 ? 1 : net.DriftDir;
             driftCharge = net.DriftLevel == 3 ? 2.7f : net.DriftLevel == 2 ? 1.7f : net.DriftLevel == 1 ? 0.9f : 0f;
             boostTimer = (f & NetKartState.FBoost) != 0 ? 0.3f : 0f;
@@ -126,19 +127,18 @@ public partial class Kart
             }
             shieldTimer = (f & NetKartState.FShield) != 0 ? 3f : 0f;
             spinTimer = (f & NetKartState.FSpin) != 0 ? 0.3f : 0f;
-            isAirborne = (f & NetKartState.FAir) != 0;
             isBraking = (f & NetKartState.FBrake) != 0;
             Lap = net.Lap;
             MaxLap = net.MaxLap;
             Finished = (f & NetKartState.FDone) != 0;
             FinishTime = net.FinishTime;
         }
-        airTrickSpin = isAirborne ? airTrickSpin + 720f * dt : 0f;
+        if (isAirborne) airTrickSpin += 720f * dt;
         track.Locate(transform.position, ref Index, out Lateral, out float localProgress);
         Progress = hasNet ? net.Progress : localProgress;
         Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
 
-        bool skidding = drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f);
+        bool skidding = !isAirborne && (drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f));
         if (skidTrails[0] != null)
         {
             skidTrails[0].emitting = skidding;

@@ -308,18 +308,25 @@ public partial class Kart : MonoBehaviour
                 slipstreamDraftTimer = Mathf.MoveTowards(slipstreamDraftTimer, 0, dt * 1.5f);
             }
 
-            if (inp.driftDown && !drifting)
+            if (!isAirborne)
             {
-                hopT = 0;
-                if (Mathf.Abs(inp.steer) > 0.3f && Speed > 10f)
+                if (inp.driftDown && !drifting)
                 {
-                    drifting = true;
-                    driftDir = inp.steer > 0 ? 1 : -1;
-                    driftCharge = 0;
-                    lastDriftLevel = 0;
+                    hopT = 0;
+                    if (Mathf.Abs(inp.steer) > 0.3f && Speed > 10f)
+                    {
+                        drifting = true;
+                        driftDir = inp.steer > 0 ? 1 : -1;
+                        driftCharge = 0;
+                        lastDriftLevel = 0;
+                    }
                 }
+                if (drifting && (!inp.drift || Speed < 8f)) ReleaseDrift();
             }
-            if (drifting && (!inp.drift || Speed < 8f)) ReleaseDrift();
+            else if (drifting)
+            {
+                ReleaseDrift();
+            }
 
             float max = MaxSpeed * topSpeedMul * AISpeedFactor();
             if (shieldTimer > 0) max *= 1.12f;
@@ -474,7 +481,7 @@ public partial class Kart : MonoBehaviour
                 curPos.y = roadY;
                 verticalVel = 0;
                 isAirborne = false;
-                airTrickSpin = 0;
+                airTrickSpin = Mathf.Repeat(airTrickSpin + 180f, 360f) - 180f;
 
                 if (trickDone)
                 {
@@ -499,6 +506,7 @@ public partial class Kart : MonoBehaviour
             curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
             if (curPos.y > roadY + 0.9f && Speed > 20f && verticalVel <= 0)
             {
+                if (drifting) ReleaseDrift();
                 isAirborne = true;
                 verticalVel = 4f;
                 trickWindowTimer = 0.25f;
@@ -529,7 +537,7 @@ public partial class Kart : MonoBehaviour
         }
 
         isBraking = inp.throttle < 0 && Speed > 2f;
-        bool skidding = canDrive && (drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f));
+        bool skidding = canDrive && !isAirborne && (drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f));
         if (skidTrails[0] != null)
         {
             skidTrails[0].emitting = skidding;
@@ -586,6 +594,8 @@ public partial class Kart : MonoBehaviour
 
     public void LaunchJump(float power)
     {
+        if (drifting) ReleaseDrift();
+        hopT = 1f;
         verticalVel = power;
         isAirborne = true;
         airTrickSpin = 0f;
