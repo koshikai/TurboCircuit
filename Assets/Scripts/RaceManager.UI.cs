@@ -778,25 +778,33 @@ public partial class RaceManager
         // 4. 画面中央下部：PRESS ENTER TO RACE（ぷっくり立体キャンディボタン）
         float pulse = (Mathf.Sin(t * 6f) + 1f) * 0.5f;
         float maxAvailableBtnW = Mathf.Max(260f, w - (cardW + 35f) * 2f - 20f);
-        float baseBtnW = Mathf.Min(440f, maxAvailableBtnW);
+        float baseBtnW = Mathf.Min(456f, maxAvailableBtnW);
         float baseBtnH = 50f;
-        float btnW = Mathf.Min(baseBtnW + pulse * 10f, maxAvailableBtnW);
-        float btnH = baseBtnH + pulse * 4f;
-        float btnX = (w - btnW) * 0.5f;
-        float btnY = 598f - pulse * 2f;
-
         int rbw = Mathf.RoundToInt(baseBtnW);
         int rbh = Mathf.RoundToInt(baseBtnH);
-        var raceShTex = TextureGen.RoundedShadow(rbw, rbh, baseBtnH * 0.5f);
-        GUI.DrawTexture(new Rect(btnX, btnY + 4f, btnW, btnH), raceShTex);
-        var raceBtnTex = TextureGen.RaceStartButton(rbw, rbh);
-        GUI.DrawTexture(new Rect(btnX, btnY, btnW, btnH), raceBtnTex);
-        if (titleFocus == 0)
-            DrawFocusHighlight(new Rect(btnX, btnY, btnW, btnH), baseBtnH * 0.5f);
+        var baseBtnRect = new Rect(Mathf.Round((w - rbw) * 0.5f), 598f, rbw, rbh);
+        float maxScale = maxAvailableBtnW / Mathf.Max(1f, rbw);
+        float btnScale = Mathf.Min(1f + pulse * 0.04f, maxScale);
 
-        var startStyle = St(sMid, (int)(24 + pulse * 2), TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
-        Outlined(new Rect(btnX, btnY + 2, btnW, btnH - 4), "►►  PRESS ENTER / [A] TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
-        if (!titleShotRequested && GUI.Button(new Rect(btnX, btnY, btnW, btnH), GUIContent.none, GUIStyle.none))
+        Matrix4x4 prevMat = GUI.matrix;
+        Vector3 btnPivot = new Vector3(baseBtnRect.center.x, baseBtnRect.center.y, 0f);
+        GUI.matrix = prevMat
+            * Matrix4x4.Translate(btnPivot)
+            * Matrix4x4.Scale(new Vector3(btnScale, btnScale, 1f))
+            * Matrix4x4.Translate(-btnPivot);
+
+        var raceShTex = TextureGen.RoundedShadow(rbw, rbh, rbh * 0.5f);
+        GUI.DrawTexture(new Rect(baseBtnRect.x, baseBtnRect.y + 4f, baseBtnRect.width, baseBtnRect.height), raceShTex);
+        var raceBtnTex = TextureGen.RaceStartButton(rbw, rbh);
+        GUI.DrawTexture(baseBtnRect, raceBtnTex);
+        if (titleFocus == 0)
+            DrawFocusHighlight(baseBtnRect, rbh * 0.5f);
+
+        var startStyle = St(sMid, 21, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic);
+        Outlined(new Rect(baseBtnRect.x, baseBtnRect.y + 2f, baseBtnRect.width, baseBtnRect.height - 4f), "►►  PRESS ENTER / [A] TO RACE!  ◄◄", startStyle, Color.white, 2.5f);
+        bool startClicked = !titleShotRequested && GUI.Button(baseBtnRect, GUIContent.none, GUIStyle.none);
+        GUI.matrix = prevMat;
+        if (startClicked)
             StartRaceFromTitle();
 
 
