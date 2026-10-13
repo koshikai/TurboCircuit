@@ -330,21 +330,31 @@ public partial class RaceManager
 
         // プレイヤー名入力
         GUI.Label(new Rect(x, y, 140, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.15f, 0.22f, 0.38f)));
-        string enteredName = GUI.TextField(new Rect(x + 140, y, 220, 32), playerName, 12, sField);
+        var nameRect = new Rect(x + 140, y, 220, 32);
+        var codeRect = new Rect(x + 255, y + 48 + 30, 130, 42);
+        var ipRect = new Rect(x + 255, y + 48 + 105 + 30, 150, 42);
+        if (Event.current != null && Event.current.type == EventType.MouseDown
+            && !nameRect.Contains(Event.current.mousePosition)
+            && !codeRect.Contains(Event.current.mousePosition)
+            && !ipRect.Contains(Event.current.mousePosition))
+        {
+            GUIUtility.keyboardControl = 0;
+        }
+        string enteredName = GUI.TextField(nameRect, playerName, 12, sField);
         SetPlayerName(enteredName);
         y += 48;
 
         // インターネット経由（Unity Relay）
         GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
         if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST ROOM", "", new Color(1f, 0.62f, 0.1f), true, netFocus == 0)) Net.HostRelay();
-        joinCodeInput = GUI.TextField(new Rect(x + 255, y + 30, 130, 42), joinCodeInput, 8, sField).ToUpperInvariant();
+        joinCodeInput = GUI.TextField(codeRect, joinCodeInput, 8, sField).ToUpperInvariant();
         if (DrawModernButton(new Rect(x + 395, y + 30, cw - 395, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 1)) Net.JoinRelay(joinCodeInput);
 
         // IP 直接接続（LAN / VPN）
         y += 105;
         GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
         if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST (LISTEN)", "", new Color(0.65f, 0.35f, 0.92f), false, netFocus == 2)) Net.HostDirect();
-        ipInput = GUI.TextField(new Rect(x + 255, y + 30, 150, 42), ipInput, 40, sField);
+        ipInput = GUI.TextField(ipRect, ipInput, 40, sField);
         if (DrawModernButton(new Rect(x + 415, y + 30, cw - 415, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 3)) Net.JoinDirect(ipInput);
 
         if (!string.IsNullOrEmpty(Net.Message))

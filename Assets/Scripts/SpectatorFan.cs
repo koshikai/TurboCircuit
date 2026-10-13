@@ -135,7 +135,11 @@ public class SpectatorFan : MonoBehaviour
     {
         var go = GameObject.CreatePrimitive(type);
         var col = go.GetComponent<Collider>();
-        if (col != null) Object.Destroy(col);
+        if (col != null)
+        {
+            if (Application.isPlaying) Object.Destroy(col);
+            else Object.DestroyImmediate(col);
+        }
 
         go.transform.SetParent(parent, false);
         go.transform.localPosition = localPos;

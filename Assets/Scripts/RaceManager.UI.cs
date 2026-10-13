@@ -382,7 +382,10 @@ public partial class RaceManager
             y += 36;
             // プレイヤーネーム
             GUI.Label(new Rect(r.x + 30, y, lw, 28), "PLAYER NAME", St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.2f, 0.25f, 0.4f)));
-            string newName = GUI.TextField(new Rect(r.x + 30 + lw, y, 200, 28), playerName, 12, sField);
+            var nameFieldRect = new Rect(r.x + 30 + lw, y, 200, 28);
+            if (Event.current != null && Event.current.type == EventType.MouseDown && !nameFieldRect.Contains(Event.current.mousePosition))
+                GUIUtility.keyboardControl = 0;
+            string newName = GUI.TextField(nameFieldRect, playerName, 12, sField);
             SetPlayerName(newName);
 
             y += 36;

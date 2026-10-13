@@ -1364,7 +1364,7 @@ public partial class RaceManager : MonoBehaviour
 
         if (settingsTab == 0)
         {
-            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 6) % 6; if (Audio != null) Audio.Tick(); }
+            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 6) % 6; GUIUtility.keyboardControl = 0; if (Audio != null) Audio.Tick(); }
             if (settingsFocus == 0 && nav.moveX != 0) { Audio.SetMasterBgm(Mathf.Clamp01(RaceAudio.MasterBgmVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
             else if (settingsFocus == 1 && nav.moveX != 0) { Audio.SetMasterSfx(Mathf.Clamp01(RaceAudio.MasterSfxVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
             else if (settingsFocus == 2 && nav.moveX != 0) { InputSettings.StickDeadzone = Mathf.Clamp(InputSettings.StickDeadzone + nav.moveX * 0.02f, 0.05f, 0.35f); InputSettings.Save(); if (Audio != null) Audio.Tick(); }
@@ -1478,6 +1478,7 @@ public partial class RaceManager : MonoBehaviour
             if (nav.moveY != 0)
             {
                 netFocus = (netFocus - nav.moveY + 5) % 5;
+                GUIUtility.keyboardControl = 0;
                 if (Audio != null) Audio.Tick();
             }
             if (nav.confirm)
