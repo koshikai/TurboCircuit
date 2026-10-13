@@ -62,6 +62,7 @@ public partial class Kart : MonoBehaviour
     float slipstreamDraftTimer, slipstreamTimer;
     float trickWindowTimer;
     bool trickDone;
+    bool aiTrickDecided;
     AudioSource engine3D;
 
     float boostTimer, shieldTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
@@ -165,6 +166,8 @@ public partial class Kart : MonoBehaviour
         Heading = Quaternion.LookRotation(track.Dirs[Index]).eulerAngles.y;
         VelDir = Forward;
         Speed = 0;
+        CurrentThrottle = 0f;
+        throttleHeldSince = -1f;
         Lap = 0;
         MaxLap = 0;
         track.Locate(transform.position, ref Index, out Lateral, out Progress);
@@ -175,6 +178,7 @@ public partial class Kart : MonoBehaviour
         slipstreamDraftTimer = slipstreamTimer = 0;
         trickWindowTimer = 0;
         trickDone = false;
+        aiTrickDecided = false;
         InDraftStream = false;
         drifting = false;
         lastDriftLevel = 0;
@@ -183,16 +187,30 @@ public partial class Kart : MonoBehaviour
         previewLockTimer = 0f;
         isBraking = false;
         spinAngle = 0;
+        visYaw = 0f;
+        visPitch = 0f;
+        steerVis = 0f;
+        hopT = 1f;
         verticalVel = 0;
         isAirborne = false;
         airTrickSpin = 0;
         jumpCooldown = 0;
         bumpCooldown = 0;
         aiSteer = 0;
+        aiStuck = 0f;
+        aiReverse = 0f;
         hasNet = false;
+        snapBuffer.Clear();
         aiItemTimer = Random.Range(1f, 3f);
-        if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
+        if (engine3D != null) engine3D.volume = 0f;
         UpdateVisual(0, 0);
+        if (skidTrails[0] != null)
+        {
+            skidTrails[0].emitting = false;
+            skidTrails[1].emitting = false;
+            skidTrails[0].Clear();
+            skidTrails[1].Clear();
+        }
     }
 
     float previewLockTimer;
@@ -210,6 +228,30 @@ public partial class Kart : MonoBehaviour
             Effects(dt);
             return;
         }
+        if (!canDrive)
+        {
+            if (IsPlayer && !Finished && !rm.Demo)
+            {
+                var preInp = InputProvider != null ? InputProvider.GetInput(this, dt) : PlayerInput();
+                CurrentThrottle = preInp.throttle;
+                if (preInp.throttle > 0) { if (throttleHeldSince < 0) throttleHeldSince = Time.time; }
+                else throttleHeldSince = -1f;
+            }
+            else
+            {
+                CurrentThrottle = 0f;
+                throttleHeldSince = -1f;
+            }
+            if (engine3D != null) engine3D.volume = 0f;
+            if (skidTrails[0] != null)
+            {
+                skidTrails[0].emitting = false;
+                skidTrails[1].emitting = false;
+            }
+            UpdateVisual(dt, 0f);
+            return;
+        }
+
         var inp = InputProvider != null 
             ? InputProvider.GetInput(this, dt) 
             : ((IsPlayer && !Finished && !rm.Demo) ? PlayerInput() : AIInput(dt));
@@ -219,12 +261,6 @@ public partial class Kart : MonoBehaviour
         {
             if (inp.throttle > 0) { if (throttleHeldSince < 0) throttleHeldSince = Time.time; }
             else throttleHeldSince = -1f;
-        }
-
-        if (!canDrive)
-        {
-            UpdateVisual(dt, inp.steer);
-            return;
         }
 
         boostTimer -= dt;
@@ -269,7 +305,7 @@ public partial class Kart : MonoBehaviour
                 for (int kIdx = 0; kIdx < rm.Karts.Count; kIdx++)
                 {
                     var other = rm.Karts[kIdx];
-                    if (other == this || other == null) continue;
+                    if (other == this || other == null || !other.gameObject.activeSelf) continue;
                     var toOther = other.transform.position - myPos;
                     if (Mathf.Abs(toOther.y) > 2.2f) continue;
                     float fwdDist = Vector3.Dot(toOther, myFwd);
@@ -298,7 +334,7 @@ public partial class Kart : MonoBehaviour
                     if (IsPlayer)
                     {
                         rm.Audio.Boost();
-                        GamepadHaptics.Vibrate(PlayerIndex, 0.35f, 0.85f, 0.35f);
+                        if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.35f, 0.85f, 0.35f);
                     }
                     Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.95f, 1f), 18, 6.5f, 0.38f);
                 }
@@ -334,7 +370,8 @@ public partial class Kart : MonoBehaviour
             Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
             if (Offroad && boostTimer <= 0 && shieldTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
-            if (boostTimer > 0 || slipstreamTimer > 0) Speed = Mathf.MoveTowards(Speed, MaxSpeed * 1.4f, 60f * dt);
+            if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, Mathf.Max(max * 1.25f, MaxSpeed * 1.4f * topSpeedMul * AISpeedFactor()), 60f * dt);
+            else if (slipstreamTimer > 0) Speed = Mathf.MoveTowards(Speed, max, 45f * dt);
             else if (Speed > max) Speed = Mathf.MoveTowards(Speed, max, 20f * dt);
             else if (inp.throttle > 0) Speed = Mathf.MoveTowards(Speed, max, 15f * accelMul * (1f - 0.55f * Speed / max) * dt);
             else if (inp.throttle < 0) Speed = Mathf.MoveTowards(Speed, -9f, (Speed > 0 ? 32f : 12f) * dt);
@@ -374,7 +411,12 @@ public partial class Kart : MonoBehaviour
         if (prevProgress > L * 0.75f && Progress < L * 0.25f)
         {
             Lap++;
-            if (Lap > MaxLap) { MaxLap = Lap; rm.OnLapCompleted(this); }
+            if (Lap > MaxLap)
+            {
+                MaxLap = Lap;
+                rm.OnLapCompleted(this);
+                if (IsPlayer && Finished) GamepadHaptics.SetDrift(PlayerIndex, 0);
+            }
         }
         else if (prevProgress < L * 0.25f && Progress > L * 0.75f) Lap--;
 
@@ -400,7 +442,7 @@ public partial class Kart : MonoBehaviour
                         float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
                         rm.Audio.Bump(bumpInt);
                         rm.Shake(0.25f * bumpInt);
-                        GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
+                        if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
                     }
                 }
             }
@@ -413,7 +455,11 @@ public partial class Kart : MonoBehaviour
             if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral - pad.lateral) < 2.4f && boostTimer < 0.8f)
             {
                 Boost(1.1f);
-                if (IsPlayer) { rm.Audio.Boost(); GamepadHaptics.Vibrate(PlayerIndex, 0.2f, 0.85f, 0.25f); }
+                if (IsPlayer)
+                {
+                    rm.Audio.Boost();
+                    if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.2f, 0.85f, 0.25f);
+                }
             }
         }
 
@@ -447,12 +493,13 @@ public partial class Kart : MonoBehaviour
             {
                 trickWindowTimer -= dt;
                 bool doTrick = false;
-                if (IsPlayer && !rm.Demo)
+                if (IsPlayer && !Finished && !rm.Demo)
                 {
                     doTrick = inp.driftDown;
                 }
-                else if (!IsPlayer)
+                else if (!aiTrickDecided)
                 {
+                    aiTrickDecided = true;
                     doTrick = Random.value < (0.65f * aiSkill);
                 }
 
@@ -465,7 +512,7 @@ public partial class Kart : MonoBehaviour
                     {
                         rm.Audio.Boost();
                         rm.Shake(0.3f);
-                        GamepadHaptics.Vibrate(PlayerIndex, 0.45f, 0.95f, 0.35f);
+                        if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.45f, 0.95f, 0.35f);
                     }
                 }
             }
@@ -497,13 +544,17 @@ public partial class Kart : MonoBehaviour
                 trickWindowTimer = 0f;
 
                 Fx.Smoke(curPos, -Forward * 3f + Vector3.up * 1.5f, new Color(0.9f, 0.9f, 0.95f, 0.6f), 1.2f, 0.5f, 3);
-                if (IsPlayer) { rm.Audio.Bump(0.42f); rm.Shake(0.35f); GamepadHaptics.Vibrate(PlayerIndex, 0.50f, 0.2f, 0.15f); }
+                if (IsPlayer)
+                {
+                    rm.Audio.Bump(0.42f);
+                    rm.Shake(0.35f);
+                    if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.50f, 0.2f, 0.15f);
+                }
             }
             transform.position = curPos;
         }
         else
         {
-            curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
             if (curPos.y > roadY + 0.9f && Speed > 20f && verticalVel <= 0)
             {
                 if (drifting) ReleaseDrift();
@@ -511,6 +562,11 @@ public partial class Kart : MonoBehaviour
                 verticalVel = 4f;
                 trickWindowTimer = 0.25f;
                 trickDone = false;
+                aiTrickDecided = false;
+            }
+            else
+            {
+                curPos.y = Mathf.Lerp(curPos.y, roadY, 1f - Mathf.Exp(-28f * dt));
             }
             transform.position = curPos;
         }
@@ -524,14 +580,16 @@ public partial class Kart : MonoBehaviour
             isAirborne = false;
             airTrickSpin = 0f;
             trickDone = false;
+            aiTrickDecided = false;
             trickWindowTimer = 0f;
             VelDir = Forward;
             transform.position = curPos;
+            if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
             if (IsPlayer)
             {
                 rm.Shake(0.5f);
                 rm.Audio.Bump();
-                GamepadHaptics.Vibrate(PlayerIndex, 0.8f, 0.4f, 0.3f);
+                if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.8f, 0.4f, 0.3f);
             }
             Fx.Burst(curPos, new Color(0.3f, 0.8f, 1f), 18, 6f, 0.4f);
         }
@@ -544,17 +602,25 @@ public partial class Kart : MonoBehaviour
             skidTrails[1].emitting = skidding;
         }
 
-        if (IsPlayer) GamepadHaptics.SetDrift(PlayerIndex, drifting ? DriftLevel : 0);
+        if (IsPlayer) GamepadHaptics.SetDrift(PlayerIndex, (!Finished && !rm.Demo && drifting) ? DriftLevel : 0);
 
         // ライバルカートの 3D エンジン音更新
-        if (engine3D != null && engine3D.isPlaying)
+        if (IsPlayer)
         {
-            float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
-            float throttle01 = Mathf.Max(0f, inp.throttle);
-            float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01 * 0.7f + throttle01 * 0.3f);
-            engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
-            float targetVol = Mathf.Lerp(0.015f, 0.085f, spd01) * RaceAudio.MasterSfxVolume;
-            engine3D.volume = Mathf.MoveTowards(engine3D.volume, targetVol, dt * 2.0f);
+            if (engine3D != null) engine3D.volume = 0f;
+        }
+        else
+        {
+            if (engine3D == null) Setup3DEngineAudio();
+            if (engine3D != null && engine3D.isPlaying)
+            {
+                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
+                float throttle01 = Mathf.Max(0f, inp.throttle);
+                float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01 * 0.7f + throttle01 * 0.3f);
+                engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
+                float targetVol = Mathf.Lerp(0.015f, 0.085f, spd01) * RaceAudio.MasterSfxVolume;
+                engine3D.volume = Mathf.MoveTowards(engine3D.volume, targetVol, dt * 2.0f);
+            }
         }
 
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
@@ -576,7 +642,7 @@ public partial class Kart : MonoBehaviour
                 Boost(0.35f + 0.35f * lv);
                 OnDriftReleaseBoost(lv);
                 rm.Audio.Pop(lv);
-                GamepadHaptics.Vibrate(PlayerIndex, 0.28f, 0.68f + 0.10f * lv, 0.26f);
+                if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.28f, 0.68f + 0.10f * lv, 0.26f);
             }
         }
         else if (lv > 0)
@@ -602,6 +668,7 @@ public partial class Kart : MonoBehaviour
         jumpCooldown = 2.2f;
         trickWindowTimer = 0.35f;
         trickDone = false;
+        aiTrickDecided = false;
         Speed = Mathf.Max(Speed, MaxSpeed * 1.15f);
         if (IsPlayer)
         {
@@ -659,7 +726,12 @@ public partial class Kart : MonoBehaviour
         boostTimer = 0;
         drifting = false;
         Fx.Burst(transform.position + Vector3.up, new Color(1f, 0.9f, 0.3f), 20, 7f, 0.5f);
-        if (IsPlayer) { rm.Audio.Hit(); rm.Shake(0.8f); GamepadHaptics.Vibrate(PlayerIndex, 0.95f, 0.75f, 0.5f); }
+        if (IsPlayer)
+        {
+            rm.Audio.Hit();
+            rm.Shake(0.8f);
+            if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.95f, 0.75f, 0.5f);
+        }
         return true;
     }
 
@@ -683,7 +755,11 @@ public partial class Kart : MonoBehaviour
                 if (IsPlayer) rm.Audio.Boost();
                 break;
             case ItemType.Banana:
-                rm.SpawnBanana(transform.position - Forward * 2.8f, this);
+                Vector3 bPos = transform.position - Forward * 2.8f;
+                int bIdx = Index;
+                track.Locate(bPos, ref bIdx, out float bLat, out _);
+                bPos.y = track.PointAt(bIdx, bLat).y;
+                rm.SpawnBanana(bPos, this);
                 if (IsPlayer) rm.Audio.Drop();
                 break;
             case ItemType.Missile:

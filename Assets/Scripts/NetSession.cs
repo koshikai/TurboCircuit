@@ -12,7 +12,7 @@ using UnityEngine;
 // 1 台のカートの同期用スナップショット（持ち主が送り、相手側ではゴーストとして再現する）
 public struct NetKartState
 {
-    public const byte FDrift = 1, FBoost = 2, FShield = 4, FSpin = 8, FAir = 16, FBrake = 32, FDone = 64;
+    public const byte FDrift = 1, FBoost = 2, FShield = 4, FSpin = 8, FAir = 16, FBrake = 32, FDone = 64, FTrick = 128;
 
     public Vector3 Pos;
     public float Heading, Speed, Steer, Progress, FinishTime;
@@ -69,6 +69,7 @@ public class NetSession : MonoBehaviour
     NetworkPipeline reliable;
     float nextSend;
     int syncedPlayerCount = 1;
+    int sessionGen;
 
     // ───────────────────────── 接続 ─────────────────────────
 
@@ -76,14 +77,17 @@ public class NetSession : MonoBehaviour
     {
         if (Busy) return;
         Begin(true, "Contacting Relay...");
+        int gen = sessionGen;
         try
         {
             await EnsureServices();
+            if (State != Phase.Starting || sessionGen != gen) return;
             var alloc = await RelayService.Instance.CreateAllocationAsync(MaxClients);
+            if (State != Phase.Starting || sessionGen != gen) return;
             var ep = alloc.ServerEndpoints.FirstOrDefault(e => e.ConnectionType == "dtls") ?? alloc.ServerEndpoints.First();
             var data = new RelayServerData(ep.Host, (ushort)ep.Port, alloc.AllocationIdBytes, alloc.ConnectionData, alloc.ConnectionData, alloc.Key, ep.Secure);
             string code = await RelayService.Instance.GetJoinCodeAsync(alloc.AllocationId);
-            if (State != Phase.Starting) return; // 途中でキャンセルされた
+            if (State != Phase.Starting || sessionGen != gen) return; // 途中でキャンセルされた
             var settings = Settings();
             settings.WithRelayParameters(ref data);
             CreateDriver(settings);
@@ -95,7 +99,7 @@ public class NetSession : MonoBehaviour
             Message = "Waiting for players...";
             OnConnected?.Invoke();
         }
-        catch (Exception e) { Fail("Relay error: " + e.Message); }
+        catch (Exception e) { if (sessionGen == gen) Fail("Relay error: " + e.Message); }
     }
 
     public async void JoinRelay(string code)
@@ -104,14 +108,16 @@ public class NetSession : MonoBehaviour
         code = (code ?? "").Trim().ToUpperInvariant();
         if (code.Length == 0) { Message = "Enter the room code."; return; }
         Begin(false, "Contacting Relay...");
+        int gen = sessionGen;
         try
         {
             await EnsureServices();
+            if (State != Phase.Starting || sessionGen != gen) return;
             Debug.Log("[Net] Joining room " + code);
             var alloc = await RelayService.Instance.JoinAllocationAsync(code);
+            if (State != Phase.Starting || sessionGen != gen) return;
             var ep = alloc.ServerEndpoints.FirstOrDefault(e => e.ConnectionType == "dtls") ?? alloc.ServerEndpoints.First();
             var data = new RelayServerData(ep.Host, (ushort)ep.Port, alloc.AllocationIdBytes, alloc.ConnectionData, alloc.HostConnectionData, alloc.Key, ep.Secure);
-            if (State != Phase.Starting) return;
             var settings = Settings();
             settings.WithRelayParameters(ref data);
             CreateDriver(settings);
@@ -120,7 +126,7 @@ public class NetSession : MonoBehaviour
             Message = "Connecting...";
             Debug.Log("[Net] Connecting via Relay");
         }
-        catch (Exception e) { Fail("Relay error: " + e.Message); }
+        catch (Exception e) { if (sessionGen == gen) Fail("Relay error: " + e.Message); }
     }
 
     public void HostDirect(ushort port = DefaultPort)
@@ -160,6 +166,7 @@ public class NetSession : MonoBehaviour
 
     void Begin(bool host, string message)
     {
+        sessionGen++;
         IsHost = host;
         State = Phase.Starting;
         Message = message;
@@ -191,12 +198,18 @@ public class NetSession : MonoBehaviour
 
     void CreateDriver(NetworkSettings settings)
     {
+        if (driver.IsCreated)
+        {
+            driver.ScheduleUpdate().Complete();
+            driver.Dispose();
+        }
         driver = NetworkDriver.Create(settings);
         reliable = driver.CreatePipeline(typeof(ReliableSequencedPipelineStage));
     }
 
     void Teardown()
     {
+        sessionGen++;
         if (driver.IsCreated)
         {
             for (int i = 0; i < hostConnections.Count; i++)
@@ -538,7 +551,8 @@ public class NetSession : MonoBehaviour
     {
         if (r.GetBytesRead() >= r.Length) return "";
         int len = r.ReadByte();
-        if (len <= 0) return "";
+        int rem = r.Length - r.GetBytesRead();
+        if (len <= 0 || len > rem) return "";
         byte[] bytes = new byte[len];
         for (int i = 0; i < len; i++) bytes[i] = r.ReadByte();
         return System.Text.Encoding.UTF8.GetString(bytes);

@@ -72,9 +72,10 @@ public partial class Track
         {
             for (int i = 0; i < Count; i += 7)
             {
+                float lampOffset = Pts[i].y > 2.0f ? (WallOffset - 0.1f) : (WallOffset + 2.5f);
                 foreach (float side in new[] { -1f, 1f })
                 {
-                    var lpPos = PointAt(i, side * (WallOffset + 2.5f));
+                    var lpPos = PointAt(i, side * lampOffset);
                     var lpRot = Quaternion.LookRotation(side * Rights[i], Vector3.up);
                     SpawnProp(prefabLightPost, lpPos, lpRot, Vector3.one * 1.5f, rm.standMaterial, (i % 14 == 0) ? neonCyanMat : neonPinkMat);
                 }
@@ -210,6 +211,7 @@ public partial class Track
         // 1. クラーク博士胸像（William S. Clark Memorial Statue）- 中央ローン広場
         int clarkIdx = (int)(0.12f * Count);
         Vector3 clarkPos = PointAt(clarkIdx, -(WallOffset + 12f));
+        clarkPos.y = GetTerrainHeight(clarkPos.x, clarkPos.z, def);
         Quaternion clarkRot = Quaternion.LookRotation(Rights[clarkIdx], Vector3.up);
 
         if (prefabStatueBlock != null)
@@ -244,20 +246,30 @@ public partial class Track
             float fAng = f * 22f;
             Quaternion fRot = clarkRot * Quaternion.Euler(0, fAng, 0);
             Vector3 fPos = clarkPos + fRot * new Vector3(0, 0, 4.2f);
+            fPos.y = GetTerrainHeight(fPos.x, fPos.z, def);
             var fPrefab = (Mathf.Abs(f) % 2 == 0) ? (prefabFlower1 ?? prefabFlower2) : (prefabBushFlowers ?? prefabBush);
             if (fPrefab != null)
                 SpawnProp(fPrefab, fPos, Quaternion.Euler(0, f * 55, 0), Vector3.one * 1.5f, bushLeafMat, flowerMat);
         }
-        SpawnProp(prefabBushFlowers ?? prefabBush, clarkPos + clarkRot * new Vector3(-3.8f, 0, 2.5f), Quaternion.identity, Vector3.one * 1.8f, bushLeafMat, flowerMat);
-        SpawnProp(prefabBushFlowers ?? prefabBush, clarkPos + clarkRot * new Vector3(3.8f, 0, 2.5f), Quaternion.identity, Vector3.one * 1.8f, bushLeafMat, flowerMat);
+        Vector3 clarkBushL = clarkPos + clarkRot * new Vector3(-3.8f, 0, 2.5f);
+        clarkBushL.y = GetTerrainHeight(clarkBushL.x, clarkBushL.z, def);
+        Vector3 clarkBushR = clarkPos + clarkRot * new Vector3(3.8f, 0, 2.5f);
+        clarkBushR.y = GetTerrainHeight(clarkBushR.x, clarkBushR.z, def);
+        SpawnProp(prefabBushFlowers ?? prefabBush, clarkBushL, Quaternion.identity, Vector3.one * 1.8f, bushLeafMat, flowerMat);
+        SpawnProp(prefabBushFlowers ?? prefabBush, clarkBushR, Quaternion.identity, Vector3.one * 1.8f, bushLeafMat, flowerMat);
 
         // クラーク像を取り囲む雄大なエルムの大樹（Quaternius NormalTree）
-        SpawnNatureProp(prefabNormal1 ?? prefabNormal2, clarkPos + clarkRot * new Vector3(-10f, 0, -5f), Quaternion.Euler(0, 45, 0), Vector3.one * 4.2f, elmTrunkMat, elmLeafMat);
-        SpawnNatureProp(prefabNormal2 ?? prefabNormal1, clarkPos + clarkRot * new Vector3(10f, 0, -5f), Quaternion.Euler(0, 120, 0), Vector3.one * 4.0f, elmTrunkMat, elmLeafMat);
+        Vector3 clarkElmL = clarkPos + clarkRot * new Vector3(-10f, 0, -5f);
+        clarkElmL.y = GetTerrainHeight(clarkElmL.x, clarkElmL.z, def);
+        Vector3 clarkElmR = clarkPos + clarkRot * new Vector3(10f, 0, -5f);
+        clarkElmR.y = GetTerrainHeight(clarkElmR.x, clarkElmR.z, def);
+        SpawnNatureProp(prefabNormal1 ?? prefabNormal2, clarkElmL, Quaternion.Euler(0, 45, 0), Vector3.one * 4.2f, elmTrunkMat, elmLeafMat);
+        SpawnNatureProp(prefabNormal2 ?? prefabNormal1, clarkElmR, Quaternion.Euler(0, 120, 0), Vector3.one * 4.0f, elmTrunkMat, elmLeafMat);
 
         // 2. 古河記念講堂（Furukawa Memorial Hall）- アメリカン・ルネサンス様式の木造洋風校舎
         int furukawaIdx = (int)(0.155f * Count);
         Vector3 furukawaPos = PointAt(furukawaIdx, -(WallOffset + 24f));
+        furukawaPos.y = GetTerrainHeight(furukawaPos.x, furukawaPos.z, def);
         Quaternion furukawaRot = Quaternion.LookRotation(Rights[furukawaIdx], Vector3.up);
         Box("FurukawaBase", furukawaPos + Vector3.up * 5.5f, new Vector3(36f, 11f, 18f), furukawaRot, woodWhiteMat);
         Box("FurukawaPorch", furukawaPos + furukawaRot * new Vector3(0, 6f, 10f), new Vector3(10f, 12f, 3.5f), furukawaRot, woodWhiteMat);
@@ -267,22 +279,32 @@ public partial class Track
         Box("FurukawaCupolaBase", cupolaPos, new Vector3(4.0f, 4.0f, 4.0f), furukawaRot, woodWhiteMat, PrimitiveType.Cylinder);
         Box("FurukawaCupolaRoof", cupolaPos + Vector3.up * 3.2f, new Vector3(4.4f, 3.6f, 4.4f), furukawaRot, roofGreenMat, PrimitiveType.Cylinder);
         for (int b = -3; b <= 3; b += 2)
-            SpawnProp((b % 4 == 0 ? prefabBushFlowers : prefabBushLarge) ?? prefabBush, furukawaPos + furukawaRot * new Vector3(b * 4.5f, 0, 11f), Quaternion.identity, Vector3.one * 1.6f, bushLeafMat, flowerMat);
+        {
+            Vector3 fBushPos = furukawaPos + furukawaRot * new Vector3(b * 4.5f, 0, 11f);
+            fBushPos.y = GetTerrainHeight(fBushPos.x, fBushPos.z, def);
+            SpawnProp((b % 4 == 0 ? prefabBushFlowers : prefabBushLarge) ?? prefabBush, fBushPos, Quaternion.identity, Vector3.one * 1.6f, bushLeafMat, flowerMat);
+        }
 
         // 3. 北大総合博物館（HU Museum）- 東側（外側）の赤レンガ重厚校舎
         int museumIdx = (int)(0.22f * Count);
         Vector3 museumPos = PointAt(museumIdx, WallOffset + 26f);
+        museumPos.y = GetTerrainHeight(museumPos.x, museumPos.z, def);
         Quaternion museumRot = Quaternion.LookRotation(-Rights[museumIdx], Vector3.up);
         Box("MuseumWingL", museumPos + museumRot * new Vector3(-19f, 7f, 0), new Vector3(19f, 14f, 17f), museumRot, brickMuseumMat);
         Box("MuseumCenter", museumPos + Vector3.up * 9.5f, new Vector3(20f, 19f, 21f), museumRot, brickMuseumMat);
         Box("MuseumWingR", museumPos + museumRot * new Vector3(19f, 7f, 0), new Vector3(19f, 14f, 17f), museumRot, brickMuseumMat);
         Box("MuseumTower", museumPos + Vector3.up * 20.5f, new Vector3(8.5f, 5.0f, 8.5f), museumRot, brickMuseumMat);
         // エントランス前の白樺（Quaternius BirchTree）
-        SpawnNatureProp(prefabBirch1 ?? prefabBirch2, museumPos + museumRot * new Vector3(-8f, 0, 13f), Quaternion.identity, Vector3.one * 3.2f, birchTrunkMat, birchLeafMat);
-        SpawnNatureProp(prefabBirch2 ?? prefabBirch1, museumPos + museumRot * new Vector3(8f, 0, 13f), Quaternion.identity, Vector3.one * 3.2f, birchTrunkMat, birchLeafMat);
+        Vector3 musBirchL = museumPos + museumRot * new Vector3(-8f, 0, 13f);
+        musBirchL.y = GetTerrainHeight(musBirchL.x, musBirchL.z, def);
+        Vector3 musBirchR = museumPos + museumRot * new Vector3(8f, 0, 13f);
+        musBirchR.y = GetTerrainHeight(musBirchR.x, musBirchR.z, def);
+        SpawnNatureProp(prefabBirch1 ?? prefabBirch2, musBirchL, Quaternion.identity, Vector3.one * 3.2f, birchTrunkMat, birchLeafMat);
+        SpawnNatureProp(prefabBirch2 ?? prefabBirch1, musBirchR, Quaternion.identity, Vector3.one * 3.2f, birchTrunkMat, birchLeafMat);
 
         // 4. 大野池（Ono Pond）- 西側（内側）の睡蓮の池、木造アーチ橋、自然岩
         Vector3 pondPos = PointAt(museumIdx, -(WallOffset + 18f));
+        pondPos.y = GetTerrainHeight(pondPos.x, pondPos.z, def) + 0.05f;
         Box("OnoPondWater", pondPos + Vector3.up * 0.08f, new Vector3(38f, 26f, 1f), Quaternion.Euler(90, 25, 0), waterMat, PrimitiveType.Quad);
         for (int p = 0; p < 14; p++)
         {
@@ -301,12 +323,17 @@ public partial class Track
         {
             float rAng = r * 0.8f;
             Vector3 rPos = pondPos + new Vector3(Mathf.Cos(rAng) * 15f, 0, Mathf.Sin(rAng) * 10f);
+            rPos.y = GetTerrainHeight(rPos.x, rPos.z, def);
             var rPrefab = (r % 3 == 0) ? prefabRock1 : ((r % 3 == 1) ? prefabRock2 : prefabRock3);
             if (rPrefab != null)
                 SpawnProp(rPrefab, rPos, Quaternion.Euler(0, r * 45f, 0), Vector3.one * (1.8f + (r % 3) * 0.4f), rockMat, rockMat);
         }
-        Box("PondBench", pondPos + new Vector3(16f, 0.4f, -4f), new Vector3(2.6f, 0.8f, 0.8f), Quaternion.Euler(0, -20f, 0), rm.trunkMaterial);
-        SpawnNatureProp(prefabNormal1 ?? prefabNormal2, pondPos + new Vector3(-15f, 0, 9f), Quaternion.identity, Vector3.one * 4.0f, elmTrunkMat, elmLeafMat);
+        Vector3 pondBenchPos = pondPos + new Vector3(16f, 0f, -4f);
+        pondBenchPos.y = GetTerrainHeight(pondBenchPos.x, pondBenchPos.z, def) + 0.4f;
+        Box("PondBench", pondBenchPos, new Vector3(2.6f, 0.8f, 0.8f), Quaternion.Euler(0, -20f, 0), rm.trunkMaterial);
+        Vector3 pondElmPos = pondPos + new Vector3(-15f, 0, 9f);
+        pondElmPos.y = GetTerrainHeight(pondElmPos.x, pondElmPos.z, def);
+        SpawnNatureProp(prefabNormal1 ?? prefabNormal2, pondElmPos, Quaternion.identity, Vector3.one * 4.0f, elmTrunkMat, elmLeafMat);
 
         // 5. 北13条イチョウ並木（Ginkgo Avenue）- 東へ伸びる壮大な黄金のアーチトンネル！（Quaternius MapleTree）
         int ginkgoStart = (int)(0.26f * Count);
@@ -320,6 +347,7 @@ public partial class Track
             {
                 // 内側列（道路沿い）：頭上を覆うように道路側へ傾斜（黄金のアーチキャノピー）
                 Vector3 treePos1 = PointAt(i, side * (WallOffset + 4.2f));
+                treePos1.y = GetTerrainHeight(treePos1.x, treePos1.z, def);
                 Quaternion leanRot = Quaternion.AngleAxis(-side * 14f, Dirs[i]) * Quaternion.Euler(0, (i * 37) % 360, 0);
                 SpawnNatureProp(gTreePrefab ?? prefabNormal1, treePos1, leanRot, Vector3.one * s, ginkgoTrunkMat, gMat);
 
@@ -327,6 +355,7 @@ public partial class Track
                 if (i % 5 == 0)
                 {
                     Vector3 treePos2 = PointAt(i, side * (WallOffset + 8.8f));
+                    treePos2.y = GetTerrainHeight(treePos2.x, treePos2.z, def);
                     Quaternion rot2 = Quaternion.Euler(0, (i * 53) % 360, 0);
                     var gTree2 = (i % 2 == 0) ? prefabMaple2 : prefabMaple3;
                     SpawnNatureProp(gTree2 ?? prefabNormal2, treePos2, rot2, Vector3.one * (s * 1.15f), ginkgoTrunkMat, (i % 4 == 0) ? ginkgoLeafMatB : ginkgoLeafMatA);
@@ -336,10 +365,15 @@ public partial class Track
                 if (i % 6 == 0)
                 {
                     Vector3 fPos = PointAt(i, side * (WallOffset + 2.4f));
+                    fPos.y = GetTerrainHeight(fPos.x, fPos.z, def);
                     if (prefabFlower1 != null)
                         SpawnProp(prefabFlower1, fPos, Quaternion.Euler(0, i * 29, 0), Vector3.one * 1.4f, bushLeafMat, flowerMat);
                     if (prefabGrassLarge != null)
-                        SpawnProp(prefabGrassLarge, fPos + Vector3.forward * 1.2f, Quaternion.identity, Vector3.one * 1.4f, ginkgoCarpetMat);
+                    {
+                        Vector3 gPos = fPos + Vector3.forward * 1.2f;
+                        gPos.y = GetTerrainHeight(gPos.x, gPos.z, def);
+                        SpawnProp(prefabGrassLarge, gPos, Quaternion.identity, Vector3.one * 1.4f, ginkgoCarpetMat);
+                    }
                 }
             }
         }
@@ -352,6 +386,7 @@ public partial class Track
             foreach (float side in new[] { -1f, 1f })
             {
                 Vector3 treePos = PointAt(i, side * (WallOffset + 5.0f));
+                treePos.y = GetTerrainHeight(treePos.x, treePos.z, def);
                 Quaternion rot = Quaternion.Euler(0, (i * 43) % 360, 0);
                 if (i % 3 == 0) // 白樺（Quaternius BirchTree）
                     SpawnNatureProp(prefabBirch1 ?? prefabBirch2, treePos, rot, Vector3.one * 3.4f, birchTrunkMat, birchLeafMat);
@@ -365,17 +400,27 @@ public partial class Track
         // 7. 第2農場モデルバーン＆サイロ＆牧草地（Historic Model Barn & Silo & Pasture）
         int barnIdx = (int)(0.66f * Count);
         Vector3 siloPos = PointAt(barnIdx, WallOffset + 19f);
+        siloPos.y = GetTerrainHeight(siloPos.x, siloPos.z, def);
         Box("BarnSiloBody", siloPos + Vector3.up * 8.5f, new Vector3(8.0f, 17f, 8.0f), Quaternion.identity, woodWhiteMat, PrimitiveType.Cylinder);
         Box("BarnSiloCap", siloPos + Vector3.up * 18.5f, new Vector3(8.6f, 4.5f, 8.6f), Quaternion.identity, siloRoofMat, PrimitiveType.Cylinder);
         for (int h = 0; h < 6; h++)
         {
-            Vector3 hayPos = siloPos + new Vector3(-9f + h * 3.2f, 1.2f, 9f);
+            Vector3 hayPos = siloPos + new Vector3(-9f + h * 3.2f, 0f, 9f);
+            hayPos.y = GetTerrainHeight(hayPos.x, hayPos.z, def) + 1.2f;
             Box("HayBale", hayPos, new Vector3(2.3f, 2.1f, 2.3f), Quaternion.Euler(0, h * 30f, 90f), hayMat, PrimitiveType.Cylinder);
         }
         if (prefabLogStack != null)
-            SpawnProp(prefabLogStack, siloPos + new Vector3(10f, 0, -4f), Quaternion.Euler(0, 45, 0), Vector3.one * 2.2f, rm.trunkMaterial);
+        {
+            Vector3 logPos = siloPos + new Vector3(10f, 0, -4f);
+            logPos.y = GetTerrainHeight(logPos.x, logPos.z, def);
+            SpawnProp(prefabLogStack, logPos, Quaternion.Euler(0, 45, 0), Vector3.one * 2.2f, rm.trunkMaterial);
+        }
         if (prefabStump != null)
-            SpawnProp(prefabStump, siloPos + new Vector3(8f, 0, 6f), Quaternion.identity, Vector3.one * 2.0f, rm.trunkMaterial);
+        {
+            Vector3 stumpPos = siloPos + new Vector3(8f, 0, 6f);
+            stumpPos.y = GetTerrainHeight(stumpPos.x, stumpPos.z, def);
+            SpawnProp(prefabStump, stumpPos, Quaternion.identity, Vector3.one * 2.0f, rm.trunkMaterial);
+        }
 
         // 牧草地の木柵モデルと放牧ホルスタイン牛
         int pastureStart = (int)(0.68f * Count);
@@ -383,6 +428,7 @@ public partial class Track
         for (int i = pastureStart; i <= pastureEnd; i += 6)
         {
             Vector3 fencePos = PointAt(i, -(WallOffset + 5.5f));
+            fencePos.y = GetTerrainHeight(fencePos.x, fencePos.z, def);
             Quaternion fRot = Quaternion.LookRotation(Dirs[i], Vector3.up);
             if (i == pastureStart + 6 && prefabGate != null)
                 SpawnProp(prefabGate, fencePos, fRot, new Vector3(2.2f, 1.8f, 2.2f), woodWhiteMat, woodWhiteMat);
@@ -400,10 +446,15 @@ public partial class Track
             foreach (float side in new[] { -1f, 1f })
             {
                 Vector3 pPos = PointAt(i, side * (WallOffset + 4.5f));
+                pPos.y = GetTerrainHeight(pPos.x, pPos.z, def);
                 Quaternion rot = Quaternion.Euler(0, (i * 29) % 360, 0);
                 SpawnNatureProp(popPrefab ?? prefabBirch1, pPos, rot, new Vector3(s * 0.65f, s * 1.85f, s * 0.65f), poplarTrunkMat, poplarLeafMat);
                 if (prefabGrassLarge != null && i % 8 == 0)
-                    SpawnProp(prefabGrassLarge, pPos + Vector3.forward * 1.5f, Quaternion.identity, Vector3.one * 1.5f, bushLeafMat);
+                {
+                    Vector3 gPos = pPos + Vector3.forward * 1.5f;
+                    gPos.y = GetTerrainHeight(gPos.x, gPos.z, def);
+                    SpawnProp(prefabGrassLarge, gPos, Quaternion.identity, Vector3.one * 1.5f, bushLeafMat);
+                }
             }
         }
 
@@ -412,6 +463,7 @@ public partial class Track
         {
             if (i >= ginkgoStart && i <= ginkgoEnd) continue;
             Vector3 lampPos = PointAt(i, WallOffset + 2.4f);
+            lampPos.y = GetTerrainHeight(lampPos.x, lampPos.z, def);
             Quaternion lRot = Quaternion.LookRotation(Dirs[i], Vector3.up);
             if (prefabLampPost != null)
                 SpawnProp(prefabLampPost, lampPos, lRot, Vector3.one * 1.2f, rm.standMaterial, rm.glowMaterial);
@@ -419,6 +471,7 @@ public partial class Track
             if (i % 36 == 0 && prefabSign != null)
             {
                 Vector3 sPos = PointAt(i, -(WallOffset + 2.6f));
+                sPos.y = GetTerrainHeight(sPos.x, sPos.z, def);
                 SpawnProp(prefabSign, sPos, Quaternion.LookRotation(-Rights[i], Vector3.up), Vector3.one * 1.8f, rm.trunkMaterial);
             }
         }
@@ -429,6 +482,7 @@ public partial class Track
             float side = (i % 2 == 0) ? 1f : -1f;
             float offset = WallOffset + 2.5f + (float)rng.NextDouble() * 5.0f;
             Vector3 pos = PointAt(i, side * offset);
+            pos.y = GetTerrainHeight(pos.x, pos.z, def);
             int itemType = rng.Next(5);
             if (itemType == 0 && prefabGrassLarge != null)
                 SpawnProp(prefabGrassLarge, pos, Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0), Vector3.one * (1.1f + (float)rng.NextDouble() * 0.6f), bushLeafMat);
@@ -449,6 +503,7 @@ public partial class Track
             var pos = new Vector3(
                 Mathf.Lerp(bounds.min.x - 120, bounds.max.x + 120, (float)rng.NextDouble()), 0,
                 Mathf.Lerp(bounds.min.z - 120, bounds.max.z + 120, (float)rng.NextDouble()));
+            pos.y = GetTerrainHeight(pos.x, pos.z, def);
             if (DistanceToTrack(pos) < WallOffset + 4.5f) continue;
             float s = 2.8f + (float)rng.NextDouble() * 1.5f;
             Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);

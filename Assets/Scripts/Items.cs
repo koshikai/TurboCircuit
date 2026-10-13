@@ -866,22 +866,27 @@ public class Missile : MonoBehaviour
 
     void Update()
     {
+        if (rm == null) { Destroy(gameObject); return; }
+        if (!rm.RaceRunning) { Explode(); return; }
         float dt = Time.deltaTime;
         if (dt == 0) return;
         age += dt;
         if (age > 9f) { Explode(); return; }
 
         Vector3 aim;
-        bool homing = target != null && (target.transform.position - transform.position).magnitude < 35f && Mathf.Abs(target.transform.position.y - transform.position.y) < 7f;
+        bool homing = target != null && target.gameObject.activeSelf && (target.transform.position - transform.position).magnitude < 35f && Mathf.Abs(target.transform.position.y - transform.position.y) < 7f;
         if (homing) aim = target.transform.position + Vector3.up * 0.7f;
         else
         {
             lateral = Mathf.MoveTowards(lateral, 0, 4f * dt);
             aim = track.PointAt(index + 7, lateral) + Vector3.up * 0.7f;
         }
-        dir = Vector3.RotateTowards(dir, (aim - transform.position).normalized, (homing ? 5f : 8f) * dt, 0f);
+        Vector3 toAim = aim - transform.position;
+        if (toAim.sqrMagnitude > 0.001f)
+            dir = Vector3.RotateTowards(dir, toAim.normalized, (homing ? 5f : 8f) * dt, 0f);
         transform.position += dir * 50f * dt;
-        transform.rotation = Quaternion.LookRotation(dir);
+        if (dir.sqrMagnitude > 0.001f)
+            transform.rotation = Quaternion.LookRotation(dir);
         track.Locate(transform.position, ref index, out _, out _);
 
         Fx.Emit(transform.position - dir * 0.6f, -dir * 4f, new Color(1f, 0.5f, 0.2f), 0.5f, 0.25f, 1, 0.8f);
@@ -889,15 +894,13 @@ public class Missile : MonoBehaviour
 
         foreach (var k in rm.Karts)
         {
-            if (k == Owner) continue;
-            if (k.IsRemote || !k.gameObject.activeSelf) continue; // オンライン時は被弾する側（ローカル操作者またはホストのCPU）が判定する！
+            if (k == Owner || k == null || !k.gameObject.activeSelf) continue;
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
-                if (k.Shielded || k.Spin())
-                {
-                    Explode();
-                    return;
-                }
+                // オンライン時は被弾する側（ローカル操作者またはホストのCPU）がスピン判定を行い、ミサイル自体は全画面で即座に爆発消滅する
+                if (!k.IsRemote && !k.Shielded) k.Spin();
+                Explode();
+                return;
             }
         }
         if (rm.MissileHitsBanana(transform.position)) Explode();

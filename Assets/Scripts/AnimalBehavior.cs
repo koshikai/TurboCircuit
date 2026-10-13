@@ -227,7 +227,7 @@ public class FlyingBird : MonoBehaviour
         float x = centerPos.x + Mathf.Cos(angle) * radius;
         float z = centerPos.z + Mathf.Sin(angle) * (radius * 0.75f);
         // 上下にゆったり波打つ高度
-        float y = altitude + Mathf.Sin(angle * 2.2f) * 3.5f;
+        float y = centerPos.y + altitude + Mathf.Sin(angle * 2.2f) * 3.5f;
 
         Vector3 nextPos = new Vector3(x, y, z);
         Vector3 forward = new Vector3(-Mathf.Sin(angle) * radius, Mathf.Cos(angle * 2.2f) * 1.5f, Mathf.Cos(angle) * (radius * 0.75f)).normalized;

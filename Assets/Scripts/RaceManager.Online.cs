@@ -12,6 +12,7 @@ public partial class RaceManager
     void OnNetHostClientConnected(Unity.Networking.Transport.NetworkConnection conn)
     {
         if (TwoPlayer) SetTwoPlayer(false);
+        if (IsTimeAttack) IsTimeAttack = false;
         playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart);
         // 未割り当ての人間スロットを探す
         int nextSlot = HumanSlots.FirstOrDefault(s => !playerKarts.ContainsKey(s));
@@ -19,7 +20,19 @@ public partial class RaceManager
         clientSlots[conn] = nextSlot;
         playerKarts[nextSlot] = 0; // 初期選択
         Net.SendWelcome(conn, nextSlot, SelectedCourse);
-        SyncLobby();
+        if (state == State.Title)
+        {
+            SyncLobby();
+        }
+        else
+        {
+            if (nextSlot >= 0 && nextSlot < Karts.Count)
+            {
+                Karts[nextSlot].IsPlayer = false;
+                Karts[nextSlot].IsRemote = true;
+            }
+            Net.SendStart(SelectedCourse);
+        }
         if (Audio != null) Audio.Select();
     }
 
@@ -31,7 +44,7 @@ public partial class RaceManager
             playerKarts.Remove(slot);
             playerNames.Remove(slot);
             MakeAI(Karts[slot], slot);
-            SyncLobby();
+            if (state == State.Title) SyncLobby();
             Banner("PLAYER LEFT", new Color(1f, 0.4f, 0.3f), 0);
         }
     }
@@ -43,13 +56,14 @@ public partial class RaceManager
             UnpackDriverKart(kartChar, out int drv, out int krt);
             playerKarts[slot] = PackDriverKart(drv, krt);
             playerNames[slot] = string.IsNullOrEmpty(pName) ? $"P{slot + 1}" : pName;
-            SyncLobby();
+            if (state == State.Title) SyncLobby();
         }
     }
 
     void OnNetClientConnected()
     {
         if (TwoPlayer) SetTwoPlayer(false);
+        if (IsTimeAttack) IsTimeAttack = false;
         int packed = PackDriverKart(SelectedDriver, SelectedKart);
         if (Net.IsHost)
         {
@@ -66,6 +80,8 @@ public partial class RaceManager
 
     void OnNetWelcome(int assignedSlot, int course)
     {
+        if (TwoPlayer) SetTwoPlayer(false);
+        if (IsTimeAttack) IsTimeAttack = false;
         mySlot = assignedSlot;
         Player = Karts[mySlot];
         Player.IsRemote = false;
@@ -159,23 +175,25 @@ public partial class RaceManager
     {
         int ai = slot < playerGridSlot ? slot : slot - 1;
         bool named = slot != playerGridSlot;
-        int aiDrv = (ai + 2) % KartCharacters.Length;
+        int aiDrv = (ai + 3) % KartCharacters.Length;
         int aiKrt = (ai + 1) % KartMachines.Length;
         k.IsPlayer = false;
         k.IsRemote = false;
         k.PlayerIndex = 0;
         k.ModelVariant = aiDrv;
         k.KartVariant = aiKrt;
-        k.Name = named ? AiNames[ai] : "Guest";
+        k.Name = named ? $"{AiNames[ai]} ({KartCharacters[aiDrv].name})" : "Guest";
         k.DriverColor = KartCharacters[aiDrv].color;
         k.Color = named ? AiColors[ai] : new Color(0.7f, 0.75f, 0.85f);
-        k.ApplyStats(5, 5, 5, 5);
+        GetCombinedStats(aiDrv, aiKrt, out int spd, out int acc, out int hdl, out int wgt);
+        k.ApplyStats(spd, acc, hdl, wgt);
         k.RebuildModel();
     }
 
     void OnNetDisconnected()
     {
         playerKarts.Clear();
+        playerNames.Clear();
         clientSlots.Clear();
         mySlot = playerGridSlot;
         foreach (var k in Karts) k.IsRemote = false;
@@ -195,8 +213,10 @@ public partial class RaceManager
     void RestoreRoles()
     {
         playerKarts.Clear();
+        playerNames.Clear();
         clientSlots.Clear();
         mySlot = playerGridSlot;
+        ShowAllKarts();
         for (int i = 0; i < Karts.Count; i++)
         {
             if (i == playerGridSlot)
@@ -204,6 +224,11 @@ public partial class RaceManager
                 Player = Karts[i];
                 Player.IsRemote = false;
                 ConfigureHuman(0);
+            }
+            else if (TwoPlayer && i == P2Slot)
+            {
+                Karts[i].IsRemote = false;
+                ConfigureHuman(1);
             }
             else
             {
@@ -215,6 +240,8 @@ public partial class RaceManager
     void LeaveOnline()
     {
         netMenu = false;
+        GUIUtility.keyboardControl = 0;
+        GamepadHaptics.StopAll();
         Net.Disconnect();
         RestoreRoles();
         if (state != State.Title) ReturnToTitle();

@@ -769,7 +769,7 @@ public partial class Kart
         Fx.Emit(rearL, carry + sparkBack * 1.8f + Vector3.up * 0.4f, colMain, 0.50f + lv * 0.08f, 0.13f, 2, 0.4f);
         Fx.Emit(rearR, carry + sparkBack * 1.8f + Vector3.up * 0.4f, colSub, 0.50f + lv * 0.08f, 0.13f, 2, 0.4f);
 
-        if (IsPlayer && rm != null && !rm.Demo)
+        if (IsPlayer && !Finished && rm != null && !rm.Demo)
         {
             rm.Audio.DriftSpark(lv);
             GamepadHaptics.Vibrate(PlayerIndex, 0.18f * lv, 0.45f + 0.15f * lv, 0.14f);

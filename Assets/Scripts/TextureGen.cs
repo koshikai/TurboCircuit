@@ -193,7 +193,9 @@ public static class TextureGen
             c.a = 1;
             px[y * n + x] = c;
         }
-        return New(n, n, px);
+        var t = New(n, n, px);
+        cache[key] = t;
+        return t;
     }
 
     // ビルの外壁（窓の明かり付き）。1タイル = 窓4列 x 8階
@@ -224,6 +226,8 @@ public static class TextureGen
     // タイトル画面用の都市コースバッジ（夜景スカイライン）
     public static Texture2D CityBadge()
     {
+        const string key = "city_badge";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         var rng = new System.Random(5);
@@ -249,12 +253,16 @@ public static class TextureGen
             }
             px[y * n + x] = c;
         }
-        return New(n, n, px, false);
+        var t = New(n, n, px, false);
+        cache[key] = t;
+        return t;
     }
 
     // タイトル画面用の北大キャンパスコースバッジ（ポプラ並木・エルムの緑・北斗星・イチョウ）
     public static Texture2D HokkaidoBadge()
     {
+        const string key = "hokkaido_badge";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         Color skyTop = new Color(0.18f, 0.52f, 0.88f);
@@ -347,12 +355,16 @@ public static class TextureGen
             }
             px[y * n + x] = c;
         }
-        return New(n, n, px, false);
+        var t = New(n, n, px, false);
+        cache[key] = t;
+        return t;
     }
 
     // タイトル画面用の立体交差コースバッジ（スカイライン・オーバーパス：斜張橋と立体交差ハイウェイ）
     public static Texture2D OverpassBadge()
     {
+        const string key = "overpass_badge";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         Color skyTop = new Color(0.15f, 0.45f, 0.95f);
@@ -459,7 +471,9 @@ public static class TextureGen
             }
             px[y * n + x] = c;
         }
-        return New(n, n, px, false);
+        var t = New(n, n, px, false);
+        cache[key] = t;
+        return t;
     }
 
 
@@ -670,6 +684,8 @@ public static class TextureGen
 
     public static Texture2D SoftDot()
     {
+        const string key = "soft_dot";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 64;
         var px = new Color[n * n];
         for (int y = 0; y < n; y++)
@@ -681,12 +697,15 @@ public static class TextureGen
         }
         var t = New(n, n, px, false);
         t.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = t;
         return t;
     }
 
     // 画面周辺減光（スピード感・トンネル効果演出用）
     public static Texture2D Vignette()
     {
+        const string key = "vignette";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int n = 128;
         var px = new Color[n * n];
         for (int y = 0; y < n; y++)
@@ -700,12 +719,15 @@ public static class TextureGen
         }
         var t = New(n, n, px, false);
         t.wrapMode = TextureWrapMode.Clamp;
+        cache[key] = t;
         return t;
     }
 
     // スキッドマーク（タイヤ痕）テクスチャ
     public static Texture2D TireMark()
     {
+        const string key = "tire_mark";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int w = 32, h = 64;
         var px = new Color[w * h];
         for (int y = 0; y < h; y++)
@@ -721,6 +743,7 @@ public static class TextureGen
         }
         var t = New(w, h, px, false);
         t.wrapMode = TextureWrapMode.Repeat;
+        cache[key] = t;
         return t;
     }
 
@@ -802,6 +825,9 @@ public static class TextureGen
     // UIカード用の半透明グラデーション＆角丸パネル
     public static Texture2D CardPanel(int w, int h, Color topBg, Color botBg, Color borderColor, int borderThick)
     {
+        string key = $"cardpanel_{w}_{h}_{topBg.r:F2}_{topBg.g:F2}_{topBg.b:F2}_{topBg.a:F2}_{botBg.r:F2}_{botBg.g:F2}_{botBg.b:F2}_{botBg.a:F2}_{borderColor.r:F2}_{borderColor.g:F2}_{borderColor.b:F2}_{borderColor.a:F2}_{borderThick}";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
         int sw = Mathf.Max(16, w * UiScale);
         int sh = Mathf.Max(16, h * UiScale);
         float sr = 10f * UiScale;
@@ -831,12 +857,15 @@ public static class TextureGen
         var tex = New(sw, sh, px, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
+        cache[key] = tex;
         return tex;
     }
 
     // スピード線（集中線・ウィンドストリーム）用の先細り・フェードアウトテクスチャ
     public static Texture2D SpeedLine()
     {
+        const string key = "speed_line";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
         const int w = 128, h = 16;
         var px = new Color[w * h];
         for (int y = 0; y < h; y++)
@@ -860,6 +889,7 @@ public static class TextureGen
         var t = New(w, h, px, false);
         t.wrapMode = TextureWrapMode.Clamp;
         t.filterMode = FilterMode.Bilinear;
+        cache[key] = t;
         return t;
     }
 

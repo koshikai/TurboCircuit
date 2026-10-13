@@ -426,6 +426,51 @@ public partial class Track
         float dist = Mathf.Sqrt(bestSqrDist);
         float trackY = Pts[bestIdx].y;
 
+        // 立体交差・近接路面の干渉防止：
+        // 水平距離 WallOffset + 28m 以内に別の離れたコース区間があり、高低差が 4.5m を超える場合は
+        // 最も低い路面高度を採用し、高架橋が下の道路やその周辺の地形を引き上げるのを防ぐ
+        float crossRadiusSqr = (WallOffset + 28f) * (WallOffset + 28f);
+        if (bestSqrDist <= crossRadiusSqr)
+        {
+            float minNearbyY = trackY;
+            float maxNearbyY = trackY;
+            float lowSqrDist = bestSqrDist;
+            for (int i = 0; i < Count; i += 4)
+            {
+                int indexDiff = Mathf.Abs(i - bestIdx);
+                if (indexDiff > 35 && indexDiff < Count - 35)
+                {
+                    float dx = Pts[i].x - x;
+                    float dz = Pts[i].z - z;
+                    float sqr = dx * dx + dz * dz;
+                    if (sqr <= crossRadiusSqr)
+                    {
+                        if (Pts[i].y < minNearbyY)
+                        {
+                            minNearbyY = Pts[i].y;
+                            lowSqrDist = sqr;
+                        }
+                        if (Pts[i].y > maxNearbyY)
+                        {
+                            maxNearbyY = Pts[i].y;
+                        }
+                    }
+                }
+            }
+            if (maxNearbyY - minNearbyY > 4.5f && minNearbyY < trackY)
+            {
+                trackY = minNearbyY;
+                dist = Mathf.Sqrt(lowSqrDist);
+            }
+        }
+
+        // Course 0 (Turbo Circuit) の高架橋（Flyover Bridge）区間は地面を橋桁まで引き上げず、
+        // 橋の下に空間を空けて BuildBridgePillars で橋脚を生成させる
+        if (theme == 0 && (Pts[bestIdx].y > 5.0f || trackY > 4.0f))
+        {
+            trackY = Mathf.Min(trackY, 4.0f);
+        }
+
         // コース直下（道路・縁石・路肩・壁の内側）は路面底面(-0.35m)に厳密固定し、
         // 道路や路肩の上に地面がはみ出したり突き抜けたりするのを100%防止
         if (dist <= WallOffset)

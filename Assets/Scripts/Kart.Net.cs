@@ -18,6 +18,7 @@ public partial class Kart
         if (shieldTimer > 0) f |= NetKartState.FShield;
         if (spinTimer > 0) f |= NetKartState.FSpin;
         if (isAirborne) f |= NetKartState.FAir;
+        if (isAirborne && trickDone) f |= NetKartState.FTrick;
         if (isBraking) f |= NetKartState.FBrake;
         if (Finished) f |= NetKartState.FDone;
         return new NetKartState
@@ -68,7 +69,14 @@ public partial class Kart
 
             // バッファから renderTime を挟む 2 フレームを探して補間
             bool interpolated = false;
-            if (snapBuffer.Count >= 2)
+            if (snapBuffer.Count > 0 && renderTime <= snapBuffer[0].time)
+            {
+                targetPos = snapBuffer[0].state.Pos;
+                targetHeading = snapBuffer[0].state.Heading;
+                targetSpeed = snapBuffer[0].state.Speed;
+                interpolated = true;
+            }
+            else if (snapBuffer.Count >= 2)
             {
                 for (int i = 0; i < snapBuffer.Count - 1; i++)
                 {
@@ -88,7 +96,7 @@ public partial class Kart
             if (!interpolated)
             {
                 // バッファを超えた場合は最新フレームからの穏やかな外挿（デッドレコニング）
-                float extrapolateAge = Mathf.Min(Time.unscaledTime - (snapBuffer.Count > 0 ? snapBuffer[^1].time : Time.unscaledTime), 0.25f);
+                float extrapolateAge = Mathf.Clamp(renderTime - (snapBuffer.Count > 0 ? snapBuffer[^1].time : renderTime), 0f, 0.25f);
                 Vector3 fwd = Quaternion.Euler(0, net.Heading, 0) * Vector3.forward;
                 targetPos = net.Pos + fwd * net.Speed * extrapolateAge;
                 targetHeading = net.Heading;
@@ -96,13 +104,22 @@ public partial class Kart
             }
 
             float k = 1f - Mathf.Exp(-18f * dt);
-            transform.position = (targetPos - transform.position).sqrMagnitude > 64f ? targetPos : Vector3.Lerp(transform.position, targetPos, k);
+            if ((targetPos - transform.position).sqrMagnitude > 64f)
+            {
+                transform.position = targetPos;
+                if (skidTrails[0] != null) { skidTrails[0].Clear(); skidTrails[1].Clear(); }
+            }
+            else
+            {
+                transform.position = Vector3.Lerp(transform.position, targetPos, k);
+            }
             Heading = Mathf.LerpAngle(Heading, targetHeading, k);
             Speed = targetSpeed;
             VelDir = Forward;
 
             byte f = net.Flags;
             isAirborne = (f & NetKartState.FAir) != 0;
+            trickDone = isAirborne && (f & NetKartState.FTrick) != 0;
             drifting = !isAirborne && (f & NetKartState.FDrift) != 0;
             driftDir = net.DriftDir == 0 ? 1 : net.DriftDir;
             driftCharge = net.DriftLevel == 3 ? 2.7f : net.DriftLevel == 2 ? 1.7f : net.DriftLevel == 1 ? 0.9f : 0f;
@@ -133,7 +150,8 @@ public partial class Kart
             Finished = (f & NetKartState.FDone) != 0;
             FinishTime = net.FinishTime;
         }
-        if (isAirborne) airTrickSpin += 720f * dt;
+        if (isAirborne && trickDone) airTrickSpin += 720f * dt;
+        else airTrickSpin = Mathf.MoveTowards(Mathf.Repeat(airTrickSpin + 180f, 360f) - 180f, 0f, 900f * dt);
         track.Locate(transform.position, ref Index, out Lateral, out float localProgress);
         Progress = hasNet ? net.Progress : localProgress;
         Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
@@ -144,6 +162,24 @@ public partial class Kart
             skidTrails[0].emitting = skidding;
             skidTrails[1].emitting = skidding;
         }
+
+        if (!IsPlayer && engine3D == null) Setup3DEngineAudio();
+        if (engine3D != null && engine3D.isPlaying)
+        {
+            if (!IsPlayer && rm != null && rm.RaceRunning)
+            {
+                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
+                float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01);
+                engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
+                float targetVol = Mathf.Lerp(0.015f, 0.085f, spd01) * RaceAudio.MasterSfxVolume;
+                engine3D.volume = Mathf.MoveTowards(engine3D.volume, targetVol, dt * 2.0f);
+            }
+            else
+            {
+                engine3D.volume = 0f;
+            }
+        }
+
         UpdateVisual(dt, spinTimer > 0 ? 0 : net.Steer);
         Effects(dt);
     }

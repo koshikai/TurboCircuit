@@ -23,14 +23,14 @@ public partial class RaceManager
     }
 
     // OnGUI 内での GUIStyle 生成を避けるため、(基準, サイズ, 配置, 書体, 折返し, 色) ごとにキャッシュする
-    readonly Dictionary<(int, int, int, int, bool, int), GUIStyle> styleCache = new Dictionary<(int, int, int, int, bool, int), GUIStyle>();
+    readonly Dictionary<(int, int, int, int, bool, long), GUIStyle> styleCache = new Dictionary<(int, int, int, int, bool, long), GUIStyle>();
 
     GUIStyle St(GUIStyle b, int size = 0, TextAnchor? anchor = null, FontStyle? fs = null, bool wrap = false, Color? text = null)
     {
         if (b == null) b = sBig ?? GUI.skin.label;
-        int bid = b == sBig ? 0 : b == sMid ? 1 : b == sNum ? 3 : b == sMono ? 4 : b == sSys ? 5 : 2;
-        int col = -1;
-        if (text.HasValue) { Color32 c = text.Value; col = c.r << 16 | c.g << 8 | c.b; }
+        int bid = b == sBig ? 0 : b == sMid ? 1 : b == sSmall ? 2 : b == sNum ? 3 : b == sMono ? 4 : b == sSys ? 5 : b == sButton ? 6 : b == sField ? 7 : 8;
+        long col = -1L;
+        if (text.HasValue) { Color32 c = text.Value; col = ((long)c.a << 24) | ((long)c.r << 16) | ((long)c.g << 8) | c.b; }
         var key = (bid, size, anchor.HasValue ? (int)anchor.Value : -1, fs.HasValue ? (int)fs.Value : -1, wrap, col);
         if (!styleCache.TryGetValue(key, out var st))
         {
@@ -224,7 +224,12 @@ public partial class RaceManager
             Outlined(new Rect(r.x + pad, r.y, r.width - pad * 2, r.height), shortcut, scStyle, scColor, 1.2f);
         }
 
-        return GUI.Button(r, GUIContent.none, GUIStyle.none);
+        if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+        {
+            GUIUtility.keyboardControl = 0;
+            return true;
+        }
+        return false;
     }
 
     void DrawSettings(float w, float h)
@@ -257,6 +262,9 @@ public partial class RaceManager
         {
             settingsTab = 0;
             settingsFocus = 0;
+            waitingKeyAction = null;
+            waitingPadAction = null;
+            GUIUtility.keyboardControl = 0;
         }
 
         // KEYS & PAD CONFIG タブ (1)
@@ -270,6 +278,9 @@ public partial class RaceManager
         {
             settingsTab = 1;
             settingsFocus = 0;
+            waitingKeyAction = null;
+            waitingPadAction = null;
+            GUIUtility.keyboardControl = 0;
         }
 
         // UPDATES タブ (2)
@@ -285,13 +296,16 @@ public partial class RaceManager
         {
             settingsTab = 2;
             settingsFocus = 0;
+            waitingKeyAction = null;
+            waitingPadAction = null;
+            GUIUtility.keyboardControl = 0;
         }
 
         // キーボード入力待ちの検知
         if (!string.IsNullOrEmpty(waitingKeyAction))
         {
             var e = Event.current;
-            if (e != null && e.isKey && e.keyCode != KeyCode.None)
+            if (e != null && e.type == EventType.KeyDown && e.keyCode != KeyCode.None && Time.frameCount > waitingKeySkipFrame)
             {
                 if (e.keyCode != KeyCode.Escape)
                 {
@@ -419,6 +433,7 @@ public partial class RaceManager
                     settingsCol = 0;
                     waitingPadAction = null;
                     waitingKeyAction = waitingKeyThis ? null : id;
+                    waitingKeySkipFrame = Time.frameCount;
                 }
 
                 // 列 1: コントローラー割り当てボタン（ステアリングは L-STICK / D-PAD 固定ピル表示）
@@ -554,8 +569,7 @@ public partial class RaceManager
         {
             if (updater.State == AppUpdater.UpdateState.UpdateAvailable || updater.State == AppUpdater.UpdateState.Downloaded)
             {
-                float updPulse = (Mathf.Sin(t * 6f) + 1f) * 0.5f;
-                Color updBtnCol = Color.Lerp(new Color(1f, 0.55f, 0.1f), new Color(1f, 0.8f, 0.2f), updPulse);
+                Color updBtnCol = new Color(1f, 0.65f, 0.12f);
                 string verStr = updater.LatestVersion;
                 if (!string.IsNullOrEmpty(verStr) && verStr.Length > 7) verStr = verStr.Substring(0, 6) + "..";
                 string btnTxt = updater.State == AppUpdater.UpdateState.Downloaded ? "★ INSTALL NOW" : $"★ UPDATE {verStr}";
@@ -768,6 +782,7 @@ public partial class RaceManager
             }
             if (DrawModernButton(new Rect(rowX + 242f, 554f, 214f, 32), "★ ONLINE", "[O / X]", new Color(0.15f, 0.72f, 0.52f), false, titleFocus == 8))
             {
+                if (IsTimeAttack) IsTimeAttack = false;
                 netMenu = true;
                 netFocus = 0;
                 if (Audio != null) Audio.Select();
@@ -1034,7 +1049,9 @@ public partial class RaceManager
 
             float colW = hw / 3f;
             string cName = Track.Courses[SelectedCourse].Name.ToUpper();
-            float dispLap = bestLap[0] > 0 ? bestLap[0] : (firstTime > 0 ? firstTime / Mathf.Max(1, totalLaps) : 0f);
+            float pBestLap = bestLap[0];
+            if (TwoPlayer && bestLap[1] > 0 && (pBestLap <= 0 || bestLap[1] < pBestLap)) pBestLap = bestLap[1];
+            float dispLap = pBestLap > 0 ? pBestLap : (firstTime > 0 ? firstTime / Mathf.Max(1, totalLaps) : 0f);
             float dispRec = GetBestTime(SelectedCourse) > 0 ? GetBestTime(SelectedCourse) : firstTime;
 
             var lblSt = St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.38f, 0.46f, 0.62f));
@@ -1052,13 +1069,19 @@ public partial class RaceManager
 
         // ──────── 最下部のアクションボタン (RACE AGAIN / TITLE) ────────
         float halfW = (hw - 16f) * 0.5f;
-
-        if (DrawModernButton(new Rect(hx, btnY, halfW, 44), "►  RACE AGAIN", "[ENTER / A]", new Color(1f, 0.62f, 0.1f), true, resultsFocus == 0))
+        bool canRestart = !Online || Net.IsHost;
+        bool prevEnabled = GUI.enabled;
+        GUI.enabled = prevEnabled && canRestart;
+        string againLabel = canRestart ? "►  RACE AGAIN" : "⏳  HOST ONLY";
+        string againKey = canRestart ? "[ENTER / A]" : "";
+        Color againCol = canRestart ? new Color(1f, 0.62f, 0.1f) : new Color(0.45f, 0.50f, 0.60f);
+        if (DrawModernButton(new Rect(hx, btnY, halfW, 44), againLabel, againKey, againCol, canRestart, canRestart && resultsFocus == 0))
         {
-            StartRaceFromTitle();
+            if (canRestart) StartRaceFromTitle();
         }
+        GUI.enabled = prevEnabled;
 
-        if (DrawModernButton(new Rect(hx + halfW + 16f, btnY, halfW, 44), "◄  BACK TO TITLE", "[ESC / B]", new Color(0.18f, 0.62f, 0.95f), false, resultsFocus == 1))
+        if (DrawModernButton(new Rect(hx + halfW + 16f, btnY, halfW, 44), "◄  BACK TO TITLE", "[ESC / B]", new Color(0.18f, 0.62f, 0.95f), false, !canRestart || resultsFocus == 1))
         {
             if (Online) LeaveOnline();
             else ReturnToTitle();

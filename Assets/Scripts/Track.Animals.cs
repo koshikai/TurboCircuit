@@ -273,8 +273,8 @@ public partial class Track
             // ホルスタイン牛（第2農場の放牧地）- キュートなKenney Cow！
             if (prefabCow != null)
             {
-                int pastureStart = (int)(0.48f * Count);
-                int pastureEnd = (int)(0.63f * Count);
+                int pastureStart = (int)(0.68f * Count);
+                int pastureEnd = (int)(0.76f * Count);
                 for (int i = pastureStart; i <= pastureEnd; i += 6)
                 {
                     Vector3 cowPos = PointAt(i, -(WallOffset + 12f + (i % 3) * 3.5f));

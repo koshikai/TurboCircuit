@@ -131,75 +131,79 @@ public partial class Kart
         {
             float correctAngle = Vector3.SignedAngle(fwd, track.Dirs[Index], Vector3.up);
             inp.steer = Mathf.Sign(correctAngle);
-            inp.throttle = 1f; // バックではなく前進で方向転換
+            inp.throttle = 1f; // バックではなく前進で方向転換（壁スタック時は下のスタック脱出が優先される）
             inp.drift = false;
+            inp.driftDown = false;
             aiSteer = inp.steer;
-            return inp;
         }
-
-        // 5. 自己駆動ドリフト制御 (Self-Triggered Smooth Drift)
-        // ドリフト発動トリガー：
-        // 中速カーブは通常ステアで曲がり、ヘアピン等の急カーブ（曲率 > 0.026 または旋回角 > 34度）でのみ発動
-        bool canStartDrift = !drifting 
-            && (apexCurvature > 0.026f || Mathf.Abs(futureAngle) > 34f) 
-            && v > 15f 
-            && Mathf.Sign(futureAngle) == Mathf.Sign(inp.steer) 
-            && Mathf.Abs(headingError) > 8f;
-
-        if (canStartDrift)
+        else
         {
-            inp.drift = true;
-            inp.driftDown = true;
-        }
-        else if (drifting)
-        {
-            // ドリフト継続トリガー：カーブが続いており、かつ外壁に突っ込まない安全領域
-            bool curveRemains = Mathf.Abs(futureAngle) > 14f && Mathf.Sign(futureAngle) == driftDir;
-            bool wallSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 0.5f;
+            // 5. 自己駆動ドリフト制御 (Self-Triggered Smooth Drift)
+            // ドリフト発動トリガー：
+            // 中速カーブは通常ステアで曲がり、ヘアピン等の急カーブ（曲率 > 0.026 または旋回角 > 34度）でのみ発動
+            bool canStartDrift = !drifting
+                && (apexCurvature > 0.026f || Mathf.Abs(futureAngle) > 34f)
+                && v > 15f
+                && Mathf.Sign(futureAngle) == Mathf.Sign(inp.steer)
+                && Mathf.Abs(headingError) > 8f;
 
-            // ミニターボがチャージされ、コーナーの出口が見えたら即座に解除してロケットダッシュ！
-            if (curveRemains && wallSafe && DriftLevel < 2)
+            if (canStartDrift)
             {
                 inp.drift = true;
-                // ドリフト中はイン固定ではなく、目標方位に合わせて微調整（カウンターステア／微インステア）
-                // これによりイン側への極端な巻き込み内壁激突を完全に防止！
-                float driftSteer = headingError * 0.022f;
-                inp.steer = Mathf.Clamp(driftSteer, -0.45f, 0.45f);
             }
-            else
+            else if (drifting)
             {
-                // ドリフト解除！ミニターボ発動！
-                inp.drift = false;
+                // ドリフト継続トリガー：カーブが続いており、かつ外壁に突っ込まない安全領域
+                bool curveRemains = Mathf.Abs(futureAngle) > 14f && Mathf.Sign(futureAngle) == driftDir;
+                bool wallSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 0.5f;
+
+                // ミニターボがチャージされ、コーナーの出口が見えたら即座に解除してロケットダッシュ！
+                if (curveRemains && wallSafe && DriftLevel < 2)
+                {
+                    inp.drift = true;
+                    // ドリフト中はイン固定ではなく、目標方位に合わせて微調整（カウンターステア／微インステア）
+                    // これによりイン側への極端な巻き込み内壁激突を完全に防止！
+                    float driftSteer = headingError * 0.022f;
+                    inp.steer = Mathf.Clamp(driftSteer, -0.45f, 0.45f);
+                }
+                else
+                {
+                    // ドリフト解除！ミニターボ発動！
+                    inp.drift = false;
+                }
             }
-        }
 
-        // 6. コントロール・バリア・ファンクション (CBF / 滑らかな境界反発)
-        float safeBoundary = Track.HalfWidth - 0.8f; // 8.2m
-        float distToEdge = safeBoundary - Mathf.Abs(currentLateral);
-        float outwardVelocity = Vector3.Dot(VelDir, track.Rights[Index] * Mathf.Sign(currentLateral));
+            // 6. コントロール・バリア・ファンクション (CBF / 滑らかな境界反発)
+            float safeBoundary = Track.HalfWidth - 0.8f; // 8.2m
+            float distToEdge = safeBoundary - Mathf.Abs(currentLateral);
+            float outwardVelocity = Vector3.Dot(VelDir, track.Rights[Index] * Mathf.Sign(currentLateral));
 
-        if (distToEdge < 2.0f && outwardVelocity > 0.05f)
-        {
-            // 距離に応じた滑らかな比例反発（急激なフルステア反発で蛇行するのを防ぐ）
-            float repelIntensity = Mathf.Clamp01((2.0f - distToEdge) / 1.5f);
-            float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.55f;
-            inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
-            inp.drift = false; // コース端での横滑りを即座に収束
-            if (distToEdge < 0.6f && outwardVelocity > 0.15f && Speed > 7.0f)
+            if (distToEdge < 2.0f && outwardVelocity > 0.05f)
             {
-                inp.throttle = -1f; // 十分な前進速度がある場合のみ減速ブレーキ
+                // 距離に応じた滑らかな比例反発（急激なフルステア反発で蛇行するのを防ぐ）
+                float repelIntensity = Mathf.Clamp01((2.0f - distToEdge) / 1.5f);
+                float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.55f;
+                inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
+                inp.drift = false; // コース端での横滑りを即座に収束
+                if (distToEdge < 0.6f && outwardVelocity > 0.15f && Speed > 7.0f)
+                {
+                    inp.throttle = -1f; // 十分な前進速度がある場合のみ減速ブレーキ
+                }
             }
-        }
 
-        // ステアリングの滑らかな補間（カクカクした急ハンドルを根絶）
-        aiSteer = Mathf.MoveTowards(aiSteer, inp.steer, dt * 4.5f);
-        inp.steer = aiSteer;
+            // ステアリングの滑らかな補間（カクカクした急ハンドルを根絶）
+            aiSteer = Mathf.MoveTowards(aiSteer, inp.steer, dt * 4.5f);
+            inp.steer = aiSteer;
+
+            // 最終的なステア量がドリフト開始閾値を満たし、かつ境界反発等で解除されていない場合のみドリフトジャンプ開始
+            inp.driftDown = canStartDrift && inp.drift && Mathf.Abs(inp.steer) > 0.32f && Speed > 10.5f;
+        }
 
         // 7. スタック脱出 (Anti-Stuck Logic)
         // スタート直後（レース開始後3秒以内）は絶対にスタック判定を行わない！
-        // また、前進入力中 (inp.throttle > 0) なのに壁に引っかかって車速がほぼゼロ (< 1.2m/s) の状態が
-        // 2.5秒以上続いた場合のみ、一時的なバック脱出 (0.4秒間) を行う。
-        if (rm != null && rm.RaceRunning && rm.RaceTime > 3.0f && Speed < 1.2f && inp.throttle > 0)
+        // また、前進入力中 (inp.throttle > 0) なのに壁に引っかかって車速がほぼゼロ (< 3.5m/s) の状態が
+        // 続いた場合のみ、一時的なバック脱出を行う。
+        if (rm != null && rm.RaceRunning && rm.RaceTime > 3.0f && Mathf.Abs(Speed) < 3.5f && (inp.throttle > 0 || forwardDot < -0.1f))
         {
             aiStuck += dt;
         }
@@ -208,7 +212,8 @@ public partial class Kart
             aiStuck = 0;
         }
 
-        if (aiStuck > 2.5f)
+        float stuckLimit = forwardDot < -0.1f ? 0.5f : 2.5f;
+        if (aiStuck > stuckLimit)
         {
             aiReverse = 0.5f;
             aiStuck = 0;
@@ -221,6 +226,7 @@ public partial class Kart
             inp.steer = -Mathf.Sign(headingError != 0 ? headingError : (Lateral >= 0 ? 1f : -1f));
             aiSteer = inp.steer;
             inp.drift = false;
+            inp.driftDown = false;
         }
 
         // 8. 戦略的アイテム使用 (Strategic Item Usage)

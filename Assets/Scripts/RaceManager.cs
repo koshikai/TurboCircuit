@@ -122,6 +122,7 @@ public partial class RaceManager : MonoBehaviour
     int settingsTab = 0; // 0 = General, 1 = Key & Pad Config, 2 = Updates
     string waitingKeyAction = null;
     string waitingPadAction = null;
+    int waitingKeySkipFrame = -1;
     int waitingPadSkipFrame = -1;
     int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates
     int pauseFocus = 0;
@@ -145,6 +146,7 @@ public partial class RaceManager : MonoBehaviour
 
     // 入力欄が空でも表示・送信には必ず有効な名前を使う
     string DisplayName => string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim();
+    bool IsEditingTextField => GUIUtility.keyboardControl != 0 && ((showSettings && settingsTab == 0) || (state == State.Title && netMenu && !LobbyActive && (Net == null || !Net.Busy)));
     // オンラインのクライアントでは自カートが playerGridSlot ではないため、常に Player から求める
     int MyKartIndex => Karts.IndexOf(Player);
     bool Spectating => !TwoPlayer && spectateIndex >= 0 && spectateIndex < Karts.Count && spectateIndex != MyKartIndex;
@@ -165,6 +167,7 @@ public partial class RaceManager : MonoBehaviour
         showSettings = false;
         waitingKeyAction = null;
         waitingPadAction = null;
+        GUIUtility.keyboardControl = 0;
         PlayerPrefs.Save();
     }
 
@@ -477,7 +480,14 @@ public partial class RaceManager : MonoBehaviour
         Net.OnLobbySync = OnNetLobbySync;
         Net.OnCourse = c => { if (state == State.Title && c != SelectedCourse) LoadCourse(c); };
         Net.OnStart = c => { if (c != SelectedCourse) LoadCourse(c); StartCountdown(); };
-        Net.OnState = (id, s) => { if (id >= 0 && id < Karts.Count && Karts[id].IsRemote) Karts[id].ApplyNetState(s); };
+        Net.OnState = (id, s) =>
+        {
+            if (id >= 0 && id < Karts.Count && Karts[id].IsRemote)
+            {
+                if (state == State.Countdown) s.Flags &= unchecked((byte)~NetKartState.FDone);
+                Karts[id].ApplyNetState(s);
+            }
+        };
         Net.OnBanana = (id, owner, pos) => { if (owner >= 0 && owner < Karts.Count) SpawnBananaInternal(id, pos, Karts[owner]); };
         Net.OnBananaGone = RemoveBananaById;
         Net.OnMissile = (owner, target) => { if (owner >= 0 && owner < Karts.Count) SpawnMissileInternal(Karts[owner], (target >= 0 && target < Karts.Count) ? Karts[target] : null); };
@@ -927,6 +937,7 @@ public partial class RaceManager : MonoBehaviour
     {
         if (TwoPlayer == on) return;
         TwoPlayer = on;
+        if (!on && (titleFocus == 3 || titleFocus == 4)) titleFocus = 1;
         if (Audio != null) Audio.Select();
         ConfigureHuman(0);
         ConfigureHuman(1);
@@ -959,14 +970,15 @@ public partial class RaceManager : MonoBehaviour
             int ai = P2Slot; // P2Slot < playerGridSlot なので CPU 名簿のインデックスと一致
             k.IsPlayer = false;
             k.PlayerIndex = 0;
-            int aiDrv = (ai + 2) % KartCharacters.Length;
+            int aiDrv = (ai + 3) % KartCharacters.Length;
             int aiKrt = (ai + 1) % KartMachines.Length;
             k.ModelVariant = aiDrv;
             k.KartVariant = aiKrt;
-            k.Name = AiNames[ai];
+            k.Name = $"{AiNames[ai]} ({KartCharacters[aiDrv].name})";
             k.DriverColor = KartCharacters[aiDrv].color;
             k.Color = AiColors[ai];
-            k.ApplyStats(5, 5, 5, 5);
+            GetCombinedStats(aiDrv, aiKrt, out int spd, out int acc, out int hdl, out int wgt);
+            k.ApplyStats(spd, acc, hdl, wgt);
         }
         k.RebuildModel();
         k.Hop();
@@ -994,8 +1006,11 @@ public partial class RaceManager : MonoBehaviour
         state = State.Title;
         stateTime = 0;
         GamepadHaptics.StopAll();
+        if (ghostReplay != null) ghostReplay.ClearPlayback();
         RestoreRoles();
+        ShowAllKarts();
         LoadCourse(SelectedCourse);
+        Audio.SetMusicTempo(1f);
         Audio.SetMusicVolume(0.3f);
     }
 
@@ -1144,8 +1159,18 @@ public partial class RaceManager : MonoBehaviour
         moveX = 0;
         moveY = 0;
 
+        if (!((showSettings && settingsTab == 0) || (state == State.Title && netMenu && !LobbyActive && (Net == null || !Net.Busy))) && GUIUtility.keyboardControl != 0)
+        {
+            GUIUtility.keyboardControl = 0;
+        }
+        bool editingText = IsEditingTextField;
+        if (editingText && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Escape)))
+        {
+            GUIUtility.keyboardControl = 0;
+        }
+
         Vector2 padVec = InputSettings.GetMenuPadVector();
-        if (padVec == Vector2.zero)
+        if (!editingText && padVec == Vector2.zero)
         {
             float ax = Input.GetAxisRaw("Horizontal");
             float ay = Input.GetAxisRaw("Vertical");
@@ -1182,7 +1207,7 @@ public partial class RaceManager : MonoBehaviour
         }
 
         confirm = InputSettings.GetSinglePadDown(PadBind.A, 0) || InputSettings.GetSinglePadDown(PadBind.A, 1)
-               || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+               || (!editingText && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)));
         cancel = InputSettings.GetSinglePadDown(PadBind.B, 0) || InputSettings.GetSinglePadDown(PadBind.B, 1)
               || Input.GetKeyDown(KeyCode.Escape);
         tabPrev = InputSettings.GetSinglePadDown(PadBind.LB, 0) || InputSettings.GetSinglePadDown(PadBind.LB, 1);
@@ -1211,13 +1236,14 @@ public partial class RaceManager : MonoBehaviour
         nav.padX = InputSettings.GetSinglePadDown(PadBind.X, 0) || InputSettings.GetSinglePadDown(PadBind.X, 1);
         nav.padY = InputSettings.GetSinglePadDown(PadBind.Y, 0) || InputSettings.GetSinglePadDown(PadBind.Y, 1);
 
+        GamepadHaptics.Update(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
+
         if (updater != null && updater.ShowModal) { UpdateModalInput(nav); return; }
         if (showSettings) { UpdateSettingsInput(nav); return; }
         if (UpdateOverlayInput(nav)) return;
         if (paused) { UpdatePausedInput(nav); return; }
 
         float dt = Mathf.Min(Time.deltaTime, 0.05f);
-        GamepadHaptics.Update(dt);
         stateTime += dt;
         bannerTimes[0] += dt;
         bannerTimes[1] += dt;
@@ -1325,6 +1351,7 @@ public partial class RaceManager : MonoBehaviour
         {
             settingsTab = (settingsTab + (nav.tabNext ? 1 : -1) + 3) % 3;
             settingsFocus = 0;
+            GUIUtility.keyboardControl = 0;
             if (Audio != null) Audio.Select();
             return;
         }
@@ -1368,6 +1395,7 @@ public partial class RaceManager : MonoBehaviour
                     {
                         waitingKeyAction = actId;
                         waitingPadAction = null;
+                        waitingKeySkipFrame = Time.frameCount;
                     }
                     else
                     {
@@ -1443,6 +1471,7 @@ public partial class RaceManager : MonoBehaviour
             if (nav.cancel)
             {
                 netMenu = false;
+                GUIUtility.keyboardControl = 0;
                 if (Audio != null) Audio.Select();
                 return true;
             }
@@ -1457,7 +1486,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (netFocus == 1) Net.JoinRelay(joinCodeInput);
                 else if (netFocus == 2) Net.HostDirect();
                 else if (netFocus == 3) Net.JoinDirect(ipInput);
-                else if (netFocus == 4) netMenu = false;
+                else if (netFocus == 4) { netMenu = false; GUIUtility.keyboardControl = 0; }
                 if (Audio != null) Audio.Select();
             }
             return true;
@@ -1467,7 +1496,7 @@ public partial class RaceManager : MonoBehaviour
             LeaveOnline();
             return true;
         }
-        else if ((Input.GetKeyDown(KeyCode.Escape) || nav.padStart) && state != State.Title)
+        else if ((Input.GetKeyDown(KeyCode.Escape) || nav.padStart) && (state == State.Countdown || state == State.Racing))
         {
             if (Online)
             {
@@ -1517,10 +1546,11 @@ public partial class RaceManager : MonoBehaviour
     // タイトル / ロビー画面の入力
     void UpdateTitleInput(in MenuNav nav)
     {
+        bool editTxt = IsEditingTextField;
         if (LobbyActive)
         {
-            if (nav.tabPrev || Input.GetKeyDown(KeyCode.A)) SwitchCourse(-1);
-            else if (nav.tabNext || Input.GetKeyDown(KeyCode.D)) SwitchCourse(1);
+            if (nav.tabPrev || (!editTxt && Input.GetKeyDown(KeyCode.A))) SwitchCourse(-1);
+            else if (nav.tabNext || (!editTxt && Input.GetKeyDown(KeyCode.D))) SwitchCourse(1);
             if (nav.moveY != 0) { lobbyFocus = (lobbyFocus - nav.moveY + 4) % 4; if (Audio != null) Audio.Tick(); }
             if (nav.moveX != 0)
             {
@@ -1528,10 +1558,10 @@ public partial class RaceManager : MonoBehaviour
                 else if (lobbyFocus == 1) SwitchKart(0, nav.moveX);
                 else { lobbyFocus = lobbyFocus == 2 ? 3 : 2; if (Audio != null) Audio.Tick(); }
             }
-            if (Input.GetKeyDown(KeyCode.W)) SwitchDriver(0, -1);
-            else if (Input.GetKeyDown(KeyCode.S)) SwitchDriver(0, 1);
-            else if (Input.GetKeyDown(KeyCode.Q)) SwitchKart(0, -1);
-            else if (Input.GetKeyDown(KeyCode.E)) SwitchKart(0, 1);
+            if (!editTxt && Input.GetKeyDown(KeyCode.W)) SwitchDriver(0, -1);
+            else if (!editTxt && Input.GetKeyDown(KeyCode.S)) SwitchDriver(0, 1);
+            else if (!editTxt && Input.GetKeyDown(KeyCode.Q)) SwitchKart(0, -1);
+            else if (!editTxt && Input.GetKeyDown(KeyCode.E)) SwitchKart(0, 1);
 
             if (nav.padStart) StartRaceFromTitle();
             else if (nav.confirm)
@@ -1548,19 +1578,19 @@ public partial class RaceManager : MonoBehaviour
             return;
         }
 
-        if ((Input.GetKeyDown(KeyCode.P) || nav.padBack) && !Net.Busy)
+        if (((!editTxt && Input.GetKeyDown(KeyCode.P)) || nav.padBack) && !Net.Busy)
             { showSettings = !showSettings; settingsFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (Input.GetKeyDown(KeyCode.U) && !Net.Busy)
+        if (!editTxt && Input.GetKeyDown(KeyCode.U) && !Net.Busy)
             { if (updater != null) { updater.ShowModal = !updater.ShowModal; updateModalFocus = 0; if (Audio != null) Audio.Select(); } return; }
-        if ((Input.GetKeyDown(KeyCode.O) || nav.padX) && !Net.Busy)
-            { netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (Input.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
+        if (((!editTxt && Input.GetKeyDown(KeyCode.O)) || nav.padX) && !Net.Busy)
+            { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); return; }
+        if (!editTxt && Input.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
         {
             IsTimeAttack = !IsTimeAttack;
             if (Audio != null) Audio.Select();
             return;
         }
-        if ((Input.GetKeyDown(KeyCode.Tab) || nav.padY) && !Net.Busy)
+        if (((!editTxt && Input.GetKeyDown(KeyCode.Tab)) || nav.padY) && !Net.Busy)
         {
             if (IsTimeAttack) IsTimeAttack = false;
             SetTwoPlayer(!TwoPlayer);
@@ -1578,9 +1608,9 @@ public partial class RaceManager : MonoBehaviour
             if (Audio != null) Audio.Tick();
         }
 
-        if (nav.tabPrev || Input.GetKeyDown(KeyCode.A))
+        if (nav.tabPrev || (!editTxt && Input.GetKeyDown(KeyCode.A)))
             SwitchCourse(-1);
-        else if (nav.tabNext || Input.GetKeyDown(KeyCode.D))
+        else if (nav.tabNext || (!editTxt && Input.GetKeyDown(KeyCode.D)))
             SwitchCourse(1);
         else if (nav.moveX != 0)
         {
@@ -1593,26 +1623,26 @@ public partial class RaceManager : MonoBehaviour
             else if (titleFocus == 7 || titleFocus == 8) { titleFocus = titleFocus == 7 ? 8 : 7; if (Audio != null) Audio.Tick(); }
             else if (titleFocus == 9 || titleFocus == 10) { titleFocus = titleFocus == 9 ? 10 : 9; if (Audio != null) Audio.Tick(); }
         }
-        else if (Input.GetKeyDown(KeyCode.W))
+        else if (!editTxt && Input.GetKeyDown(KeyCode.W))
             SwitchDriver(0, -1);
-        else if (Input.GetKeyDown(KeyCode.S))
+        else if (!editTxt && Input.GetKeyDown(KeyCode.S))
             SwitchDriver(0, 1);
-        else if (Input.GetKeyDown(KeyCode.Q))
+        else if (!editTxt && Input.GetKeyDown(KeyCode.Q))
             SwitchKart(0, -1);
-        else if (Input.GetKeyDown(KeyCode.E))
+        else if (!editTxt && Input.GetKeyDown(KeyCode.E))
             SwitchKart(0, 1);
-        else if (TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
+        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
             SwitchDriver(1, -1);
-        else if (TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
+        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
             SwitchDriver(1, 1);
-        else if (TwoPlayer && Input.GetKeyDown(KeyCode.LeftArrow))
+        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.LeftArrow))
             SwitchKart(1, -1);
-        else if (TwoPlayer && Input.GetKeyDown(KeyCode.RightArrow))
+        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.RightArrow))
             SwitchKart(1, 1);
 
         if (!titleShotRequested)
         {
-            if (nav.padStart || Input.GetKeyDown(KeyCode.Space) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))
+            if (nav.padStart || (!editTxt && Input.GetKeyDown(KeyCode.Space)) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))
             {
                 StartRaceFromTitle();
             }
@@ -1620,7 +1650,7 @@ public partial class RaceManager : MonoBehaviour
             {
                 if (titleFocus == 6) { if (TwoPlayer) SetTwoPlayer(false); IsTimeAttack = !IsTimeAttack; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 7) { if (IsTimeAttack) IsTimeAttack = false; SetTwoPlayer(!TwoPlayer); }
-                else if (titleFocus == 8 && !Net.Busy) { netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); }
+                else if (titleFocus == 8 && !Net.Busy) { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 9 && !Net.Busy) { showSettings = true; settingsFocus = 0; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 10 && !Net.Busy) { if (updater != null) { updater.ShowModal = true; updateModalFocus = 0; if (Audio != null) Audio.Select(); } }
                 else StartRaceFromTitle();
@@ -1690,16 +1720,19 @@ public partial class RaceManager : MonoBehaviour
 
     void UpdateResults(in MenuNav nav, float dt)
     {
+        raceTime += dt;
+        bool canRestart = !Online || Net.IsHost;
+        if (!canRestart) resultsFocus = 1;
         if (Time.time > finishAt + 2.5f)
         {
-            if (nav.moveX != 0 || nav.moveY != 0)
+            if (canRestart && (nav.moveX != 0 || nav.moveY != 0))
             {
                 resultsFocus = 1 - resultsFocus;
                 if (Audio != null) Audio.Tick();
             }
-            if (nav.confirm || nav.padStart)
+            if (nav.confirm || (canRestart && nav.padStart))
             {
-                if (resultsFocus == 0 || nav.padStart) StartRaceFromTitle();
+                if (canRestart && (resultsFocus == 0 || nav.padStart)) StartRaceFromTitle();
                 else
                 {
                     if (Online) LeaveOnline();
@@ -1775,7 +1808,7 @@ public partial class RaceManager : MonoBehaviour
         // 接続メニューが残ると Update が早期 return し、カウントダウンが進まない。
         netMenu = false;
         if (!Online) RestoreRoles();
-        if (IsTimeAttack)
+        if (IsTimeAttack && !Online)
         {
             currentRunGhost.Clear();
             nextGhostSampleTime = 0f;
@@ -1813,7 +1846,7 @@ public partial class RaceManager : MonoBehaviour
                 Banner("FINISH!", Color.white, k.PlayerIndex);
                 RecordLap(k.PlayerIndex);
 
-                if (k.PlayerIndex == 0 && !Demo)
+                if (!Demo)
                 {
                     float prevBest = GetBestTime(SelectedCourse);
                     if (prevBest <= 0 || k.FinishTime < prevBest)
@@ -1822,8 +1855,9 @@ public partial class RaceManager : MonoBehaviour
                         newRecordTime = true;
                         Banner("NEW COURSE RECORD!", new Color(1f, 0.85f, 0.2f), k.PlayerIndex);
                     }
-                    if (IsTimeAttack && currentRunGhost.Count > 1)
+                    if (k.PlayerIndex == 0 && IsTimeAttack && currentRunGhost.Count > 1)
                     {
+                        currentRunGhost.Add(new GhostFrame { t = k.FinishTime, pos = k.transform.position, heading = k.Heading });
                         var oldGhost = GhostReplay.LoadGhost(SelectedCourse);
                         if (oldGhost == null || oldGhost.frames == null || oldGhost.frames.Count < 2 || k.FinishTime < oldGhost.finishTime)
                         {
@@ -1836,6 +1870,7 @@ public partial class RaceManager : MonoBehaviour
             if (state != State.Results && AllHumansFinished())
             {
                 state = State.Results;
+                resultsFocus = 0;
                 finishAt = Time.time;
                 GamepadHaptics.StopAll();
                 Audio.SetMusicVolume(0.15f);
@@ -1865,7 +1900,7 @@ public partial class RaceManager : MonoBehaviour
         if (bestLap[p] <= 0 || lap < bestLap[p])
         {
             bestLap[p] = lap;
-            if (p == 0 && !Demo)
+            if (!Demo)
             {
                 float prevBestLap = GetBestLap(SelectedCourse);
                 if (prevBestLap <= 0 || lap < prevBestLap)
@@ -2046,10 +2081,14 @@ public partial class RaceManager : MonoBehaviour
     {
         for (int i = 0; i < bananas.Count; i++)
         {
+            if (bananas[i] == null) continue;
             if ((bananas[i].transform.position + Vector3.up * 0.5f - pos).magnitude < 1.4f)
             {
-                Destroy(bananas[i].gameObject);
+                var b = bananas[i];
+                Fx.Burst(b.transform.position, new Color(1f, 0.95f, 0.3f), 12, 5f, 0.4f);
                 bananas.RemoveAt(i);
+                if (Online) Net.SendBananaGone(b.NetId);
+                Destroy(b.gameObject);
                 return true;
             }
         }
@@ -2084,6 +2123,8 @@ public partial class RaceManager : MonoBehaviour
     {
         GamepadHaptics.StopAll();
         Fx.Shutdown();
+        if (minimap != null) Destroy(minimap);
+        TextureGen.ClearCache();
     }
 
     void OnApplicationQuit()
