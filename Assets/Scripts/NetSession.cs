@@ -76,7 +76,7 @@ public class NetSession : MonoBehaviour
     public async void HostRelay()
     {
         if (Busy) return;
-        Begin(true, "Contacting Relay...");
+        Begin(true, Loc.T("Contacting Relay...", "Relay サーバーに接続中..."));
         int gen = sessionGen;
         try
         {
@@ -96,18 +96,18 @@ public class NetSession : MonoBehaviour
             JoinCode = code;
             Debug.Log("[Net] Room code: " + code);
             State = Phase.Waiting;
-            Message = "Waiting for players...";
+            Message = Loc.T("Waiting for players...", "プレイヤーの参加を待機中...");
             OnConnected?.Invoke();
         }
-        catch (Exception e) { if (sessionGen == gen) Fail("Relay error: " + e.Message); }
+        catch (Exception e) { if (sessionGen == gen) Fail(Loc.T("Relay error: ", "Relay エラー: ") + e.Message); }
     }
 
     public async void JoinRelay(string code)
     {
         if (Busy) return;
         code = (code ?? "").Trim().ToUpperInvariant();
-        if (code.Length == 0) { Message = "Enter the room code."; return; }
-        Begin(false, "Contacting Relay...");
+        if (code.Length == 0) { Message = Loc.T("Enter the room code.", "ルームコードを入力してください。"); return; }
+        Begin(false, Loc.T("Contacting Relay...", "Relay サーバーに接続中..."));
         int gen = sessionGen;
         try
         {
@@ -123,10 +123,10 @@ public class NetSession : MonoBehaviour
             CreateDriver(settings);
             clientConn = driver.Connect(data.Endpoint);
             State = Phase.Connecting;
-            Message = "Connecting...";
+            Message = Loc.T("Connecting...", "接続中...");
             Debug.Log("[Net] Connecting via Relay");
         }
-        catch (Exception e) { if (sessionGen == gen) Fail("Relay error: " + e.Message); }
+        catch (Exception e) { if (sessionGen == gen) Fail(Loc.T("Relay error: ", "Relay エラー: ") + e.Message); }
     }
 
     public void HostDirect(ushort port = DefaultPort)
@@ -134,11 +134,11 @@ public class NetSession : MonoBehaviour
         if (Busy) return;
         Begin(true, "");
         CreateDriver(Settings());
-        if (driver.Bind(NetworkEndpoint.AnyIpv4.WithPort(port)) != 0) { Fail("Could not open port " + port); return; }
+        if (driver.Bind(NetworkEndpoint.AnyIpv4.WithPort(port)) != 0) { Fail(Loc.T("Could not open port ", "ポートを開けませんでした: ") + port); return; }
         driver.Listen();
         JoinCode = "";
         State = Phase.Waiting;
-        Message = "Waiting for players on port " + port + "...";
+        Message = Loc.T("Waiting for players on port " + port + "...", $"ポート {port} で参加者を待機中...");
         OnConnected?.Invoke();
     }
 
@@ -149,8 +149,8 @@ public class NetSession : MonoBehaviour
         ushort port = DefaultPort;
         int colon = address.LastIndexOf(':');
         if (colon > 0 && ushort.TryParse(address.Substring(colon + 1), out ushort p)) { port = p; address = address.Substring(0, colon); }
-        if (!NetworkEndpoint.TryParse(address, port, out var endpoint)) { Message = "Invalid address."; return; }
-        Begin(false, "Connecting...");
+        if (!NetworkEndpoint.TryParse(address, port, out var endpoint)) { Message = Loc.T("Invalid address.", "無効なIPアドレスです。"); return; }
+        Begin(false, Loc.T("Connecting...", "接続中..."));
         CreateDriver(Settings());
         clientConn = driver.Connect(endpoint);
         State = Phase.Connecting;
@@ -255,7 +255,7 @@ public class NetSession : MonoBehaviour
                     Debug.Log($"[Net] Accepted a client (#{hostConnections.Count + 1})");
                     hostConnections.Add(accepted);
                     State = Phase.Connected;
-                    Message = $"Connected ({hostConnections.Count + 1} players)";
+                    Message = Loc.T($"Connected ({hostConnections.Count + 1} players)", $"接続中 ({hostConnections.Count + 1}人参加)");
                     OnClientConnected?.Invoke(accepted);
                 }
             }
@@ -279,11 +279,11 @@ public class NetSession : MonoBehaviour
                         if (hostConnections.Count == 0)
                         {
                             State = Phase.Waiting;
-                            Message = "Waiting for players...";
+                            Message = Loc.T("Waiting for players...", "プレイヤーの参加を待機中...");
                         }
                         else
                         {
-                            Message = $"Connected ({hostConnections.Count + 1} players)";
+                            Message = Loc.T($"Connected ({hostConnections.Count + 1} players)", $"接続中 ({hostConnections.Count + 1}人参加)");
                         }
                         break;
                     }
@@ -300,7 +300,7 @@ public class NetSession : MonoBehaviour
                 {
                     Debug.Log("[Net] Connected to host");
                     State = Phase.Connected;
-                    Message = "Connected to host";
+                    Message = Loc.T("Connected to host", "ホストに接続しました");
                     OnConnected?.Invoke();
                 }
                 else if (cmd == NetworkEvent.Type.Data)
@@ -312,7 +312,7 @@ public class NetSession : MonoBehaviour
                     Debug.Log("[Net] Disconnected from host (was connected: " + Connected + ")");
                     bool wasConnected = Connected;
                     Teardown();
-                    Message = wasConnected ? "Disconnected from host." : "Could not connect.";
+                    Message = wasConnected ? Loc.T("Disconnected from host.", "ホストから切断されました。") : Loc.T("Could not connect.", "接続できませんでした。");
                     if (wasConnected) OnDisconnected?.Invoke();
                     return;
                 }

@@ -45,7 +45,7 @@ public partial class RaceManager
             playerNames.Remove(slot);
             MakeAI(Karts[slot], slot);
             if (state == State.Title) SyncLobby();
-            Banner("PLAYER LEFT", new Color(1f, 0.4f, 0.3f), 0);
+            Banner(Loc.T("PLAYER LEFT", "プレイヤー退出"), new Color(1f, 0.4f, 0.3f), 0);
         }
     }
 
@@ -136,15 +136,16 @@ public partial class RaceManager
 
             int order = System.Array.IndexOf(HumanSlots, slot);
             string customName = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : "";
+            string drvName = Loc.DriverName(drvIdx, d.name);
             string title;
             if (slot == mySlot)
             {
-                title = string.IsNullOrEmpty(customName) ? $"{DisplayName} ({d.name})" : $"{customName} ({d.name})";
+                title = string.IsNullOrEmpty(customName) ? $"{DisplayName} ({drvName})" : $"{customName} ({drvName})";
             }
             else
             {
                 string fallback = (slot == 5 ? "HOST" : $"P{order + 1}");
-                title = string.IsNullOrEmpty(customName) ? $"{fallback} ({d.name})" : $"{customName} ({d.name})";
+                title = string.IsNullOrEmpty(customName) ? $"{fallback} ({drvName})" : $"{customName} ({drvName})";
             }
             k.Name = title;
             k.RebuildModel();
@@ -182,7 +183,9 @@ public partial class RaceManager
         k.PlayerIndex = 0;
         k.ModelVariant = aiDrv;
         k.KartVariant = aiKrt;
-        k.Name = named ? $"{AiNames[ai]} ({KartCharacters[aiDrv].name})" : "Guest";
+        string aiName = Loc.AiName(ai, AiNames[ai]);
+        string drvName = Loc.DriverName(aiDrv, KartCharacters[aiDrv].name);
+        k.Name = named ? $"{aiName} ({drvName})" : Loc.T("Guest", "ゲスト");
         k.DriverColor = KartCharacters[aiDrv].color;
         k.Color = named ? AiColors[ai] : new Color(0.7f, 0.75f, 0.85f);
         GetCombinedStats(aiDrv, aiKrt, out int spd, out int acc, out int hdl, out int wgt);
@@ -205,7 +208,7 @@ public partial class RaceManager
         else
         {
             ReturnToTitle();
-            Banner("HOST DISCONNECTED", new Color(1f, 0.4f, 0.3f), 0);
+            Banner(Loc.T("HOST DISCONNECTED", "ホストとの接続が切断されました"), new Color(1f, 0.4f, 0.3f), 0);
         }
     }
 
@@ -314,7 +317,7 @@ public partial class RaceManager
 
         var r = new Rect(w / 2 - 290, 75, 580, 560);
         DrawPopCard(r);
-        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 38), ribbonDriverTex, "★ ONLINE MULTIPLAYER ★");
+        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 38), ribbonDriverTex, Loc.T("★ ONLINE MULTIPLAYER ★", "★ オンライン対戦（最大8人） ★"));
 
         float x = r.x + 35, cw = r.width - 70, y = r.y + 64;
         var info = St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, true, new Color(0.35f, 0.42f, 0.55f));
@@ -322,14 +325,14 @@ public partial class RaceManager
         if (Net.Busy)
         {
             // ロビー（参加者一覧）に入る前の接続待ち。入室後は DrawLobby に切り替わる
-            string msg = string.IsNullOrEmpty(Net.Message) ? "Connecting..." : Net.Message;
+            string msg = string.IsNullOrEmpty(Net.Message) ? Loc.T("Connecting...", "接続中...") : Net.Message;
             GUI.Label(new Rect(x, y + 60, cw, 60), msg, St(sSmall, 22, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(0.15f, 0.22f, 0.38f)));
-            if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 56, 200, 38), "CANCEL", "[ESC / B]", new Color(1f, 0.45f, 0.35f), false, true)) LeaveOnline();
+            if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 56, 200, 38), Loc.T("CANCEL", "キャンセル"), "[ESC / B]", new Color(1f, 0.45f, 0.35f), false, true)) LeaveOnline();
             return;
         }
 
         // プレイヤー名入力
-        GUI.Label(new Rect(x, y, 140, 32), "YOUR NAME:", St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.15f, 0.22f, 0.38f)));
+        GUI.Label(new Rect(x, y, 140, 32), Loc.T("YOUR NAME:", "プレイヤー名:"), St(sSmall, 16, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.15f, 0.22f, 0.38f)));
         var nameRect = new Rect(x + 140, y, 220, 32);
         var codeRect = new Rect(x + 255, y + 48 + 30, 130, 42);
         var ipRect = new Rect(x + 255, y + 48 + 105 + 30, 150, 42);
@@ -345,22 +348,22 @@ public partial class RaceManager
         y += 48;
 
         // インターネット経由（Unity Relay）
-        GUI.Label(new Rect(x, y, cw, 26), "INTERNET  (Unity Relay - Up to 8 Players)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
-        if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST ROOM", "", new Color(1f, 0.62f, 0.1f), true, netFocus == 0)) Net.HostRelay();
+        GUI.Label(new Rect(x, y, cw, 26), Loc.T("INTERNET  (Unity Relay - Up to 8 Players)", "インターネット対戦  (Unity Relay・ルームコード)"), St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
+        if (DrawModernButton(new Rect(x, y + 30, 240, 42), Loc.T("HOST ROOM", "部屋を作る"), "", new Color(1f, 0.62f, 0.1f), true, netFocus == 0)) Net.HostRelay();
         joinCodeInput = GUI.TextField(codeRect, joinCodeInput, 8, sField).ToUpperInvariant();
-        if (DrawModernButton(new Rect(x + 395, y + 30, cw - 395, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 1)) Net.JoinRelay(joinCodeInput);
+        if (DrawModernButton(new Rect(x + 395, y + 30, cw - 395, 42), Loc.T("JOIN", "参加"), "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 1)) Net.JoinRelay(joinCodeInput);
 
         // IP 直接接続（LAN / VPN）
         y += 105;
-        GUI.Label(new Rect(x, y, cw, 26), "DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
-        if (DrawModernButton(new Rect(x, y + 30, 240, 42), "HOST (LISTEN)", "", new Color(0.65f, 0.35f, 0.92f), false, netFocus == 2)) Net.HostDirect();
+        GUI.Label(new Rect(x, y, cw, 26), Loc.T("DIRECT IP  (LAN / VPN / port " + NetSession.DefaultPort + " open)", $"IP直接接続  (LAN / VPN / ポート {NetSession.DefaultPort})"), St(sSmall, 17, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.12f, 0.45f, 0.85f)));
+        if (DrawModernButton(new Rect(x, y + 30, 240, 42), Loc.T("HOST (LISTEN)", "ホスト待機"), "", new Color(0.65f, 0.35f, 0.92f), false, netFocus == 2)) Net.HostDirect();
         ipInput = GUI.TextField(ipRect, ipInput, 40, sField);
-        if (DrawModernButton(new Rect(x + 415, y + 30, cw - 415, 42), "JOIN", "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 3)) Net.JoinDirect(ipInput);
+        if (DrawModernButton(new Rect(x + 415, y + 30, cw - 415, 42), Loc.T("JOIN", "参加"), "", new Color(0.18f, 0.65f, 0.95f), false, netFocus == 3)) Net.JoinDirect(ipInput);
 
         if (!string.IsNullOrEmpty(Net.Message))
             GUI.Label(new Rect(x, y + 84, cw, 40), Net.Message, St(sSmall, 15, TextAnchor.MiddleCenter, FontStyle.Bold, true, new Color(0.95f, 0.3f, 0.25f)));
-        GUI.Label(new Rect(x, r.yMax - 98, cw, 40), "Host picks the course and starts the race. Up to 8 players, CPU karts fill empty slots.", info);
-        if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 50, 200, 38), "CLOSE", "[ESC / B]", new Color(0.2f, 0.85f, 0.45f), false, netFocus == 4)) netMenu = false;
+        GUI.Label(new Rect(x, r.yMax - 98, cw, 40), Loc.T("Host picks the course and starts the race. Up to 8 players, CPU karts fill empty slots.", "ホストがコースを選択してレースを開始します。最大8人まで参加でき、空席はCPUが補充します。"), info);
+        if (DrawModernButton(new Rect(x + cw / 2 - 100, r.yMax - 50, 200, 38), Loc.T("CLOSE", "閉じる"), "[ESC / B]", new Color(0.2f, 0.85f, 0.45f), false, netFocus == 4)) netMenu = false;
     }
 
     // オンラインロビー：3D ステージ上に全員のカートを並べ、頭上に名前タグ、下に操作パネルを表示する
@@ -375,14 +378,14 @@ public partial class RaceManager
         GUI.DrawTexture(new Rect(0, 0, w, 84), Texture2D.whiteTexture);
         GUI.color = Color.white;
         DrawFrame(new Rect(0, 0, w, 84), 1, new Color(1f, 0.85f, 0.25f, 0.5f));
-        Outlined(new Rect(24, 8, 360, 40), "ONLINE LOBBY", St(sMid, 32, TextAnchor.MiddleLeft), gold, 2);
-        GUI.Label(new Rect(28, 50, 360, 26), $"PLAYERS  {playerKarts.Count} / 8   (CPU fills empty slots)", St(sSmall, 15, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.85f, 0.9f, 1f)));
+        Outlined(new Rect(24, 8, 360, 40), Loc.T("ONLINE LOBBY", "オンラインロビー"), St(sMid, 30, TextAnchor.MiddleLeft), gold, 2);
+        GUI.Label(new Rect(28, 50, 360, 26), Loc.T($"PLAYERS  {playerKarts.Count} / 8   (CPU fills empty slots)", $"参加人数  {playerKarts.Count} / 8人   (空席はCPUが走行)"), St(sSmall, 14, TextAnchor.MiddleLeft, FontStyle.Bold, false, new Color(0.85f, 0.9f, 1f)));
 
         if (!string.IsNullOrEmpty(Net.JoinCode))
         {
-            GUI.Label(new Rect(w / 2 - 160, 4, 320, 18), "ROOM CODE (CLICK TO COPY)", St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
-            Outlined(new Rect(w / 2 - 160, 20, 200, 56), Net.JoinCode, St(sBig, 48), new Color(0.4f, 1f, 0.6f), 3);
-            string copyBtnText = copyNotifyTimer > 0 ? "★ COPIED!" : "► COPY";
+            GUI.Label(new Rect(w / 2 - 160, 4, 320, 18), Loc.T("ROOM CODE (CLICK TO COPY)", "ルームコード（コピーして共有）"), St(sSmall, 12, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.7f, 0.85f, 1f)));
+            Outlined(new Rect(w / 2 - 160, 20, 200, 56), Net.JoinCode, St(sNum, 46), new Color(0.4f, 1f, 0.6f), 3);
+            string copyBtnText = copyNotifyTimer > 0 ? Loc.T("★ COPIED!", "★ コピー済!") : Loc.T("► COPY", "► コピー");
             Color copyBtnCol = copyNotifyTimer > 0 ? new Color(0.2f, 0.82f, 0.45f) : new Color(0.18f, 0.62f, 0.95f);
             if (DrawModernButton(new Rect(w / 2 + 50, 26, 114, 38), copyBtnText, "", copyBtnCol, false, !Net.IsHost && lobbyFocus == 2))
             {
@@ -392,13 +395,18 @@ public partial class RaceManager
         }
         else
         {
-            Outlined(new Rect(w / 2 - 150, 20, 300, 50), Net.IsHost ? "DIRECT  (port " + NetSession.DefaultPort + ")" : "DIRECT CONNECTION", St(sMid, 22), new Color(0.4f, 1f, 0.6f), 2);
+            Outlined(new Rect(w / 2 - 150, 20, 300, 50),
+                Net.IsHost ? Loc.T("DIRECT  (port " + NetSession.DefaultPort + ")", $"IP直接接続 (ポート {NetSession.DefaultPort})") : Loc.T("DIRECT CONNECTION", "IP直接接続"),
+                St(sMid, 22), new Color(0.4f, 1f, 0.6f), 2);
         }
 
         var curDef = Track.Courses[SelectedCourse];
-        GUI.Label(new Rect(w - 384, 8, 360, 36), $"◄  {curDef.Name.ToUpper()}  ►", St(sSmall, 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
-        string diffBadge = SelectedCourse == 0 ? "★☆☆ NOVICE" : SelectedCourse == 1 ? "★★☆ ADVANCED" : SelectedCourse == 2 ? "★★★ EXPERT" : SelectedCourse == 3 ? "★★☆ URBAN" : SelectedCourse == 4 ? "★★☆ CAMPUS" : "★★★ OVERPASS";
-        string courseInfo = Net.IsHost ? $"[A/D / LB/RB] CHANGE  •  {diffBadge}  •  {totalLaps} LAPS" : $"{diffBadge}  •  {totalLaps} LAPS";
+        string cName = Loc.CourseName(SelectedCourse, curDef.Name);
+        GUI.Label(new Rect(w - 384, 8, 360, 36), $"◄  {cName}  ►", St(sMid, Loc.IsJa ? 21 : 24, TextAnchor.MiddleRight, FontStyle.BoldAndItalic, false, Color.white));
+        string diffBadge = Loc.CourseShortDifficulty(SelectedCourse);
+        string courseInfo = Net.IsHost
+            ? Loc.T($"[A/D / LB/RB] CHANGE  •  {diffBadge}  •  {totalLaps} LAPS", $"[A/D / LB/RB] コース変更  •  {diffBadge}  •  {totalLaps}周")
+            : Loc.T($"{diffBadge}  •  {totalLaps} LAPS", $"{diffBadge}  •  {totalLaps}周");
         GUI.Label(new Rect(w - 384, 48, 360, 26), courseInfo, St(sSmall, 13, TextAnchor.MiddleRight, FontStyle.Bold, false, new Color(0.7f, 0.9f, 1f)));
 
         float py = h - 190;
@@ -430,10 +438,12 @@ public partial class RaceManager
 
             bool me = slot == mySlot;
             string custom = playerNames.TryGetValue(slot, out var pn) && !string.IsNullOrEmpty(pn) ? pn : (me ? DisplayName : (slot == 5 ? "HOST" : $"P{orderIndex + 1}"));
-            string role = me ? (slot == 5 ? "YOU · HOST" : "YOU") : (slot == 5 ? "HOST" : $"P{orderIndex + 1}");
+            string role = me
+                ? (slot == 5 ? Loc.T("YOU · HOST", "自分 · ホスト") : Loc.T("YOU", "自分"))
+                : (slot == 5 ? Loc.T("HOST", "ホスト") : $"P{orderIndex + 1}");
             var bg = me ? new Color(0.15f, 0.7f, 0.38f) : new Color(0.16f, 0.2f, 0.4f);
             DrawPopPill(new Rect(gx - tw / 2, gy - 44, tw, 20), $"{role}: {custom}", bg);
-            DrawPopPill(new Rect(gx - tw / 2, gy - 22, tw, 22), $"{d.name} • {m.name}", m.color * 0.85f);
+            DrawPopPill(new Rect(gx - tw / 2, gy - 22, tw, 22), $"{Loc.DriverName(drvIdx, d.name)} • {Loc.KartName(krtIdx, m.name)}", m.color * 0.85f);
         }
 
         // 下部パネル
@@ -443,29 +453,35 @@ public partial class RaceManager
         DrawFrame(new Rect(0, py, w, 190), 1, new Color(1f, 0.85f, 0.25f, 0.5f));
 
         // 左：自分のドライバー＆マシン選択
-        var myDrv = KartCharacters[Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1)];
-        var myKrt = KartMachines[Mathf.Clamp(SelectedKart, 0, KartMachines.Length - 1)];
+        int myDrvIdx = Mathf.Clamp(SelectedDriver, 0, KartCharacters.Length - 1);
+        int myKrtIdx = Mathf.Clamp(SelectedKart, 0, KartMachines.Length - 1);
+        var myDrv = KartCharacters[myDrvIdx];
+        var myKrt = KartMachines[myKrtIdx];
         GetCombinedStats(SelectedDriver, SelectedKart, out int spd, out int acc, out int hdl, out int wgt);
         var card = new Rect(24, py + 12, 380, 166);
         DrawPopCard(card);
         if (lobbyFocus == 0)
             DrawFocusHighlight(new Rect(card.x + 10, card.y + 6, card.width - 20, 30), 7f);
         if (DrawModernButton(new Rect(card.x + 12, card.y + 8, 30, 26), "◄", "", myDrv.color)) SwitchDriver(0, -1);
-        Outlined(new Rect(card.x + 44, card.y + 7, card.width - 88, 28), $"DRIVER: {myDrv.name}", St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myDrv.color, 1.5f);
+        Outlined(new Rect(card.x + 44, card.y + 7, card.width - 88, 28),
+            Loc.T($"DRIVER: {myDrv.name}", $"ドライバー: {Loc.DriverName(myDrvIdx, myDrv.name)}"),
+            St(sMid, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myDrv.color, 1.5f);
         if (DrawModernButton(new Rect(card.xMax - 42, card.y + 8, 30, 26), "►", "", myDrv.color)) SwitchDriver(0, 1);
 
         if (lobbyFocus == 1)
             DrawFocusHighlight(new Rect(card.x + 10, card.y + 36, card.width - 20, 30), 7f);
         if (DrawModernButton(new Rect(card.x + 12, card.y + 38, 30, 26), "◄", "", myKrt.color)) SwitchKart(0, -1);
-        Outlined(new Rect(card.x + 44, card.y + 37, card.width - 88, 28), $"KART: {myKrt.name}", St(sSmall, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myKrt.color, 1.5f);
+        Outlined(new Rect(card.x + 44, card.y + 37, card.width - 88, 28),
+            Loc.T($"KART: {myKrt.name}", $"マシン: {Loc.KartName(myKrtIdx, myKrt.name)}"),
+            St(sMid, 16, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), myKrt.color, 1.5f);
         if (DrawModernButton(new Rect(card.xMax - 42, card.y + 38, 30, 26), "►", "", myKrt.color)) SwitchKart(0, 1);
 
         float gy0 = card.y + 70;
-        DrawToonStatGauge(card.x + 18, gy0 + 0, card.width - 36, "SPEED", spd, 8, new Color(0.08f, 0.72f, 0.98f));
-        DrawToonStatGauge(card.x + 18, gy0 + 19, card.width - 36, "ACCEL", acc, 8, new Color(1f, 0.72f, 0.05f));
-        DrawToonStatGauge(card.x + 18, gy0 + 38, card.width - 36, "STEER", hdl, 8, new Color(0.25f, 0.85f, 0.35f));
-        DrawToonStatGauge(card.x + 18, gy0 + 57, card.width - 36, "WEIGHT", wgt, 8, new Color(0.95f, 0.42f, 0.25f));
-        GUI.Label(new Rect(card.x + 10, card.y + 146, card.width - 20, 18), "[W/S / D-Pad] Driver   •   [Q/E / D-Pad] Kart", St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.45f, 0.5f, 0.65f)));
+        DrawToonStatGauge(card.x + 18, gy0 + 0, card.width - 36, Loc.T("SPEED",  "最高速"), spd, 8, new Color(0.08f, 0.72f, 0.98f));
+        DrawToonStatGauge(card.x + 18, gy0 + 19, card.width - 36, Loc.T("ACCEL",  "加速力"), acc, 8, new Color(1f, 0.72f, 0.05f));
+        DrawToonStatGauge(card.x + 18, gy0 + 38, card.width - 36, Loc.T("STEER",  "旋回性"), hdl, 8, new Color(0.25f, 0.85f, 0.35f));
+        DrawToonStatGauge(card.x + 18, gy0 + 57, card.width - 36, Loc.T("WEIGHT", "重さ"),   wgt, 8, new Color(0.95f, 0.42f, 0.25f));
+        GUI.Label(new Rect(card.x + 10, card.y + 146, card.width - 20, 18), Loc.T("[W/S / D-Pad] Driver   •   [Q/E / D-Pad] Kart", "[W/S / 十字キー] ドライバー   •   [Q/E / 十字キー] マシン"), St(sSmall, 11, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.45f, 0.5f, 0.65f)));
 
         // 中央：スタート
         float cx = w / 2 + 16f;
@@ -487,19 +503,19 @@ public partial class RaceManager
             GUI.DrawTexture(br, raceBtn);
             if (lobbyFocus == 2)
                 DrawFocusHighlight(br, 32f);
-            Outlined(br, "►► START RACE ◄◄", St(sMid, 26, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), Color.white, 2.5f);
+            Outlined(br, Loc.T("►► START RACE ◄◄", "►► レース開始！ ◄◄"), St(sMid, 26, TextAnchor.MiddleCenter, FontStyle.BoldAndItalic), Color.white, 2.5f);
             bool startClicked = GUI.Button(br, GUIContent.none, GUIStyle.none);
             GUI.matrix = prevMat;
             if (startClicked) StartRaceFromTitle();
-            GUI.Label(new Rect(cx - 190, py + 118, 380, 24), "[ENTER / A / START] to start for everyone", St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
+            GUI.Label(new Rect(cx - 190, py + 118, 380, 24), Loc.T("[ENTER / A / START] to start for everyone", "[ENTER / A / START] で全員のレースを開始"), St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
         }
         else
         {
             string dots = new string('.', 1 + (int)(Time.time * 2f) % 3);
-            Outlined(new Rect(cx - 220, py + 44, 440, 50), "Waiting for host" + dots, St(sMid, 26), Color.white, 2);
+            Outlined(new Rect(cx - 220, py + 44, 440, 50), Loc.T("Waiting for host" + dots, "ホストの開始を待っています" + dots), St(sMid, 24), Color.white, 2);
         }
 
         // 右：退出
-        if (DrawModernButton(new Rect(w - 270, py + 122, 246, 44), "◄ LEAVE ROOM", "[ESC / B]", new Color(0.92f, 0.32f, 0.32f), false, lobbyFocus == 3)) LeaveOnline();
+        if (DrawModernButton(new Rect(w - 270, py + 122, 246, 44), Loc.T("◄ LEAVE ROOM", "◄ ルームを退出"), "[ESC / B]", new Color(0.92f, 0.32f, 0.32f), false, lobbyFocus == 3)) LeaveOnline();
     }
 }

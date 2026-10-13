@@ -126,7 +126,7 @@ public class AppUpdater : MonoBehaviour
     IEnumerator CheckForUpdatesRoutine(bool openModalIfNew)
     {
         State = UpdateState.Checking;
-        StatusMessage = "Checking for updates...";
+        StatusMessage = Loc.T("Checking for updates...", "アップデートを確認中...");
         ErrorMessage = "";
         TotalBytes = 0;
 
@@ -163,8 +163,8 @@ public class AppUpdater : MonoBehaviour
         if (string.IsNullOrEmpty(json))
         {
             State = UpdateState.Error;
-            ErrorMessage = "Could not check for updates. Check internet connection.";
-            StatusMessage = "Update check failed.";
+            ErrorMessage = Loc.T("Could not check for updates. Check internet connection.", "アップデートを確認できませんでした。インターネット接続を確認してください。");
+            StatusMessage = Loc.T("Update check failed.", "更新確認に失敗しました。");
             yield break;
         }
 
@@ -177,7 +177,7 @@ public class AppUpdater : MonoBehaviour
         if (string.IsNullOrEmpty(LatestVersion))
         {
             State = UpdateState.Error;
-            ErrorMessage = "Failed to parse update information.";
+            ErrorMessage = Loc.T("Failed to parse update information.", "アップデート情報の解析に失敗しました。");
             yield break;
         }
 
@@ -185,7 +185,7 @@ public class AppUpdater : MonoBehaviour
         if (isNewer)
         {
             State = UpdateState.UpdateAvailable;
-            StatusMessage = $"New update available: {LatestVersion}";
+            StatusMessage = Loc.T($"New update available: {LatestVersion}", $"新しいアップデートがあります: {LatestVersion}");
             if (openModalIfNew)
             {
                 ShowModal = true;
@@ -194,7 +194,7 @@ public class AppUpdater : MonoBehaviour
         else
         {
             State = UpdateState.UpToDate;
-            StatusMessage = $"Turbo Circuit is up to date ({CurrentVersion}).";
+            StatusMessage = Loc.T($"Turbo Circuit is up to date ({CurrentVersion}).", $"最新バージョンです ({CurrentVersion})。");
         }
     }
 

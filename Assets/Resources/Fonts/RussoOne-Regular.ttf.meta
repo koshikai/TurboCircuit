@@ -8,8 +8,13 @@ TrueTypeFontImporter:
   characterSpacing: 0
   characterPadding: 1
   includeFontData: 1
-  fontNames: []
-  fallbackFontReferences: []
+  fontNames:
+  - Russo One
+  - Mochiy Pop One
+  - Rounded Mplus 1c ExtraBold
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: d479ef30108c4a2bbdd232fc469c5b01, type: 3}
+  - {fileID: 12800000, guid: d479ef30108c4a2bbdd232fc469c5b02, type: 3}
   customBorderThickness: 0
   fontRenderingMode: 0
   ascentCalculationMode: 1
