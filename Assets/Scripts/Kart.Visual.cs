@@ -609,14 +609,17 @@ public partial class Kart
         float bob = Offroad && Speed > 5f ? Mathf.Sin(Time.time * 40f) * 0.04f : 0f;
         model.localPosition = new Vector3(0, hop + bob, 0);
 
-        float trickAngle = isAirborne ? airTrickSpin : 0f;
-        model.localRotation = Quaternion.Euler(visPitch, visYaw + spinAngle + trickAngle, roll);
+        if (!isAirborne)
+        {
+            airTrickSpin = Mathf.MoveTowards(Mathf.Repeat(airTrickSpin + 180f, 360f) - 180f, 0f, 900f * dt);
+        }
+        model.localRotation = Quaternion.Euler(visPitch, visYaw + spinAngle + airTrickSpin, roll);
 
         if (blobShadow != null)
         {
             float shadowScale = isAirborne ? 0.65f : (1f - hop * 0.3f);
             blobShadow.localScale = new Vector3(2.15f * shadowScale, 2.55f * shadowScale, 1f);
-            blobShadow.localRotation = Quaternion.Euler(90f, visYaw + spinAngle, 0f);
+            blobShadow.localRotation = Quaternion.Euler(90f, visYaw + spinAngle + airTrickSpin, 0f);
         }
 
         wheelAngle += Speed * dt / 0.37f * Mathf.Rad2Deg;
