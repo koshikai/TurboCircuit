@@ -125,7 +125,9 @@ public partial class RaceManager : MonoBehaviour
     string waitingPadAction = null;
     int waitingKeySkipFrame = -1;
     int waitingPadSkipFrame = -1;
-    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates, 11=Language
+    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates, 11=Language, 12=Quit
+    bool showQuitConfirm;
+    int quitModalFocus = 1; // 0=Quit, 1=Cancel
     int pauseFocus = 0;
     int settingsFocus = 0;
     int settingsCol = 0; // 0=Keyboard, 1=Controller
@@ -1254,8 +1256,8 @@ public partial class RaceManager : MonoBehaviour
         tabNext = InputSettings.GetSinglePadDown(PadBind.RB, 0) || InputSettings.GetSinglePadDown(PadBind.RB, 1);
     }
 
-    static readonly int[] TitleFocusOrder1P = { 1, 2, 7, 8, 0, 6, 5, 9, 10, 11 };
-    static readonly int[] TitleFocusOrder2P = { 1, 2, 3, 4, 7, 8, 0, 6, 5, 9, 10, 11 };
+    static readonly int[] TitleFocusOrder1P = { 1, 2, 7, 8, 0, 6, 5, 9, 10, 11, 12 };
+    static readonly int[] TitleFocusOrder2P = { 1, 2, 3, 4, 7, 8, 0, 6, 5, 9, 10, 11, 12 };
 
     // メニュー操作の入力スナップショット（Update の先頭で1フレームに1回だけ取得する）
     struct MenuNav
@@ -1278,6 +1280,7 @@ public partial class RaceManager : MonoBehaviour
 
         GamepadHaptics.Update(Mathf.Min(Time.unscaledDeltaTime, 0.05f));
 
+        if (showQuitConfirm) { UpdateQuitModalInput(nav); return; }
         if (updater != null && updater.ShowModal) { UpdateModalInput(nav); return; }
         if (showSettings) { UpdateSettingsInput(nav); return; }
         if (UpdateOverlayInput(nav)) return;
@@ -1326,6 +1329,47 @@ public partial class RaceManager : MonoBehaviour
             Invoke(nameof(QuitAfterScreenshot), 0.4f);
         }
         if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
+    }
+
+    // ゲーム終了確認モーダル表示・非表示
+    void ShowQuitModal()
+    {
+        showQuitConfirm = true;
+        quitModalFocus = 1; // 既定は「戻る (CANCEL)」
+        if (Audio != null) Audio.Select();
+    }
+
+    void CloseQuitModal()
+    {
+        showQuitConfirm = false;
+        if (Audio != null) Audio.Select();
+    }
+
+    // ゲーム終了確認モーダル表示中の入力
+    void UpdateQuitModalInput(in MenuNav nav)
+    {
+        if (nav.moveX != 0)
+        {
+            quitModalFocus = 1 - quitModalFocus;
+            if (Audio != null) Audio.Tick();
+        }
+        if (nav.cancel)
+        {
+            CloseQuitModal();
+            return;
+        }
+        if (nav.confirm)
+        {
+            if (quitModalFocus == 0)
+            {
+                Application.Quit();
+            }
+            else
+            {
+                CloseQuitModal();
+            }
+            return;
+        }
     }
 
     // アップデート確認モーダル表示中の入力
@@ -1620,7 +1664,9 @@ public partial class RaceManager : MonoBehaviour
             return;
         }
 
-        if (((!editTxt && Input.GetKeyDown(KeyCode.P)) || nav.padBack) && !Net.Busy)
+        if (!editTxt && !Net.Busy && (Input.GetKeyDown(KeyCode.Escape) || nav.cancel || nav.padBack))
+            { ShowQuitModal(); return; }
+        if (!editTxt && Input.GetKeyDown(KeyCode.P) && !Net.Busy)
             { showSettings = !showSettings; settingsFocus = 0; if (Audio != null) Audio.Select(); return; }
         if (!editTxt && Input.GetKeyDown(KeyCode.L) && !Net.Busy)
             { ToggleLanguage(); return; }
@@ -1665,11 +1711,11 @@ public partial class RaceManager : MonoBehaviour
             else if (titleFocus == 5 || titleFocus == 0) SwitchCourse(nav.moveX);
             else if (titleFocus == 6) { if (TwoPlayer) SetTwoPlayer(false); IsTimeAttack = !IsTimeAttack; if (Audio != null) Audio.Select(); }
             else if (titleFocus == 7 || titleFocus == 8) { titleFocus = titleFocus == 7 ? 8 : 7; if (Audio != null) Audio.Tick(); }
-            else if (titleFocus == 9 || titleFocus == 10 || titleFocus == 11)
+            else if (titleFocus == 9 || titleFocus == 10 || titleFocus == 11 || titleFocus == 12)
             {
-                int[] topBar = { 11, 10, 9 };
+                int[] topBar = { 11, 10, 9, 12 };
                 int ti = System.Array.IndexOf(topBar, titleFocus);
-                titleFocus = topBar[(ti + (nav.moveX > 0 ? 1 : 2)) % 3];
+                titleFocus = topBar[(ti + (nav.moveX > 0 ? 1 : topBar.Length - 1)) % topBar.Length];
                 if (Audio != null) Audio.Tick();
             }
         }
@@ -1704,6 +1750,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (titleFocus == 9 && !Net.Busy) { showSettings = true; settingsFocus = 0; if (Audio != null) Audio.Select(); }
                 else if (titleFocus == 10 && !Net.Busy) { if (updater != null) { updater.ShowModal = true; updateModalFocus = 0; if (Audio != null) Audio.Select(); } }
                 else if (titleFocus == 11 && !Net.Busy) { ToggleLanguage(); }
+                else if (titleFocus == 12 && !Net.Busy) { ShowQuitModal(); }
                 else StartRaceFromTitle();
             }
         }
