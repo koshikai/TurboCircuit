@@ -95,6 +95,7 @@ public partial class RaceManager
         iconBanana = LoadTexture("Icons/item_banana_pop", iconDir + "item_banana_pop.png") ?? LoadTexture("Icons/item_banana", iconDir + "item_banana.jpg");
         iconMissile = LoadTexture("Icons/item_missile_pop", iconDir + "item_missile_pop.png") ?? LoadTexture("Icons/item_missile", iconDir + "item_missile.jpg");
         iconShield = LoadTexture("Icons/item_shield_pop", iconDir + "item_shield_pop.png") ?? LoadTexture("Icons/item_shield", iconDir + "item_shield.jpg");
+        iconBomb = LoadTexture("Icons/item_bomb_pop", iconDir + "item_bomb_pop.png") ?? LoadTexture("Icons/item_bomb", iconDir + "item_bomb.jpg");
 
         string uiDir = Application.dataPath + "/Resources/UI/";
         titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");

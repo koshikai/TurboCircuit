@@ -325,12 +325,20 @@ public partial class Kart
                         canUse = rm.KartBehindWithin(this, 12f) || rm.KartAheadWithin(this, 10f);
                     }
                     break;
+                case ItemType.Bomb:
+                    // 前方にライバルがいる場合（前方投擲）、または後方に迫っている時（後方投下）
+                    canUse = rm.KartAheadWithin(this, 35f) || rm.KartBehindWithin(this, 18f);
+                    break;
             }
 
             float forceUseThreshold = Item == ItemType.Shield ? -4.5f : -3.5f;
             if (urgentUse || (aiItemTimer <= 0 && (canUse || aiItemTimer < forceUseThreshold)))
             {
                 inp.useItem = true;
+                if (Item == ItemType.Bomb && !rm.KartAheadWithin(this, 25f) && rm.KartBehindWithin(this, 18f))
+                {
+                    inp.throttle = -1f; // 後方に敵がいる場合は後方投下
+                }
                 aiItemTimer = Random.Range(1.5f, 3.0f);
             }
         }

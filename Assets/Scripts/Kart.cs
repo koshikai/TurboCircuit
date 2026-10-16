@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum ItemType { None, Turbo, Banana, Missile, Shield }
+public enum ItemType { None, Turbo, Banana, Missile, Shield, Bomb }
 
 public struct KartInput
 {
@@ -292,7 +292,7 @@ public partial class Kart : MonoBehaviour
         }
         else
         {
-            if (inp.useItem && Item != ItemType.None && RouletteTimer <= 0) UseItem();
+            if (inp.useItem && Item != ItemType.None && RouletteTimer <= 0) UseItem(inp);
 
             slipstreamTimer -= dt;
 
@@ -744,7 +744,7 @@ public partial class Kart : MonoBehaviour
         return true;
     }
 
-    void UseItem()
+    void UseItem(KartInput inp)
     {
         var it = Item;
         Item = ItemType.None;
@@ -770,6 +770,23 @@ public partial class Kart : MonoBehaviour
                 shieldTimer = 6f;
                 Boost(0.6f);
                 if (IsPlayer) rm.Audio.Shield();
+                break;
+            case ItemType.Bomb:
+                bool throwBackward = inp.throttle < -0.1f;
+                Vector3 bombPos;
+                Vector3 bombVel;
+                if (throwBackward)
+                {
+                    bombPos = transform.position - Forward * 2.2f + Vector3.up * 0.7f;
+                    bombVel = -Forward * (Speed * 0.35f + 5f) + Vector3.up * 2.2f;
+                }
+                else
+                {
+                    bombPos = transform.position + Forward * 2.2f + Vector3.up * 0.9f;
+                    bombVel = Forward * (Speed + 15f) + Vector3.up * 7.5f;
+                }
+                rm.SpawnBomb(bombPos, bombVel, this);
+                if (IsPlayer) rm.Audio.Drop();
                 break;
         }
     }

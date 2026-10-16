@@ -91,7 +91,7 @@ public partial class RaceManager
         }
 
         ItemType shown = pl.Item;
-        if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 4);
+        if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 5);
         if (shown != ItemType.None)
         {
             Texture2D icon = null;
@@ -101,6 +101,7 @@ public partial class RaceManager
                 case ItemType.Turbo: icon = iconTurbo; ic = new Color(1f, 0.55f, 0.1f); label = Loc.T("TURBO", "ターボ"); break;
                 case ItemType.Banana: icon = iconBanana; ic = new Color(1f, 0.9f, 0.2f); label = Loc.T("BANANA", "バナナ"); break;
                 case ItemType.Missile: icon = iconMissile; ic = new Color(1f, 0.2f, 0.2f); label = Loc.T("MISSILE", "ミサイル"); break;
+                case ItemType.Bomb: icon = iconBomb; ic = new Color(1f, 0.35f, 0.15f); label = Loc.T("BOMB", "ボム"); break;
                 default: icon = iconShield; ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = Loc.T("SHIELD", "シールド"); break;
             }
 
