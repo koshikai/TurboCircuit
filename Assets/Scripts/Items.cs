@@ -898,7 +898,7 @@ public class Missile : MonoBehaviour
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
                 // オンライン時は被弾する側（ローカル操作者またはホストのCPU）がスピン判定を行い、ミサイル自体は全画面で即座に爆発消滅する
-                if (!k.IsRemote && !k.Shielded) k.Spin();
+                if (!k.IsRemote && !k.StarInvincible) k.Spin();
                 Explode();
                 return;
             }
@@ -1319,7 +1319,7 @@ public class Bomb : MonoBehaviour
                 float d = Vector3.Distance(k.transform.position, pos);
                 if (d < 6.5f)
                 {
-                    if (!k.IsRemote && !k.Shielded)
+                    if (!k.IsRemote && !k.StarInvincible)
                     {
                         k.Spin();
                     }

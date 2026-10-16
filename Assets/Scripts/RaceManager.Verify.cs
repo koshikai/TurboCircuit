@@ -329,7 +329,7 @@ public partial class RaceManager
                     state = State.Racing;
                     stateTime = 5f;
                     raceTime = 14.2f;
-                    if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Thunder);
+                    if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Star);
                     break;
                 case "hud2p":
                 case "racing2p":
@@ -338,7 +338,7 @@ public partial class RaceManager
                     state = State.Racing;
                     stateTime = 5f;
                     raceTime = 15.2f;
-                    if (Player != null) Player.SetPreviewSpeedAndBoost(27.2f, 0f, ItemType.Thunder);
+                    if (Player != null) Player.SetPreviewSpeedAndBoost(27.2f, 0f, ItemType.Star);
                     if (Player2 != null) Player2.SetPreviewSpeedAndBoost(29.0f, 1.2f, ItemType.Bomb);
                     break;
                 case "paused":

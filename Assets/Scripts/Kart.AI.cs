@@ -313,16 +313,16 @@ public partial class Kart
                         canUse = !Boosting && Mathf.Abs(futureAngle) < 15f && Mathf.Abs(currentLateral) < Track.HalfWidth - 1.5f;
                     }
                     break;
-                case ItemType.Shield:
-                    // ミサイル接近時はタイマーを待たず即座にシールド展開して防御！
+                case ItemType.Star:
+                    // ミサイル接近時は即座にスター無敵を発動して防御！
                     if (rm.IsMissileApproaching(this, out float mDist) && mDist < 34f)
                     {
                         urgentUse = true;
                     }
                     else
                     {
-                        // 周囲にライバルが接近して接触・被弾リスクがある時
-                        canUse = rm.KartBehindWithin(this, 12f) || rm.KartAheadWithin(this, 10f);
+                        // 周囲にライバルがいて体当たりできる時、または直線で一気に加速したい時
+                        canUse = rm.KartBehindWithin(this, 12f) || rm.KartAheadWithin(this, 18f);
                     }
                     break;
                 case ItemType.Bomb:
@@ -335,7 +335,7 @@ public partial class Kart
                     break;
             }
 
-            float forceUseThreshold = Item == ItemType.Shield ? -4.5f : -3.5f;
+            float forceUseThreshold = Item == ItemType.Star ? -4.5f : -3.5f;
             if (urgentUse || (aiItemTimer <= 0 && (canUse || aiItemTimer < forceUseThreshold)))
             {
                 inp.useItem = true;
@@ -453,7 +453,7 @@ public partial class Kart
         }
 
         // C. コース上のバナナ（罠）の検知・回避（最優先）
-        if (!Shielded && rm != null && rm.Bananas != null && rm.Bananas.Count > 0)
+        if (!StarInvincible && rm != null && rm.Bananas != null && rm.Bananas.Count > 0)
         {
             float closestBananaFwd = 26.0f;
             float threatBananaLat = 0f;

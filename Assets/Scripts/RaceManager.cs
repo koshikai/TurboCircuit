@@ -235,7 +235,7 @@ public partial class RaceManager : MonoBehaviour
     Texture2D minimap;
     Texture2D vignetteTex;
     Texture2D speedLineTex;
-    Texture2D iconTurbo, iconBanana, iconMissile, iconShield, iconBomb, iconThunder;
+    Texture2D iconTurbo, iconBanana, iconMissile, iconStar, iconShield, iconBomb, iconThunder;
     Texture2D titleLogoTex;
     Texture2D[] trackBadgeTex = new Texture2D[8];
     Texture2D cardPanelTex;
@@ -839,7 +839,7 @@ public partial class RaceManager : MonoBehaviour
         stateTime = 5f;
         raceTime = 12.4f;
         yield return new WaitForSeconds(0.8f);
-        if (Player != null) Player.SetPreviewSpeedAndBoost(26.5f, 0f, ItemType.Shield);
+        if (Player != null) Player.SetPreviewSpeedAndBoost(26.5f, 0f, ItemType.Star);
         ScreenCapture.CaptureScreenshot("shot_13_campus_race.png");
         yield return new WaitForSeconds(0.3f);
 
@@ -941,7 +941,7 @@ public partial class RaceManager : MonoBehaviour
             stateTime = 5f;
             raceTime = 10f;
             yield return new WaitForSeconds(0.8f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(27.5f, 0f, ItemType.Shield);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(27.5f, 0f, ItemType.Star);
             ScreenCapture.CaptureScreenshot("shot_21_frost_race.png");
             yield return new WaitForSeconds(0.3f);
 

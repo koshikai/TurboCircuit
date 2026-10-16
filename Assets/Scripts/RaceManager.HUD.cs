@@ -112,7 +112,7 @@ public partial class RaceManager
             Texture2D icon = def?.Icon;
             Color ic = def != null ? def.AccentColor : Color.white;
             string label = def != null ? def.LocalizedName : shown.ToString();
-            if (shown == ItemType.Shield) ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f);
+            if (shown == ItemType.Star) ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f);
 
             if (icon != null)
             {
