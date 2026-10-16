@@ -39,7 +39,8 @@ public class NetSession : MonoBehaviour
         Welcome = 8,        // ホスト -> 新規クライアント: [割り当てスロット, コース番号]
         LobbySync = 9,      // ホスト -> 全員: 参加プレイヤー一覧 [count, {slot, kartChar}...]
         BombSpawn = 10,     // 投擲 -> 全員中継
-        BombExplode = 11    // 爆発 -> 全員中継
+        BombExplode = 11,   // 爆発 -> 全員中継
+        ThunderUse = 12     // サンダー発動 -> 全員中継 [userSlot]
     }
 
     public const ushort DefaultPort = 7777;
@@ -60,7 +61,7 @@ public class NetSession : MonoBehaviour
     public Action<NetworkConnection> OnClientConnected, OnClientDisconnected;
     public Action<int, int> OnWelcome; // (assignedSlot, course)
     public Action<List<(int slot, int kartChar, string name)>> OnLobbySync;
-    public Action<int> OnCourse, OnStart, OnBananaGone, OnBombExplode;
+    public Action<int> OnCourse, OnStart, OnBananaGone, OnBombExplode, OnThunder;
     public Action<int, NetKartState> OnState;
     public Action<int, int, Vector3> OnBanana;
     public Action<int, int> OnMissile;
@@ -331,7 +332,7 @@ public class NetSession : MonoBehaviour
         int need;
         switch (type)
         {
-            case Msg.Hello: case Msg.LobbySync: case Msg.Course: case Msg.Start: case Msg.State: need = 1; break;
+            case Msg.Hello: case Msg.LobbySync: case Msg.Course: case Msg.Start: case Msg.State: case Msg.ThunderUse: need = 1; break;
             case Msg.Welcome: case Msg.MissileSpawn: need = 2; break;
             case Msg.BananaGone: case Msg.BombExplode: need = 4; break;
             case Msg.BananaSpawn: need = 17; break;
@@ -444,6 +445,14 @@ public class NetSession : MonoBehaviour
                 if (IsHost)
                 {
                     BroadcastExcept(sourceConn, true, Msg.BombExplode, (ref DataStreamWriter w) => w.WriteInt(beId));
+                }
+                break;
+            case Msg.ThunderUse:
+                int tuSlot = r.ReadByte();
+                OnThunder?.Invoke(tuSlot);
+                if (IsHost)
+                {
+                    BroadcastExcept(sourceConn, true, Msg.ThunderUse, (ref DataStreamWriter w) => w.WriteByte((byte)tuSlot));
                 }
                 break;
         }
@@ -685,6 +694,20 @@ public class NetSession : MonoBehaviour
         {
             if (!Open(clientConn, true, Msg.BombExplode, out var w)) return;
             w.WriteInt(id);
+            driver.EndSend(w);
+        }
+    }
+
+    public void SendThunder(int userSlot)
+    {
+        if (IsHost)
+        {
+            Broadcast(true, Msg.ThunderUse, (ref DataStreamWriter w) => w.WriteByte((byte)userSlot));
+        }
+        else
+        {
+            if (!Open(clientConn, true, Msg.ThunderUse, out var w)) return;
+            w.WriteByte((byte)userSlot);
             driver.EndSend(w);
         }
     }

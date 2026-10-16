@@ -225,12 +225,17 @@ public partial class RaceManager : MonoBehaviour
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
     int nextBombId;
+    public static readonly List<ItemDef> ItemDefs = new List<ItemDef>();
+    public static ItemDef GetItemDef(ItemType type) => ItemDefs.Find(d => d.Type == type);
+    float screenFlashTimer;
+    float thunderCooldown;
+    public float ScreenFlashTimer => screenFlashTimer;
     GUIStyle sButton, sField, sNum, sMono, sSys;
     readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
     Texture2D speedLineTex;
-    Texture2D iconTurbo, iconBanana, iconMissile, iconShield, iconBomb;
+    Texture2D iconTurbo, iconBanana, iconMissile, iconShield, iconBomb, iconThunder;
     Texture2D titleLogoTex;
     Texture2D[] trackBadgeTex = new Texture2D[8];
     Texture2D cardPanelTex;
@@ -540,6 +545,17 @@ public partial class RaceManager : MonoBehaviour
         Net.OnMissile = (owner, target) => { if (owner >= 0 && owner < Karts.Count) SpawnMissileInternal(Karts[owner], (target >= 0 && target < Karts.Count) ? Karts[target] : null); };
         Net.OnBomb = (id, owner, pos, vel) => { if (owner >= 0 && owner < Karts.Count) SpawnBombInternal(id, pos, vel, Karts[owner]); };
         Net.OnBombExplode = ExplodeBombById;
+        Net.OnThunder = (userSlot) =>
+        {
+            screenFlashTimer = 0.35f;
+            Audio.Explode(1.2f);
+            foreach (var k in Karts)
+            {
+                if (k == null || !k.gameObject.activeSelf) continue;
+                if (userSlot >= 0 && userSlot < Karts.Count && k == Karts[userSlot]) continue;
+                k.Shock(6.5f);
+            }
+        };
         // 動作確認用：-nethost / -netjoin <ip> で起動直後に直接接続する
         if (args.Contains("-netmenu")) netMenu = true;
         if (args.Contains("-nethost")) Net.HostDirect();
@@ -1310,6 +1326,8 @@ public partial class RaceManager : MonoBehaviour
         stateTime += dt;
         bannerTimes[0] += dt;
         bannerTimes[1] += dt;
+        if (screenFlashTimer > 0) screenFlashTimer -= dt;
+        if (thunderCooldown > 0) thunderCooldown -= dt;
 
         switch (state)
         {
@@ -2064,13 +2082,17 @@ public partial class RaceManager : MonoBehaviour
             float m = d.magnitude, min = Kart.Radius * 2f;
             if (m >= min || m < 0.001f) continue;
             var n = d / m;
-            // 重いカートほど押し返されにくい
-            float wa = b.Mass / (a.Mass + b.Mass), wb = 1f - wa;
+            // 重いカートほど押し返されにくい（ミニ化中は軽くなり弾かれやすい）
+            float massA = a.Mass * (a.Shocked ? 0.35f : 1.0f);
+            float massB = b.Mass * (b.Shocked ? 0.35f : 1.0f);
+            float wa = massB / (massA + massB), wb = 1f - wa;
             a.transform.position += n * (min - m) * wa;
             b.transform.position -= n * (min - m) * wb;
 
             if (a.Shielded && !b.Shielded) { b.Spin(); continue; }
             if (b.Shielded && !a.Shielded) { a.Spin(); continue; }
+            if (!a.Shocked && b.Shocked) { b.Spin(); continue; }
+            if (!b.Shocked && a.Shocked) { a.Spin(); continue; }
 
             // 相対接近速度を計算し、擦れ続けではなく実際に衝突した瞬間のみ強さに応じたバンプ音を鳴らす
             float relVel = Vector3.Dot(b.VelDir * b.Speed - a.VelDir * a.Speed, n);
@@ -2150,19 +2172,44 @@ public partial class RaceManager : MonoBehaviour
 
     ItemType RollItem(Kart k)
     {
+        if (ItemDefs.Count == 0) return ItemType.Banana;
         int activeCount = Karts.Count(x => x.gameObject.activeSelf);
         float p = activeCount > 1 ? Mathf.Clamp01((k.Place - 1) / (float)(activeCount - 1)) : 0f;
-        float wBanana = Mathf.Lerp(0.50f, 0.05f, p);
-        float wTurbo = Mathf.Lerp(0.25f, 0.32f, p);
-        float wBomb = Mathf.Lerp(0.08f, 0.25f, p);
-        float wMissile = Mathf.Lerp(0.17f, 0.23f, p);
-        float wShield = Mathf.Lerp(0.00f, 0.15f, p);
-        float r = Random.value * (wBanana + wTurbo + wBomb + wMissile + wShield);
-        if ((r -= wBanana) < 0) return ItemType.Banana;
-        if ((r -= wTurbo) < 0) return ItemType.Turbo;
-        if ((r -= wBomb) < 0) return ItemType.Bomb;
-        if ((r -= wMissile) < 0) return ItemType.Missile;
-        return ItemType.Shield;
+
+        float totalWeight = 0f;
+        for (int i = 0; i < ItemDefs.Count; i++)
+        {
+            totalWeight += ItemDefs[i].WeightFunc != null ? ItemDefs[i].WeightFunc(p) : 0.1f;
+        }
+
+        if (totalWeight <= 0f) return ItemType.Banana;
+
+        float r = Random.value * totalWeight;
+        for (int i = 0; i < ItemDefs.Count; i++)
+        {
+            float w = ItemDefs[i].WeightFunc != null ? ItemDefs[i].WeightFunc(p) : 0.1f;
+            if ((r -= w) < 0f) return ItemDefs[i].Type;
+        }
+
+        return ItemDefs[ItemDefs.Count - 1].Type;
+    }
+
+    public void UseThunder(Kart user)
+    {
+        thunderCooldown = 28f;
+        screenFlashTimer = 0.35f;
+        Audio.Explode(1.2f);
+
+        foreach (var k in Karts)
+        {
+            if (k == null || !k.gameObject.activeSelf || k == user) continue;
+            k.Shock(6.5f);
+        }
+
+        if (Online && user != null && !user.IsRemote)
+        {
+            Net.SendThunder(Karts.IndexOf(user));
+        }
     }
 
     public void SpawnBanana(Vector3 pos, Kart owner)

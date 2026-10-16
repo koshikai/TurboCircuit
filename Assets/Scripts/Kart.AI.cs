@@ -329,6 +329,10 @@ public partial class Kart
                     // 前方にライバルがいる場合（前方投擲）、または後方に迫っている時（後方投下）
                     canUse = rm.KartAheadWithin(this, 35f) || rm.KartBehindWithin(this, 18f);
                     break;
+                case ItemType.Thunder:
+                    // サンダーは下位からの大逆転アイテム。前方にカートがいれば確実に発動！
+                    canUse = rm.KartAheadWithin(this, 120f);
+                    break;
             }
 
             float forceUseThreshold = Item == ItemType.Shield ? -4.5f : -3.5f;

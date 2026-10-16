@@ -96,6 +96,8 @@ public partial class RaceManager
         iconMissile = LoadTexture("Icons/item_missile_pop", iconDir + "item_missile_pop.png") ?? LoadTexture("Icons/item_missile", iconDir + "item_missile.jpg");
         iconShield = LoadTexture("Icons/item_shield_pop", iconDir + "item_shield_pop.png") ?? LoadTexture("Icons/item_shield", iconDir + "item_shield.jpg");
         iconBomb = LoadTexture("Icons/item_bomb_pop", iconDir + "item_bomb_pop.png") ?? LoadTexture("Icons/item_bomb", iconDir + "item_bomb.jpg");
+        iconThunder = LoadTexture("Icons/item_thunder_pop", iconDir + "item_thunder_pop.png");
+        InitItemDefs();
 
         string uiDir = Application.dataPath + "/Resources/UI/";
         titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");
@@ -157,5 +159,59 @@ public partial class RaceManager
         }
         sBig = null;
         styleCache.Clear();
+    }
+
+    void InitItemDefs()
+    {
+        ItemDefs.Clear();
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Turbo,
+            NameEn = "TURBO", NameJp = "ターボ",
+            AccentColor = new Color(1f, 0.55f, 0.1f),
+            Icon = iconTurbo,
+            WeightFunc = p => Mathf.Lerp(0.25f, 0.30f, p)
+        });
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Banana,
+            NameEn = "BANANA", NameJp = "バナナ",
+            AccentColor = new Color(1f, 0.9f, 0.2f),
+            Icon = iconBanana,
+            WeightFunc = p => Mathf.Lerp(0.50f, 0.05f, p)
+        });
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Missile,
+            NameEn = "MISSILE", NameJp = "ミサイル",
+            AccentColor = new Color(1f, 0.2f, 0.2f),
+            Icon = iconMissile,
+            WeightFunc = p => Mathf.Lerp(0.15f, 0.25f, p)
+        });
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Shield,
+            NameEn = "SHIELD", NameJp = "シールド",
+            AccentColor = new Color(0.2f, 0.85f, 1.0f),
+            Icon = iconShield,
+            WeightFunc = p => Mathf.Lerp(0.00f, 0.15f, p)
+        });
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Bomb,
+            NameEn = "BOMB", NameJp = "ボム",
+            AccentColor = new Color(1f, 0.35f, 0.15f),
+            Icon = iconBomb,
+            WeightFunc = p => Mathf.Lerp(0.10f, 0.22f, p)
+        });
+        ItemDefs.Add(new ItemDef
+        {
+            Type = ItemType.Thunder,
+            NameEn = "THUNDER", NameJp = "サンダー",
+            AccentColor = new Color(1f, 0.95f, 0.2f),
+            Icon = iconThunder,
+            // 1〜4位 (p < 0.65) では出ない。6〜8位 (p >= 0.65) で出現！
+            WeightFunc = p => (thunderCooldown > 0 || p < 0.65f) ? 0f : Mathf.Lerp(0f, 0.20f, (p - 0.65f) / 0.35f)
+        });
     }
 }
