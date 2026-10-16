@@ -57,7 +57,7 @@ public partial class Kart
             }
         }
 
-        // 2. 動的レーシングライン生成 (Smooth Racing Line)
+        // 2. 動的レーシングライン生成 (Smooth Racing Line & Tactical Adjustments)
         // 極端な端への振りを抑え、コース中央寄りの安全なラインを滑らかにトレース
         float targetLane = 0f;
 
@@ -80,6 +80,9 @@ public partial class Kart
             // 直線：個別の走行レーンを維持
             targetLane = Mathf.Clamp(aiLane, -1.8f, 1.8f);
         }
+
+        // 2b. アイテムボックス・ダッシュボード取得と、スリップストリーム／追い抜き・バナナ回避
+        targetLane = ApplyTacticalLineAdjustments(curPos, currentLateral, targetLane, apexCurvature, apexBend);
 
         // 3. 非線形 Stanley 操舵制御 (Smooth Path Tracking Control)
         // 先読み距離を長めに取り、遠くを見て滑らかな円弧を描いて曲がる
@@ -157,8 +160,11 @@ public partial class Kart
                 bool curveRemains = Mathf.Abs(futureAngle) > 14f && Mathf.Sign(futureAngle) == driftDir;
                 bool wallSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 0.5f;
 
+                // 長いヘアピン・深いカーブ（先読み角 > 26度）がまだ続く間は Level 3（紫火花：ウルトラミニターボ）まで溜める
+                int targetDriftLv = (Mathf.Abs(futureAngle) > 26f && apexCurvature > 0.024f) ? 3 : 2;
+
                 // ミニターボがチャージされ、コーナーの出口が見えたら即座に解除してロケットダッシュ！
-                if (curveRemains && wallSafe && DriftLevel < 2)
+                if (curveRemains && wallSafe && DriftLevel < targetDriftLv)
                 {
                     inp.drift = true;
                     // ドリフト中はイン固定ではなく、目標方位に合わせて微調整（カウンターステア／微インステア）
@@ -230,26 +236,49 @@ public partial class Kart
         }
 
         // 8. 戦略的アイテム使用 (Strategic Item Usage)
-        if (!Finished && Item != ItemType.None && RouletteTimer <= 0)
+        if (!Finished && Item != ItemType.None && RouletteTimer <= 0 && rm != null)
         {
             aiItemTimer -= dt;
             bool canUse = false;
+            bool urgentUse = false;
+
             switch (Item)
             {
                 case ItemType.Missile:
-                    canUse = rm.KartAheadWithin(this, 55f);
+                    canUse = rm.KartAheadWithin(this, 60f);
                     break;
                 case ItemType.Banana:
-                    canUse = rm.KartBehindWithin(this, 18f);
+                    // 後方にライバルが迫っている時、または急コーナーのエペックス上に罠を仕掛ける時
+                    canUse = rm.KartBehindWithin(this, 22f)
+                          || (apexCurvature > 0.025f && apexOffset <= 6 && rm.KartBehindWithin(this, 45f));
                     break;
                 case ItemType.Turbo:
-                    canUse = Mathf.Abs(futureAngle) < 15f && Mathf.Abs(currentLateral) < Track.HalfWidth - 1.5f;
+                    // オフロード（ダート）に飛び出して減速した時は即座にターボで復帰！
+                    if (Offroad && !Boosting)
+                    {
+                        urgentUse = true;
+                    }
+                    else
+                    {
+                        canUse = !Boosting && Mathf.Abs(futureAngle) < 15f && Mathf.Abs(currentLateral) < Track.HalfWidth - 1.5f;
+                    }
                     break;
                 case ItemType.Shield:
-                    canUse = true;
+                    // ミサイル接近時はタイマーを待たず即座にシールド展開して防御！
+                    if (rm.IsMissileApproaching(this, out float mDist) && mDist < 34f)
+                    {
+                        urgentUse = true;
+                    }
+                    else
+                    {
+                        // 周囲にライバルが接近して接触・被弾リスクがある時
+                        canUse = rm.KartBehindWithin(this, 12f) || rm.KartAheadWithin(this, 10f);
+                    }
                     break;
             }
-            if (aiItemTimer <= 0 && (canUse || aiItemTimer < -3.5f))
+
+            float forceUseThreshold = Item == ItemType.Shield ? -4.5f : -3.5f;
+            if (urgentUse || (aiItemTimer <= 0 && (canUse || aiItemTimer < forceUseThreshold)))
             {
                 inp.useItem = true;
                 aiItemTimer = Random.Range(1.5f, 3.0f);
@@ -259,16 +288,176 @@ public partial class Kart
         return inp;
     }
 
+    // アイテムボックス・ダッシュボードへのライン寄せ、スリップストリーム／追い抜き、およびバナナ回避
+    float ApplyTacticalLineAdjustments(Vector3 curPos, float currentLateral, float baseLane, float apexCurvature, float apexBend)
+    {
+        float lane = baseLane;
+        float maxSafeLane = Track.HalfWidth - 1.6f; // 7.4m
+        Vector3 trackFwd = track.Dirs[Index];
+
+        // A. アイテムボックス & ダッシュボード取得（急カーブ・ドリフト中でない場合）
+        if (!drifting && apexCurvature < 0.022f)
+        {
+            bool foundPickup = false;
+            // アイテム未所持なら前方のアクティブなアイテムボックスを狙う
+            if (Item == ItemType.None && RouletteTimer <= 0 && rm != null && track.ItemBoxSpots != null)
+            {
+                int bestSteps = 999;
+                float bestLatDiff = 999f;
+                float boxLane = lane;
+                for (int i = 0; i < track.ItemBoxSpots.Count; i++)
+                {
+                    if (!rm.IsItemBoxActive(i)) continue;
+                    var spot = track.ItemBoxSpots[i];
+                    int dIdx = track.Wrap(spot.index - Index);
+                    if (dIdx >= 3 && dIdx <= 18)
+                    {
+                        float latDiff = Mathf.Abs(spot.lateral - currentLateral);
+                        if (latDiff < 4.2f && (dIdx < bestSteps || (dIdx == bestSteps && latDiff < bestLatDiff)))
+                        {
+                            bestSteps = dIdx;
+                            bestLatDiff = latDiff;
+                            boxLane = spot.lateral;
+                            foundPickup = true;
+                        }
+                    }
+                }
+                if (foundPickup) lane = boxLane;
+            }
+
+            // ダッシュボード（BoostPad）が前方近くにあれば乗る
+            if (!foundPickup && boostTimer < 0.4f && track.BoostPads != null)
+            {
+                int bestSteps = 999;
+                for (int i = 0; i < track.BoostPads.Count; i++)
+                {
+                    var pad = track.BoostPads[i];
+                    int dIdx = track.Wrap(pad.index - Index);
+                    if (dIdx >= 3 && dIdx <= 16 && dIdx < bestSteps && Mathf.Abs(pad.lateral - currentLateral) < 3.8f)
+                    {
+                        bestSteps = dIdx;
+                        lane = pad.lateral;
+                    }
+                }
+            }
+        }
+
+        // B. 前走車との駆け引き（スリップストリーム追従 & オーバーテイク追い抜き）
+        if (rm != null && rm.Karts != null)
+        {
+            Kart closestAhead = null;
+            float minFwdDist = 18.0f;
+            for (int i = 0; i < rm.Karts.Count; i++)
+            {
+                var other = rm.Karts[i];
+                if (other == this || other == null || !other.gameObject.activeSelf) continue;
+                Vector3 toOther = other.transform.position - curPos;
+                if (Mathf.Abs(toOther.y) > 2.2f) continue;
+                float fwdDist = Vector3.Dot(toOther, trackFwd);
+                if (fwdDist > 1.2f && fwdDist < minFwdDist)
+                {
+                    if (Mathf.Abs(other.Lateral - currentLateral) < 3.2f || Mathf.Abs(other.Lateral - lane) < 2.6f)
+                    {
+                        minFwdDist = fwdDist;
+                        closestAhead = other;
+                    }
+                }
+            }
+
+            if (closestAhead != null)
+            {
+                bool shouldPass = minFwdDist < 7.5f
+                               || closestAhead.Speed < Speed - 1.8f
+                               || Boosting
+                               || Slipstreaming;
+
+                if (shouldPass)
+                {
+                    // 追突を避けて追い抜く：コース内側に余裕がある方、または現在の自分のオフセット側を選択
+                    float passDir;
+                    if (closestAhead.Lateral > 2.0f) passDir = -1f;
+                    else if (closestAhead.Lateral < -2.0f) passDir = 1f;
+                    else if (Mathf.Abs(apexBend) > 12f) passDir = Mathf.Sign(apexBend); // コーナーのイン側を突く
+                    else passDir = currentLateral >= closestAhead.Lateral ? 1f : -1f;
+
+                    lane = closestAhead.Lateral + passDir * 2.8f;
+                }
+                else if (!drifting && apexCurvature < 0.018f && minFwdDist >= 7.5f && minFwdDist <= 16.0f && Mathf.Abs(closestAhead.Lateral - currentLateral) < 2.4f)
+                {
+                    // 直線〜緩やかなカーブでは前走車の真後ろに入ってスリップストリーム（ドラフティング）を狙う
+                    lane = Mathf.Lerp(lane, closestAhead.Lateral, 0.75f);
+                }
+            }
+        }
+
+        // C. コース上のバナナ（罠）の検知・回避（最優先）
+        if (!Shielded && rm != null && rm.Bananas != null && rm.Bananas.Count > 0)
+        {
+            float closestBananaFwd = 26.0f;
+            float threatBananaLat = 0f;
+            bool hasThreat = false;
+
+            for (int i = 0; i < rm.Bananas.Count; i++)
+            {
+                var b = rm.Bananas[i];
+                if (b == null || (!b.Armed && b.Owner == this)) continue;
+                Vector3 toB = b.transform.position - curPos;
+                if (Mathf.Abs(toB.y) > 2.2f) continue;
+                float fwdDist = Vector3.Dot(toB, trackFwd);
+                if (fwdDist > 1.0f && fwdDist < closestBananaFwd)
+                {
+                    int bIdx = track.Wrap(Index + Mathf.RoundToInt(fwdDist / 2f));
+                    float bLat = Vector3.Dot(b.transform.position - track.Pts[bIdx], track.Rights[bIdx]);
+                    if (Mathf.Abs(bLat - lane) < 2.6f || Mathf.Abs(bLat - currentLateral) < 2.4f)
+                    {
+                        closestBananaFwd = fwdDist;
+                        threatBananaLat = bLat;
+                        hasThreat = true;
+                    }
+                }
+            }
+
+            if (hasThreat)
+            {
+                float avoidDir;
+                if (threatBananaLat > 1.8f) avoidDir = -1f;
+                else if (threatBananaLat < -1.8f) avoidDir = 1f;
+                else avoidDir = currentLateral >= threatBananaLat ? 1f : -1f;
+
+                lane = threatBananaLat + avoidDir * 2.9f;
+            }
+        }
+
+        return Mathf.Clamp(lane, -maxSafeLane, maxSafeLane);
+    }
+
     float AISpeedFactor()
     {
         if (IsPlayer && !Finished && !rm.Demo) return 1f;
         float f = aiSkill;
-        var player = rm.Player;
-        if (player != null && !player.Finished && player != this)
+        if (rm != null)
         {
-            // ラバーバンド：プレイヤーとの差に応じて少し速さを調整
-            float diff = player.RaceDistance - RaceDistance;
-            f += Mathf.Clamp(diff / 220f, -0.06f, 0.08f);
+            // 1P / 2P の人間プレイヤーのうち、最も距離が近いプレイヤーを基準にラバーバンド補正を行う
+            Kart refHuman = null;
+            float bestDist = float.MaxValue;
+            if (rm.Player != null && !rm.Player.Finished && rm.Player != this)
+            {
+                refHuman = rm.Player;
+                bestDist = Mathf.Abs(rm.Player.RaceDistance - RaceDistance);
+            }
+            if (rm.TwoPlayer && rm.Player2 != null && !rm.Player2.Finished && rm.Player2 != this)
+            {
+                float d2 = Mathf.Abs(rm.Player2.RaceDistance - RaceDistance);
+                if (d2 < bestDist)
+                {
+                    refHuman = rm.Player2;
+                }
+            }
+            if (refHuman != null)
+            {
+                float diff = refHuman.RaceDistance - RaceDistance;
+                f += Mathf.Clamp(diff / 220f, -0.06f, 0.08f);
+            }
         }
         return Mathf.Clamp(f, 0.90f, 1.05f);
     }
