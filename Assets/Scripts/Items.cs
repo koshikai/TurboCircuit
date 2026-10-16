@@ -922,3 +922,434 @@ public class Missile : MonoBehaviour
         Destroy(gameObject);
     }
 }
+
+// ボム：放物線を描いて投げられ、バウンド後に一定時間または接触で大爆発を起こす（トイ・アーケード調の球体・口金・導火線・ゼンマイキー）
+public class Bomb : MonoBehaviour
+{
+    public Kart Owner;
+    public int NetId;
+    RaceManager rm;
+    Track track;
+    Vector3 velocity;
+    float age;
+    const float FuseTime = 3.6f;
+    bool exploded;
+    int trackIdx;
+
+    Transform bodyRoot;
+    Renderer bodyRend;
+    MaterialPropertyBlock bodyMpb;
+    Transform keyWindUp;
+    Transform fuseSpark;
+    Vector3 sparkLocalPos;
+
+    static Mesh s_fuseMesh;
+
+    static Mesh EnsureFuseMesh()
+    {
+        if (s_fuseMesh != null) return s_fuseMesh;
+        Vector2[] fusePts =
+        {
+            new Vector2(0.00f, 0.00f),
+            new Vector2(0.02f, 0.08f),
+            new Vector2(0.08f, 0.16f),
+            new Vector2(0.16f, 0.21f),
+            new Vector2(0.23f, 0.22f)
+        };
+        s_fuseMesh = Banana.BuildLoftedTube(
+            10, 10,
+            t =>
+            {
+                Vector2 p = Banana.EvalSplinePublic(fusePts, t);
+                return new Vector3(p.x, p.y, 0f);
+            },
+            (t, ang) => 0.022f * Mathf.Lerp(1.1f, 0.75f, t),
+            true, true
+        );
+        return s_fuseMesh;
+    }
+
+    public void Init(RaceManager rm, Track track, Kart owner, Vector3 startPos, Vector3 initialVel, Material mat)
+    {
+        this.rm = rm;
+        this.track = track;
+        Owner = owner;
+        transform.position = startPos;
+        velocity = initialVel;
+        if (track != null) track.Locate(startPos, ref trackIdx, out _, out _);
+
+        BuildVisuals(mat);
+    }
+
+    void BuildVisuals(Material mat)
+    {
+        Material chromeMat = (rm != null && rm.chromeMaterial != null) ? rm.chromeMaterial : mat;
+        Material darkMat   = (rm != null && rm.tireMaterial != null) ? rm.tireMaterial : mat;
+        Material glowMat   = (rm != null && rm.glowMaterial != null) ? rm.glowMaterial : mat;
+
+        bodyRoot = new GameObject("BombBody").transform;
+        bodyRoot.SetParent(transform, false);
+
+        Color darkBody   = new Color(0.11f, 0.12f, 0.16f);
+        Color capGold    = new Color(1.00f, 0.82f, 0.14f);
+        Color keyGold    = new Color(0.98f, 0.75f, 0.12f);
+        Color fuseCream  = new Color(0.88f, 0.82f, 0.68f);
+        Color sparkColor = new Color(1.00f, 0.55f, 0.10f);
+        Color eyeWhite   = new Color(0.98f, 0.99f, 1.00f);
+        Color eyePupil   = new Color(0.06f, 0.08f, 0.14f);
+
+        // 1. メイン球体胴体 (直径 0.74m)
+        var bodySphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(bodySphere.GetComponent<Collider>());
+        bodySphere.name = "BodySphere";
+        bodySphere.transform.SetParent(bodyRoot, false);
+        bodySphere.transform.localScale = Vector3.one * 0.74f;
+        bodyRend = bodySphere.GetComponent<Renderer>();
+        bodyRend.sharedMaterial = darkMat;
+        bodyMpb = new MaterialPropertyBlock();
+        bodyMpb.SetColor("_Color", darkBody);
+        bodyMpb.SetColor("_BaseColor", darkBody);
+        bodyMpb.SetColor("_EmissionColor", Color.black);
+        bodyRend.SetPropertyBlock(bodyMpb);
+
+        // 2. 右上の丸いポップハイライト（2Dトイ調のツヤ表現）
+        var hi = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(hi.GetComponent<Collider>());
+        hi.transform.SetParent(bodyRoot, false);
+        hi.transform.localPosition = new Vector3(0.16f, 0.22f, 0.20f);
+        hi.transform.localScale = new Vector3(0.13f, 0.15f, 0.06f);
+        hi.transform.localRotation = Quaternion.Euler(-25f, 32f, 0f);
+        var hiR = hi.GetComponent<Renderer>();
+        hiR.sharedMaterial = mat;
+        var hiMpb = new MaterialPropertyBlock();
+        hiMpb.SetColor("_Color", Color.white);
+        hiMpb.SetColor("_BaseColor", Color.white);
+        hiMpb.SetColor("_EmissionColor", new Color(0.2f, 0.2f, 0.2f));
+        hiR.SetPropertyBlock(hiMpb);
+
+        // 3. 上部ネック・ゴールド口金
+        var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(cap.GetComponent<Collider>());
+        cap.name = "GoldCap";
+        cap.transform.SetParent(bodyRoot, false);
+        cap.transform.localPosition = new Vector3(0f, 0.36f, 0f);
+        cap.transform.localScale = new Vector3(0.26f, 0.05f, 0.26f);
+        var capR = cap.GetComponent<Renderer>();
+        capR.sharedMaterial = chromeMat;
+        var capMpb = new MaterialPropertyBlock();
+        capMpb.SetColor("_Color", capGold);
+        capMpb.SetColor("_BaseColor", capGold);
+        capMpb.SetColor("_EmissionColor", new Color(0.1f, 0.07f, 0.01f));
+        capR.SetPropertyBlock(capMpb);
+
+        // 4. 導火線メッシュ & 先端スパーク
+        var fuseGo = new GameObject("FuseRope");
+        fuseGo.transform.SetParent(bodyRoot, false);
+        fuseGo.transform.localPosition = new Vector3(0f, 0.39f, 0f);
+        fuseGo.transform.localRotation = Quaternion.Euler(0f, 25f, 0f);
+        var fuseMf = fuseGo.AddComponent<MeshFilter>();
+        fuseMf.sharedMesh = EnsureFuseMesh();
+        var fuseMr = fuseGo.AddComponent<MeshRenderer>();
+        fuseMr.sharedMaterial = mat;
+        var fuseMpb = new MaterialPropertyBlock();
+        fuseMpb.SetColor("_Color", fuseCream);
+        fuseMpb.SetColor("_BaseColor", fuseCream);
+        fuseMr.SetPropertyBlock(fuseMpb);
+
+        // 導火線の先端発光球
+        var spark = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(spark.GetComponent<Collider>());
+        spark.name = "FuseSpark";
+        spark.transform.SetParent(fuseGo.transform, false);
+        spark.transform.localPosition = new Vector3(0.23f, 0.22f, 0f);
+        spark.transform.localScale = Vector3.one * 0.075f;
+        var sparkR = spark.GetComponent<Renderer>();
+        sparkR.sharedMaterial = glowMat;
+        var sparkMpb = new MaterialPropertyBlock();
+        sparkMpb.SetColor("_Color", sparkColor);
+        sparkMpb.SetColor("_BaseColor", sparkColor);
+        sparkMpb.SetColor("_EmissionColor", new Color(1.6f, 0.7f, 0.1f));
+        sparkR.SetPropertyBlock(sparkMpb);
+        fuseSpark = spark.transform;
+        sparkLocalPos = spark.transform.position - transform.position;
+
+        // 5. 正面のトイ調・勇ましい怒り目（左右）
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            float eyeX = sx * 0.13f;
+            float eyeY = 0.035f;
+            float eyeZ = 0.33f;
+            var eyeRot = Quaternion.Euler(0f, sx * 22f, sx * -10f);
+
+            // 白目ベース
+            var eyeWhiteObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Destroy(eyeWhiteObj.GetComponent<Collider>());
+            eyeWhiteObj.transform.SetParent(bodyRoot, false);
+            eyeWhiteObj.transform.localPosition = new Vector3(eyeX, eyeY, eyeZ);
+            eyeWhiteObj.transform.localRotation = eyeRot;
+            eyeWhiteObj.transform.localScale = new Vector3(0.095f, 0.125f, 0.045f);
+            var ewr = eyeWhiteObj.GetComponent<Renderer>();
+            ewr.sharedMaterial = mat;
+            var ewMpb = new MaterialPropertyBlock();
+            ewMpb.SetColor("_Color", eyeWhite);
+            ewMpb.SetColor("_BaseColor", eyeWhite);
+            ewr.SetPropertyBlock(ewMpb);
+
+            // 黒目瞳（中央前方を睨む）
+            var pupilObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Destroy(pupilObj.GetComponent<Collider>());
+            pupilObj.transform.SetParent(bodyRoot, false);
+            pupilObj.transform.localPosition = new Vector3(eyeX + sx * 0.012f, eyeY - 0.005f, eyeZ + 0.018f);
+            pupilObj.transform.localRotation = eyeRot;
+            pupilObj.transform.localScale = new Vector3(0.054f, 0.075f, 0.038f);
+            var pr = pupilObj.GetComponent<Renderer>();
+            pr.sharedMaterial = darkMat;
+            var pMpb = new MaterialPropertyBlock();
+            pMpb.SetColor("_Color", eyePupil);
+            pMpb.SetColor("_BaseColor", eyePupil);
+            pr.SetPropertyBlock(pMpb);
+
+            // 瞳のハイライト光
+            var specObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Destroy(specObj.GetComponent<Collider>());
+            specObj.transform.SetParent(bodyRoot, false);
+            specObj.transform.localPosition = new Vector3(eyeX + sx * 0.022f, eyeY + 0.022f, eyeZ + 0.032f);
+            specObj.transform.localScale = Vector3.one * 0.024f;
+            var sr = specObj.GetComponent<Renderer>();
+            sr.sharedMaterial = mat;
+            var sMpb = new MaterialPropertyBlock();
+            sMpb.SetColor("_Color", Color.white);
+            sMpb.SetColor("_BaseColor", Color.white);
+            sr.SetPropertyBlock(sMpb);
+
+            // 怒り眉毛（中央へつり下がるV字の凛々しいトイライン）
+            var browObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            Destroy(browObj.GetComponent<Collider>());
+            browObj.transform.SetParent(bodyRoot, false);
+            browObj.transform.localPosition = new Vector3(eyeX - sx * 0.005f, eyeY + 0.082f, eyeZ + 0.014f);
+            browObj.transform.localRotation = Quaternion.Euler(0f, sx * 20f, sx * 28f) * Quaternion.Euler(90f, 0f, 0f);
+            browObj.transform.localScale = new Vector3(0.026f, 0.052f, 0.026f);
+            var br = browObj.GetComponent<Renderer>();
+            br.sharedMaterial = darkMat;
+            br.SetPropertyBlock(pMpb);
+        }
+
+        // 6. 背中のゼンマイ巻き鍵 (Wind-up Key)
+        var keyRoot = new GameObject("WindUpKey").transform;
+        keyRoot.SetParent(bodyRoot, false);
+        keyRoot.localPosition = new Vector3(0f, 0.04f, -0.37f);
+        keyWindUp = keyRoot;
+
+        // 軸シャフト
+        var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(shaft.GetComponent<Collider>());
+        shaft.transform.SetParent(keyRoot, false);
+        shaft.transform.localPosition = new Vector3(0f, 0f, -0.06f);
+        shaft.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        shaft.transform.localScale = new Vector3(0.05f, 0.06f, 0.05f);
+        var shaftR = shaft.GetComponent<Renderer>();
+        shaftR.sharedMaterial = chromeMat;
+        shaftR.SetPropertyBlock(capMpb);
+
+        // キーの左右ウイング（丸い穴の空いた巻き鍵）
+        foreach (float sx in new[] { -1f, 1f })
+        {
+            var wing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(wing.GetComponent<Collider>());
+            wing.transform.SetParent(keyRoot, false);
+            wing.transform.localPosition = new Vector3(sx * 0.12f, 0f, -0.12f);
+            wing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            wing.transform.localScale = new Vector3(0.13f, 0.016f, 0.13f);
+            var wingR = wing.GetComponent<Renderer>();
+            wingR.sharedMaterial = chromeMat;
+            var wMpb = new MaterialPropertyBlock();
+            wMpb.SetColor("_Color", keyGold);
+            wMpb.SetColor("_BaseColor", keyGold);
+            wingR.SetPropertyBlock(wMpb);
+
+            // 穴を模したインナーダークコア
+            var hole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(hole.GetComponent<Collider>());
+            hole.transform.SetParent(keyRoot, false);
+            hole.transform.localPosition = new Vector3(sx * 0.12f, 0f, -0.12f);
+            hole.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            hole.transform.localScale = new Vector3(0.065f, 0.022f, 0.065f);
+            var holeR = hole.GetComponent<Renderer>();
+            holeR.sharedMaterial = darkMat;
+            var hMpb = new MaterialPropertyBlock();
+            hMpb.SetColor("_Color", darkBody);
+            hMpb.SetColor("_BaseColor", darkBody);
+            holeR.SetPropertyBlock(hMpb);
+        }
+    }
+
+    void Update()
+    {
+        if (exploded) return;
+        if (rm == null) { Destroy(gameObject); return; }
+        if (!rm.RaceRunning) { Explode(); return; }
+
+        float dt = Time.deltaTime;
+        if (dt == 0f) return;
+        age += dt;
+
+        // 1. ゼンマイキーの回転
+        if (keyWindUp != null)
+        {
+            keyWindUp.Rotate(0f, 0f, 190f * dt);
+        }
+
+        // 2. 導火線の火花エフェクト
+        if (fuseSpark != null)
+        {
+            Vector3 sparkWorldPos = fuseSpark.position;
+            Fx.Emit(sparkWorldPos, Random.insideUnitSphere * 1.6f + Vector3.up * 0.6f, new Color(1f, 0.65f, 0.12f), 0.35f, 0.22f, 1, 0.9f);
+            Fx.Emit(sparkWorldPos, Vector3.up * 1.0f + Random.insideUnitSphere * 0.5f, new Color(0.5f, 0.5f, 0.5f, 0.4f), 0.45f, 0.35f, 1, 0.4f);
+        }
+
+        // 3. 物理移動・重力 & 空気摩擦
+        velocity += Vector3.down * 22f * dt;
+        float fric = Mathf.Pow(0.92f, dt * 60f);
+        velocity.x *= fric;
+        velocity.z *= fric;
+
+        // コース路面接地・バウンド判定
+        if (track != null)
+        {
+            track.Locate(transform.position, ref trackIdx, out float lat, out _);
+            Vector3 roadPt = track.PointAt(trackIdx, lat);
+            float groundY = roadPt.y + 0.37f;
+            if (transform.position.y <= groundY)
+            {
+                var curPos = transform.position;
+                curPos.y = groundY;
+                transform.position = curPos;
+
+                if (velocity.y < -1.8f)
+                {
+                    velocity.y = -velocity.y * 0.42f; // バウンド
+                    Fx.Emit(transform.position, Vector3.up * 1.2f, new Color(0.8f, 0.8f, 0.8f, 0.4f), 0.4f, 0.3f, 2, 0.4f);
+                }
+                else
+                {
+                    velocity.y = 0f;
+                }
+            }
+        }
+
+        transform.position += velocity * dt;
+
+        // 4. 球体の転がり回転
+        Vector3 horizVel = new Vector3(velocity.x, 0f, velocity.z);
+        if (horizVel.sqrMagnitude > 0.04f && bodyRoot != null)
+        {
+            Vector3 rollAxis = Vector3.Cross(Vector3.up, horizVel.normalized);
+            float rollSpeed = (horizVel.magnitude / 0.37f) * Mathf.Rad2Deg;
+            bodyRoot.Rotate(rollAxis, rollSpeed * dt, Space.World);
+        }
+
+        // 5. 爆発直前（残り 1.4秒未満）の危険点滅 & 脈動
+        float remaining = FuseTime - age;
+        if (remaining < 1.4f && bodyRend != null && bodyMpb != null)
+        {
+            float blinkFreq = Mathf.Lerp(12f, 32f, 1f - Mathf.Clamp01(remaining / 1.4f));
+            bool isRed = Mathf.Sin(Time.time * blinkFreq) > 0f;
+
+            Color c = isRed ? new Color(0.94f, 0.14f, 0.16f) : new Color(0.11f, 0.12f, 0.16f);
+            Color em = isRed ? new Color(0.35f, 0.04f, 0.04f) : Color.black;
+            bodyMpb.SetColor("_Color", c);
+            bodyMpb.SetColor("_BaseColor", c);
+            bodyMpb.SetColor("_EmissionColor", em);
+            bodyRend.SetPropertyBlock(bodyMpb);
+
+            float pulse = 1.0f + (isRed ? 0.08f : 0f);
+            bodyRoot.localScale = Vector3.one * pulse;
+        }
+
+        // 6. 起爆判定: タイムアップ
+        if (age >= FuseTime)
+        {
+            Explode();
+            return;
+        }
+
+        // 7. 起爆判定: 投擲0.35秒以降、他カートとの接触
+        if (age > 0.35f && rm != null)
+        {
+            foreach (var k in rm.Karts)
+            {
+                if (k == null || !k.gameObject.activeSelf) continue;
+                if ((k.transform.position + Vector3.up * 0.4f - transform.position).magnitude < 1.85f)
+                {
+                    Explode();
+                    return;
+                }
+            }
+        }
+    }
+
+    public void Explode()
+    {
+        if (exploded) return;
+        exploded = true;
+
+        Vector3 pos = transform.position;
+
+        // 1. 多層大爆発パーティクル
+        Fx.Burst(pos + Vector3.up * 0.2f, new Color(1.0f, 0.50f, 0.08f), 45, 13f, 1.1f);
+        Fx.Burst(pos + Vector3.up * 0.5f, new Color(1.0f, 0.95f, 0.35f), 30, 8f, 0.7f);
+        Fx.Burst(pos + Vector3.up * 0.7f, new Color(0.35f, 0.35f, 0.40f, 0.85f), 25, 7f, 1.3f);
+
+        // 2. 距離減衰爆発音
+        float atten = 1f;
+        var mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            float dist = Vector3.Distance(mainCam.transform.position, pos);
+            atten = Mathf.Clamp01(1f - dist / 75f);
+        }
+        if (atten > 0.05f && rm != null) rm.Audio.Explode(atten);
+
+        // 3. 爆風範囲（半径 6.5m）の全カートへ衝撃・スピン
+        if (rm != null)
+        {
+            foreach (var k in rm.Karts)
+            {
+                if (k == null || !k.gameObject.activeSelf) continue;
+                float d = Vector3.Distance(k.transform.position, pos);
+                if (d < 6.5f)
+                {
+                    if (!k.IsRemote && !k.Shielded)
+                    {
+                        k.Spin();
+                    }
+                    // 衝撃ノックバック（爆心地から外側へ押し出す）
+                    Vector3 toKart = k.transform.position - pos;
+                    toKart.y = 0;
+                    if (toKart.sqrMagnitude > 0.01f)
+                    {
+                        float pushStrength = Mathf.Lerp(1.2f, 0.2f, d / 6.5f);
+                        k.transform.position += toKart.normalized * pushStrength;
+                    }
+                }
+            }
+
+            // 4. 付近のバナナを破壊
+            rm.MissileHitsBanana(pos);
+
+            // 5. 連鎖爆発（近くの他のボムを即誘爆）
+            rm.TriggerBombChain(this, pos, 6.5f);
+
+            // 6. オンライン同期
+            if (rm.Online && Owner != null && !Owner.IsRemote)
+            {
+                rm.Net.SendBombExplode(NetId);
+            }
+
+            rm.RemoveBomb(this);
+        }
+
+        Destroy(gameObject);
+    }
+}
+

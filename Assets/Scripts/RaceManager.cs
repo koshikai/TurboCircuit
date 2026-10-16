@@ -83,7 +83,9 @@ public partial class RaceManager : MonoBehaviour
     readonly List<ItemBox> boxes = new List<ItemBox>();
     readonly List<Banana> bananas = new List<Banana>();
     readonly List<Missile> missiles = new List<Missile>();
+    readonly List<Bomb> bombs = new List<Bomb>();
     public List<Banana> Bananas => bananas;
+    public List<Bomb> Bombs => bombs;
     public bool IsItemBoxActive(int spotIndex) => spotIndex >= 0 && spotIndex < boxes.Count && boxes[spotIndex] != null && boxes[spotIndex].Active;
     Font font;
     Font fontMain, fontNum, fontMono, fontSys;
@@ -222,12 +224,13 @@ public partial class RaceManager : MonoBehaviour
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
     int nextBananaId;
+    int nextBombId;
     GUIStyle sButton, sField, sNum, sMono, sSys;
     readonly List<(int id, NetKartState s)> sendBuf = new List<(int, NetKartState)>();
     Texture2D minimap;
     Texture2D vignetteTex;
     Texture2D speedLineTex;
-    Texture2D iconTurbo, iconBanana, iconMissile, iconShield;
+    Texture2D iconTurbo, iconBanana, iconMissile, iconShield, iconBomb;
     Texture2D titleLogoTex;
     Texture2D[] trackBadgeTex = new Texture2D[8];
     Texture2D cardPanelTex;
@@ -535,6 +538,8 @@ public partial class RaceManager : MonoBehaviour
         Net.OnBanana = (id, owner, pos) => { if (owner >= 0 && owner < Karts.Count) SpawnBananaInternal(id, pos, Karts[owner]); };
         Net.OnBananaGone = RemoveBananaById;
         Net.OnMissile = (owner, target) => { if (owner >= 0 && owner < Karts.Count) SpawnMissileInternal(Karts[owner], (target >= 0 && target < Karts.Count) ? Karts[target] : null); };
+        Net.OnBomb = (id, owner, pos, vel) => { if (owner >= 0 && owner < Karts.Count) SpawnBombInternal(id, pos, vel, Karts[owner]); };
+        Net.OnBombExplode = ExplodeBombById;
         // 動作確認用：-nethost / -netjoin <ip> で起動直後に直接接続する
         if (args.Contains("-netmenu")) netMenu = true;
         if (args.Contains("-nethost")) Net.HostDirect();
@@ -1068,6 +1073,15 @@ public partial class RaceManager : MonoBehaviour
             }
     }
 
+    void ExplodeBombById(int id)
+    {
+        for (int i = bombs.Count - 1; i >= 0; i--)
+            if (bombs[i] != null && bombs[i].NetId == id)
+            {
+                bombs[i].Explode();
+            }
+    }
+
     public void LoadCourse(int index)
     {
         SelectedCourse = Mathf.Clamp(index, 0, Track.Courses.Length - 1);
@@ -1077,6 +1091,8 @@ public partial class RaceManager : MonoBehaviour
         bananas.Clear();
         foreach (var m in missiles) if (m) Destroy(m.gameObject);
         missiles.Clear();
+        foreach (var b in bombs) if (b) Destroy(b.gameObject);
+        bombs.Clear();
 
         Audio.SetCourseMusic(SelectedCourse);
         track.BuildPath(SelectedCourse);
@@ -1166,6 +1182,8 @@ public partial class RaceManager : MonoBehaviour
         bananas.Clear();
         foreach (var m in missiles) if (m) Destroy(m.gameObject);
         missiles.Clear();
+        foreach (var b in bombs) if (b) Destroy(b.gameObject);
+        bombs.Clear();
 
         for (int i = 0; i < Karts.Count; i++)
         {
@@ -2134,13 +2152,15 @@ public partial class RaceManager : MonoBehaviour
     {
         int activeCount = Karts.Count(x => x.gameObject.activeSelf);
         float p = activeCount > 1 ? Mathf.Clamp01((k.Place - 1) / (float)(activeCount - 1)) : 0f;
-        float wBanana = Mathf.Lerp(0.55f, 0.05f, p);
-        float wTurbo = Mathf.Lerp(0.25f, 0.4f, p);
-        float wMissile = Mathf.Lerp(0.2f, 0.35f, p);
-        float wShield = Mathf.Lerp(0.0f, 0.2f, p);
-        float r = Random.value * (wBanana + wTurbo + wMissile + wShield);
+        float wBanana = Mathf.Lerp(0.50f, 0.05f, p);
+        float wTurbo = Mathf.Lerp(0.25f, 0.32f, p);
+        float wBomb = Mathf.Lerp(0.08f, 0.25f, p);
+        float wMissile = Mathf.Lerp(0.17f, 0.23f, p);
+        float wShield = Mathf.Lerp(0.00f, 0.15f, p);
+        float r = Random.value * (wBanana + wTurbo + wBomb + wMissile + wShield);
         if ((r -= wBanana) < 0) return ItemType.Banana;
         if ((r -= wTurbo) < 0) return ItemType.Turbo;
+        if ((r -= wBomb) < 0) return ItemType.Bomb;
         if ((r -= wMissile) < 0) return ItemType.Missile;
         return ItemType.Shield;
     }
@@ -2176,6 +2196,37 @@ public partial class RaceManager : MonoBehaviour
     }
 
     public void RemoveMissile(Missile m) => missiles.Remove(m);
+
+    public void SpawnBomb(Vector3 pos, Vector3 vel, Kart owner)
+    {
+        int ownerId = Karts.IndexOf(owner);
+        int id = ownerId * 100000 + (nextBombId++ % 100000);
+        SpawnBombInternal(id, pos, vel, owner);
+        if (Online && !owner.IsRemote) Net.SendBomb(id, ownerId, pos, vel);
+    }
+
+    void SpawnBombInternal(int id, Vector3 pos, Vector3 vel, Kart owner)
+    {
+        var b = new GameObject("Bomb").AddComponent<Bomb>();
+        b.Init(this, track, owner, pos, vel, kartPaintMaterial);
+        b.NetId = id;
+        bombs.Add(b);
+    }
+
+    public void RemoveBomb(Bomb b) => bombs.Remove(b);
+
+    public void TriggerBombChain(Bomb source, Vector3 pos, float radius)
+    {
+        for (int i = bombs.Count - 1; i >= 0; i--)
+        {
+            var b = bombs[i];
+            if (b == null || b == source) continue;
+            if (Vector3.Distance(b.transform.position, pos) < radius)
+            {
+                b.Explode();
+            }
+        }
+    }
 
     public bool MissileHitsBanana(Vector3 pos)
     {

@@ -37,7 +37,9 @@ public class NetSession : MonoBehaviour
         BananaGone = 6,     // 消滅 -> 全員中継
         MissileSpawn = 7,   // 発射 -> 全員中継
         Welcome = 8,        // ホスト -> 新規クライアント: [割り当てスロット, コース番号]
-        LobbySync = 9       // ホスト -> 全員: 参加プレイヤー一覧 [count, {slot, kartChar}...]
+        LobbySync = 9,      // ホスト -> 全員: 参加プレイヤー一覧 [count, {slot, kartChar}...]
+        BombSpawn = 10,     // 投擲 -> 全員中継
+        BombExplode = 11    // 爆発 -> 全員中継
     }
 
     public const ushort DefaultPort = 7777;
@@ -58,10 +60,11 @@ public class NetSession : MonoBehaviour
     public Action<NetworkConnection> OnClientConnected, OnClientDisconnected;
     public Action<int, int> OnWelcome; // (assignedSlot, course)
     public Action<List<(int slot, int kartChar, string name)>> OnLobbySync;
-    public Action<int> OnCourse, OnStart, OnBananaGone;
+    public Action<int> OnCourse, OnStart, OnBananaGone, OnBombExplode;
     public Action<int, NetKartState> OnState;
     public Action<int, int, Vector3> OnBanana;
     public Action<int, int> OnMissile;
+    public Action<int, int, Vector3, Vector3> OnBomb;
 
     NetworkDriver driver;
     NetworkConnection clientConn;
@@ -330,8 +333,9 @@ public class NetSession : MonoBehaviour
         {
             case Msg.Hello: case Msg.LobbySync: case Msg.Course: case Msg.Start: case Msg.State: need = 1; break;
             case Msg.Welcome: case Msg.MissileSpawn: need = 2; break;
-            case Msg.BananaGone: need = 4; break;
+            case Msg.BananaGone: case Msg.BombExplode: need = 4; break;
             case Msg.BananaSpawn: need = 17; break;
+            case Msg.BombSpawn: need = 29; break;
             default: return;
         }
         if (remain < need) return; // 壊れた/途中で切れたパケットは破棄
@@ -416,6 +420,30 @@ public class NetSession : MonoBehaviour
                         w.WriteByte((byte)mOwner);
                         w.WriteByte((byte)mTarget);
                     });
+                }
+                break;
+            case Msg.BombSpawn:
+                int bmbId = r.ReadInt(), bmbOwner = r.ReadByte();
+                var bmbPos = new Vector3(r.ReadFloat(), r.ReadFloat(), r.ReadFloat());
+                var bmbVel = new Vector3(r.ReadFloat(), r.ReadFloat(), r.ReadFloat());
+                OnBomb?.Invoke(bmbId, bmbOwner, bmbPos, bmbVel);
+                if (IsHost)
+                {
+                    BroadcastExcept(sourceConn, true, Msg.BombSpawn, (ref DataStreamWriter w) =>
+                    {
+                        w.WriteInt(bmbId);
+                        w.WriteByte((byte)bmbOwner);
+                        w.WriteFloat(bmbPos.x); w.WriteFloat(bmbPos.y); w.WriteFloat(bmbPos.z);
+                        w.WriteFloat(bmbVel.x); w.WriteFloat(bmbVel.y); w.WriteFloat(bmbVel.z);
+                    });
+                }
+                break;
+            case Msg.BombExplode:
+                int beId = r.ReadInt();
+                OnBombExplode?.Invoke(beId);
+                if (IsHost)
+                {
+                    BroadcastExcept(sourceConn, true, Msg.BombExplode, (ref DataStreamWriter w) => w.WriteInt(beId));
                 }
                 break;
         }
@@ -620,6 +648,43 @@ public class NetSession : MonoBehaviour
             w.WriteInt(id);
             w.WriteByte((byte)owner);
             w.WriteFloat(pos.x); w.WriteFloat(pos.y); w.WriteFloat(pos.z);
+            driver.EndSend(w);
+        }
+    }
+
+    public void SendBomb(int id, int owner, Vector3 pos, Vector3 vel)
+    {
+        if (IsHost)
+        {
+            Broadcast(true, Msg.BombSpawn, (ref DataStreamWriter w) =>
+            {
+                w.WriteInt(id);
+                w.WriteByte((byte)owner);
+                w.WriteFloat(pos.x); w.WriteFloat(pos.y); w.WriteFloat(pos.z);
+                w.WriteFloat(vel.x); w.WriteFloat(vel.y); w.WriteFloat(vel.z);
+            });
+        }
+        else
+        {
+            if (!Open(clientConn, true, Msg.BombSpawn, out var w)) return;
+            w.WriteInt(id);
+            w.WriteByte((byte)owner);
+            w.WriteFloat(pos.x); w.WriteFloat(pos.y); w.WriteFloat(pos.z);
+            w.WriteFloat(vel.x); w.WriteFloat(vel.y); w.WriteFloat(vel.z);
+            driver.EndSend(w);
+        }
+    }
+
+    public void SendBombExplode(int id)
+    {
+        if (IsHost)
+        {
+            Broadcast(true, Msg.BombExplode, (ref DataStreamWriter w) => w.WriteInt(id));
+        }
+        else
+        {
+            if (!Open(clientConn, true, Msg.BombExplode, out var w)) return;
+            w.WriteInt(id);
             driver.EndSend(w);
         }
     }

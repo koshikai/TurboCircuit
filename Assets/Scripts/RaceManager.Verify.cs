@@ -329,7 +329,7 @@ public partial class RaceManager
                     state = State.Racing;
                     stateTime = 5f;
                     raceTime = 14.2f;
-                    if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Missile);
+                    if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Bomb);
                     break;
                 case "hud2p":
                 case "racing2p":
@@ -619,33 +619,60 @@ public partial class RaceManager
         }
         else if (category == "item")
         {
+            bool shotAll = arg1.Equals("all", System.StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(arg1) || arg1 == "0";
+            bool shotBanana = shotAll || arg1.Equals("banana", System.StringComparison.OrdinalIgnoreCase);
+            bool shotMissile = shotAll || arg1.Equals("missile", System.StringComparison.OrdinalIgnoreCase);
+            bool shotBox = shotAll || arg1.Equals("box", System.StringComparison.OrdinalIgnoreCase);
+            bool shotBomb = shotAll || arg1.Equals("bomb", System.StringComparison.OrdinalIgnoreCase);
+
             // Banana
-            var bananaGo = new GameObject("VerifyBanana");
-            bananaGo.transform.SetParent(studio.transform, false);
-            var banana = bananaGo.AddComponent<Banana>();
-            banana.Init(center, null, bananaMaterial);
-            bananaGo.transform.rotation = Quaternion.identity;
-            RenderObjectTurnaround(bananaGo, center, "verify_model_item_banana.png", "item:banana", reportLines);
-            DestroyImmediate(bananaGo);
+            if (shotBanana)
+            {
+                var bananaGo = new GameObject("VerifyBanana");
+                bananaGo.transform.SetParent(studio.transform, false);
+                var banana = bananaGo.AddComponent<Banana>();
+                banana.Init(center, null, bananaMaterial);
+                bananaGo.transform.rotation = Quaternion.identity;
+                RenderObjectTurnaround(bananaGo, center, "verify_model_item_banana.png", "item:banana", reportLines);
+                DestroyImmediate(bananaGo);
+            }
 
             // Missile
-            var missileGo = new GameObject("VerifyMissile");
-            missileGo.transform.SetParent(studio.transform, false);
-            var missile = missileGo.AddComponent<Missile>();
-            missile.Init(this, track, Player, null, missileMaterial);
-            missileGo.transform.position = center + Vector3.up * 0.4f;
-            missileGo.transform.rotation = Quaternion.identity;
-            RenderObjectTurnaround(missileGo, center, "verify_model_item_missile.png", "item:missile", reportLines);
-            DestroyImmediate(missileGo);
+            if (shotMissile)
+            {
+                var missileGo = new GameObject("VerifyMissile");
+                missileGo.transform.SetParent(studio.transform, false);
+                var missile = missileGo.AddComponent<Missile>();
+                missile.Init(this, track, Player, null, missileMaterial);
+                missileGo.transform.position = center + Vector3.up * 0.4f;
+                missileGo.transform.rotation = Quaternion.identity;
+                RenderObjectTurnaround(missileGo, center, "verify_model_item_missile.png", "item:missile", reportLines);
+                DestroyImmediate(missileGo);
+            }
+
+            // Bomb
+            if (shotBomb)
+            {
+                var bombGo = new GameObject("VerifyBomb");
+                bombGo.transform.SetParent(studio.transform, false);
+                var bomb = bombGo.AddComponent<Bomb>();
+                bomb.Init(this, track, Player, center + Vector3.up * 0.38f, Vector3.zero, kartPaintMaterial);
+                bombGo.transform.rotation = Quaternion.identity;
+                RenderObjectTurnaround(bombGo, center, "verify_model_item_bomb.png", "item:bomb", reportLines);
+                DestroyImmediate(bombGo);
+            }
 
             // ItemBox
-            var boxGo = new GameObject("VerifyItemBox");
-            boxGo.transform.SetParent(studio.transform, false);
-            var box = boxGo.AddComponent<ItemBox>();
-            box.Init(center - Vector3.up * 0.45f, itemBoxMaterial, font);
-            boxGo.transform.rotation = Quaternion.identity;
-            RenderObjectTurnaround(boxGo, center, "verify_model_item_box.png", "item:box", reportLines);
-            DestroyImmediate(boxGo);
+            if (shotBox)
+            {
+                var boxGo = new GameObject("VerifyItemBox");
+                boxGo.transform.SetParent(studio.transform, false);
+                var box = boxGo.AddComponent<ItemBox>();
+                box.Init(center - Vector3.up * 0.45f, itemBoxMaterial, font);
+                boxGo.transform.rotation = Quaternion.identity;
+                RenderObjectTurnaround(boxGo, center, "verify_model_item_box.png", "item:box", reportLines);
+                DestroyImmediate(boxGo);
+            }
         }
 
         if (reportLines.Count > 0)
