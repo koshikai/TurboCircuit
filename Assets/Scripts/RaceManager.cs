@@ -83,6 +83,8 @@ public partial class RaceManager : MonoBehaviour
     readonly List<ItemBox> boxes = new List<ItemBox>();
     readonly List<Banana> bananas = new List<Banana>();
     readonly List<Missile> missiles = new List<Missile>();
+    public List<Banana> Bananas => bananas;
+    public bool IsItemBoxActive(int spotIndex) => spotIndex >= 0 && spotIndex < boxes.Count && boxes[spotIndex] != null && boxes[spotIndex].Active;
     Font font;
     Font fontMain, fontNum, fontMono, fontSys;
     Font fontEnMain, fontJpPop, fontJpRound;
