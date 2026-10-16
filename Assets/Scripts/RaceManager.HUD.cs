@@ -15,22 +15,31 @@ public partial class RaceManager
             DrawHud(ViewKart, w, h, false, 0);
             if (countdown) DrawCountdown(w, h);
             DrawBanner(0, w, h);
-            return;
+        }
+        else
+        {
+            float hw = w * 0.5f;
+            for (int p = 0; p < 2; p++)
+            {
+                GUI.BeginClip(new Rect(p * hw, 0, hw, h));
+                DrawVignette(HumanKart(p), hw, h);
+                DrawHud(HumanKart(p), hw, h, true, p);
+                if (countdown) DrawCountdown(hw, h);
+                DrawBanner(p, hw, h);
+                GUI.EndClip();
+            }
+            GUI.color = Color.black;
+            GUI.DrawTexture(new Rect(hw - 2f, 0, 4f, h), Texture2D.whiteTexture);
+            GUI.color = Color.white;
         }
 
-        float hw = w * 0.5f;
-        for (int p = 0; p < 2; p++)
+        if (screenFlashTimer > 0)
         {
-            GUI.BeginClip(new Rect(p * hw, 0, hw, h));
-            DrawVignette(HumanKart(p), hw, h);
-            DrawHud(HumanKart(p), hw, h, true, p);
-            if (countdown) DrawCountdown(hw, h);
-            DrawBanner(p, hw, h);
-            GUI.EndClip();
+            float alpha = Mathf.Clamp01(screenFlashTimer / 0.35f);
+            GUI.color = new Color(1f, 1f, 1f, alpha * 0.85f);
+            GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
+            GUI.color = Color.white;
         }
-        GUI.color = Color.black;
-        GUI.DrawTexture(new Rect(hw - 2f, 0, 4f, h), Texture2D.whiteTexture);
-        GUI.color = Color.white;
     }
 
     void DrawBanner(int p, float w, float h)
@@ -91,19 +100,19 @@ public partial class RaceManager
         }
 
         ItemType shown = pl.Item;
-        if (pl.RouletteTimer > 0) shown = (ItemType)(1 + (int)(Time.time * 16f) % 5);
+        if (pl.RouletteTimer > 0 && ItemDefs.Count > 0)
+        {
+            int rIdx = (int)(Time.time * 16f) % ItemDefs.Count;
+            shown = ItemDefs[rIdx].Type;
+        }
+
         if (shown != ItemType.None)
         {
-            Texture2D icon = null;
-            Color ic; string label;
-            switch (shown)
-            {
-                case ItemType.Turbo: icon = iconTurbo; ic = new Color(1f, 0.55f, 0.1f); label = Loc.T("TURBO", "ターボ"); break;
-                case ItemType.Banana: icon = iconBanana; ic = new Color(1f, 0.9f, 0.2f); label = Loc.T("BANANA", "バナナ"); break;
-                case ItemType.Missile: icon = iconMissile; ic = new Color(1f, 0.2f, 0.2f); label = Loc.T("MISSILE", "ミサイル"); break;
-                case ItemType.Bomb: icon = iconBomb; ic = new Color(1f, 0.35f, 0.15f); label = Loc.T("BOMB", "ボム"); break;
-                default: icon = iconShield; ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f); label = Loc.T("SHIELD", "シールド"); break;
-            }
+            var def = GetItemDef(shown);
+            Texture2D icon = def?.Icon;
+            Color ic = def != null ? def.AccentColor : Color.white;
+            string label = def != null ? def.LocalizedName : shown.ToString();
+            if (shown == ItemType.Shield) ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f);
 
             if (icon != null)
             {

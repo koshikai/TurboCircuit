@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum ItemType { None, Turbo, Banana, Missile, Shield, Bomb }
+public enum ItemType { None, Turbo, Banana, Missile, Shield, Bomb, Thunder }
 
 public struct KartInput
 {
@@ -49,6 +49,7 @@ public partial class Kart : MonoBehaviour
     public int DriftLevel => driftCharge >= 2.6f ? 3 : driftCharge >= 1.6f ? 2 : driftCharge >= 0.8f ? 1 : 0;
     public bool Boosting => boostTimer > 0;
     public bool Shielded => shieldTimer > 0;
+    public bool Shocked => shockTimer > 0;
     public bool Offroad { get; private set; }
     public bool IsAirborne => isAirborne;
     public Vector3 Forward => Quaternion.Euler(0, Heading, 0) * Vector3.forward;
@@ -65,7 +66,7 @@ public partial class Kart : MonoBehaviour
     bool aiTrickDecided;
     AudioSource engine3D;
 
-    float boostTimer, shieldTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
+    float boostTimer, shieldTimer, shockTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
     float driftFlarePopTimer;
     bool drifting;
     int driftDir, lastDriftLevel, boostColorLevel;
@@ -367,6 +368,7 @@ public partial class Kart : MonoBehaviour
             float max = MaxSpeed * topSpeedMul * AISpeedFactor();
             if (shieldTimer > 0) max *= 1.12f;
             if (slipstreamTimer > 0) max *= 1.18f;
+            if (shockTimer > 0) max *= 0.72f;
             Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
             if (Offroad && boostTimer <= 0 && shieldTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
@@ -623,6 +625,24 @@ public partial class Kart : MonoBehaviour
             }
         }
 
+        bool wasShocked = shockTimer > 0;
+        if (shockTimer > 0)
+        {
+            shockTimer -= dt;
+            if (Random.value < 0.35f)
+            {
+                Vector3 sparkPos = transform.position + Vector3.up * (0.35f * transform.localScale.y) + Random.insideUnitSphere * 0.45f;
+                Fx.Emit(sparkPos, Random.insideUnitSphere * 1.5f + Vector3.up * 0.5f, new Color(1.0f, 0.92f, 0.2f), 0.35f, 0.2f, 1, 0.9f);
+                Fx.Emit(sparkPos, Random.insideUnitSphere * 1.2f, new Color(0.4f, 0.85f, 1f), 0.30f, 0.15f, 1, 0.9f);
+            }
+        }
+        float targetScale = shockTimer > 0 ? 0.58f : 1.0f;
+        transform.localScale = Vector3.Lerp(transform.localScale, Vector3.one * targetScale, 10f * dt);
+        if (wasShocked && shockTimer <= 0)
+        {
+            Fx.Burst(transform.position + Vector3.up * 0.5f, new Color(1f, 0.95f, 0.4f), 14, 4f, 0.4f);
+        }
+
         UpdateVisual(dt, spinTimer > 0 ? 0 : inp.steer);
         Effects(dt);
     }
@@ -735,6 +755,38 @@ public partial class Kart : MonoBehaviour
         return true;
     }
 
+    public bool Shock(float duration = 6.5f)
+    {
+        if (IsRemote) return false;
+        if (shieldTimer > 0) return false;
+        shockTimer = duration;
+        spinTimer = 1.3f;
+        Speed *= 0.25f;
+        boostTimer = 0;
+        drifting = false;
+        // 所持アイテムを落とす
+        Item = ItemType.None;
+        RouletteTimer = 0;
+
+        // 落雷エフェクト：頭上から地面へ稲妻スパーク
+        Vector3 top = transform.position + Vector3.up * 7f;
+        for (int i = 0; i <= 6; i++)
+        {
+            Vector3 seg = Vector3.Lerp(top, transform.position, i / 6f) + Random.insideUnitSphere * 0.45f;
+            Fx.Burst(seg, new Color(1.0f, 0.95f, 0.25f), 6, 3.5f, 0.3f);
+        }
+        Fx.Burst(transform.position + Vector3.up * 0.4f, new Color(0.4f, 0.85f, 1f), 24, 7f, 0.6f);
+        Fx.Smoke(transform.position, Vector3.up * 1.5f, new Color(0.2f, 0.2f, 0.2f, 0.8f), 1.5f, 0.8f, 5);
+
+        if (IsPlayer)
+        {
+            rm.Audio.Hit();
+            rm.Shake(1.0f);
+            if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 1.0f, 0.85f, 0.65f);
+        }
+        return true;
+    }
+
     public bool GiveItem(ItemType it)
     {
         if (Item != ItemType.None || RouletteTimer > 0) return false;
@@ -787,6 +839,9 @@ public partial class Kart : MonoBehaviour
                 }
                 rm.SpawnBomb(bombPos, bombVel, this);
                 if (IsPlayer) rm.Audio.Drop();
+                break;
+            case ItemType.Thunder:
+                rm.UseThunder(this);
                 break;
         }
     }
