@@ -216,6 +216,7 @@ public partial class RaceManager
             if (string.IsNullOrEmpty(t)) continue;
 
             // 状態リセット
+            showQuitConfirm = false;
             showSettings = false;
             paused = false;
             netMenu = false;
@@ -226,6 +227,13 @@ public partial class RaceManager
 
             switch (t)
             {
+                case "quitmodal":
+                case "quit_modal":
+                case "quit":
+                    state = State.Title;
+                    showQuitConfirm = true;
+                    quitModalFocus = 1;
+                    break;
                 case "title":
                     state = State.Title;
                     ConfigureHuman(0);

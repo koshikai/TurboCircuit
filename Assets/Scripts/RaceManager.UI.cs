@@ -81,7 +81,7 @@ public partial class RaceManager
         }
 
         bool updateModalOpen = updater != null && updater.ShowModal;
-        bool overlayModalOpen = updateModalOpen || showSettings || paused;
+        bool overlayModalOpen = updateModalOpen || showSettings || paused || showQuitConfirm;
 
         // 背面レイヤー（モーダル表示中は背面ボタンがマウスクリックを奪わないよう GUI.enabled = false にする）
         switch (state)
@@ -120,7 +120,7 @@ public partial class RaceManager
 
         if (paused && !showSettings)
         {
-            GUI.enabled = !updateModalOpen;
+            GUI.enabled = !updateModalOpen && !showQuitConfirm;
             GUI.color = new Color(0f, 0f, 0f, 0.65f);
             GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -174,14 +174,20 @@ public partial class RaceManager
 
         if (showSettings)
         {
-            GUI.enabled = !updateModalOpen;
+            GUI.enabled = !updateModalOpen && !showQuitConfirm;
             DrawSettings(w, h);
         }
 
         if (updateModalOpen)
         {
-            GUI.enabled = true;
+            GUI.enabled = !showQuitConfirm;
             DrawUpdateModal(w, h);
+        }
+
+        if (showQuitConfirm)
+        {
+            GUI.enabled = true;
+            DrawQuitModal(w, h);
         }
 
         GUI.enabled = true;
@@ -605,10 +611,15 @@ public partial class RaceManager
                 ToggleLanguage();
             }
 
-            if (DrawModernButton(new Rect(w - 180, 16, 155, 36), Loc.T("★ OPTIONS", "★ 設定"), "[P]", new Color(0.18f, 0.55f, 0.92f), false, titleFocus == 9))
+            if (DrawModernButton(new Rect(w - 296, 16, 138, 36), Loc.T("★ OPTIONS", "★ 設定"), "[P]", new Color(0.18f, 0.55f, 0.92f), false, titleFocus == 9))
             {
                 showSettings = true;
                 settingsFocus = 0;
+            }
+
+            if (DrawModernButton(new Rect(w - 146, 16, 122, 36), Loc.T("✖ QUIT", "✖ 終了"), "[ESC]", new Color(0.92f, 0.32f, 0.32f), false, titleFocus == 12))
+            {
+                ShowQuitModal();
             }
         }
 
@@ -622,7 +633,7 @@ public partial class RaceManager
                 string btnTxt = updater.State == AppUpdater.UpdateState.Downloaded
                     ? Loc.T("★ INSTALL NOW", "★ 今すぐ更新")
                     : Loc.T($"★ UPDATE {verStr}", $"★ 更新 {verStr}");
-                if (DrawModernButton(new Rect(w - 390, 16, 200, 36), btnTxt, "[U]", updBtnCol, true, titleFocus == 10))
+                if (DrawModernButton(new Rect(w - 506, 16, 198, 36), btnTxt, "[U]", updBtnCol, true, titleFocus == 10))
                 {
                     updater.ShowModal = true;
                     updateModalFocus = 0;
@@ -630,7 +641,7 @@ public partial class RaceManager
             }
             else
             {
-                if (DrawModernButton(new Rect(w - 355, 16, 165, 36), Loc.T("▲ UPDATES", "▲ 更新確認"), "[U]", new Color(0.28f, 0.4f, 0.6f), false, titleFocus == 10))
+                if (DrawModernButton(new Rect(w - 468, 16, 160, 36), Loc.T("▲ UPDATES", "▲ 更新確認"), "[U]", new Color(0.28f, 0.4f, 0.6f), false, titleFocus == 10))
                 {
                     updater.ShowModal = true;
                     updateModalFocus = 0;
@@ -640,8 +651,8 @@ public partial class RaceManager
 
         if (titleLogoTex != null)
         {
-            float maxLogoW = Mathf.Min(380f, w - 420f);
-            float logoW = Mathf.Max(260f, maxLogoW);
+            float maxLogoW = Mathf.Min(380f, w - 530f);
+            float logoW = Mathf.Max(240f, maxLogoW);
             float logoH = logoW * (titleLogoTex.height / (float)titleLogoTex.width);
             float logoY = 8f + Mathf.Sin(t * 2.2f) * 2f;
             GUI.DrawTexture(new Rect((w - logoW) * 0.5f, logoY, logoW, logoH), titleLogoTex, ScaleMode.ScaleToFit);
@@ -887,10 +898,10 @@ public partial class RaceManager
 
         var barStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal);
         string guideText = TwoPlayer
-            ? Loc.T("P1: [W/S] Drv [Q/E] Kart  •  P2: [↑/↓] Drv [←/→] Kart  •  [A/D / LB/RB] Track  •  [TAB/Y] 1P/2P  •  [L] Lang",
-                    "1P: [W/S] キャラ [Q/E] マシン  •  2P: [↑/↓] キャラ [←/→] マシン  •  [A/D / LB/RB] コース  •  [TAB/Y] 1P/2P  •  [L] 言語")
-            : Loc.T("[D-Pad/Stick] Select  •  [A/Enter] OK  •  [LB/RB] Track  •  [TAB/Y] 2P  •  [O/X] Online  •  [L] 日本語/EN  •  [P] Options",
-                    "[十字キー/スティック] 選択  •  [A/Enter] 決定  •  [LB/RB] コース  •  [TAB/Y] 2P対戦  •  [O/X] オンライン  •  [L] 言語  •  [P] 設定");
+            ? Loc.T("P1: [W/S] Drv [Q/E] Kart  •  P2: [↑/↓] Drv [←/→] Kart  •  [A/D / LB/RB] Track  •  [TAB/Y] 1P/2P  •  [L] Lang  •  [ESC] Quit",
+                    "1P: [W/S] キャラ [Q/E] マシン  •  2P: [↑/↓] キャラ [←/→] マシン  •  [A/D / LB/RB] コース  •  [TAB/Y] 1P/2P  •  [L] 言語  •  [ESC] 終了")
+            : Loc.T("[D-Pad/Stick] Select  •  [A/Enter] OK  •  [LB/RB] Track  •  [TAB/Y] 2P  •  [O/X] Online  •  [L] 日本語/EN  •  [P] Options  •  [ESC] Quit",
+                    "[十字キー/スティック] 選択  •  [A/Enter] 決定  •  [LB/RB] コース  •  [TAB/Y] 2P対戦  •  [O/X] オンライン  •  [L] 言語  •  [P] 設定  •  [ESC] 終了");
         Outlined(new Rect(0, h - 32, w, 28), guideText, barStyle, new Color(0.9f, 0.95f, 1f), 1);
     }
 
@@ -1444,6 +1455,45 @@ public partial class RaceManager
         PlayerPrefs.SetInt("tc_res_h", next.h);
         PlayerPrefs.Save();
         if (Audio != null) Audio.Select();
+    }
+
+    void DrawQuitModal(float w, float h)
+    {
+        // 1. 暗転オーバーレイ
+        GUI.color = new Color(0f, 0f, 0f, 0.70f);
+        GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        // 2. モーダルポップカード
+        float mw = 480f, mh = 220f;
+        var r = new Rect((w - mw) * 0.5f, (h - mh) * 0.5f, mw, mh);
+        DrawPopCard(r);
+
+        // 3. ヘッダーリボン
+        DrawPopRibbon(new Rect(r.x + 20, r.y + 12, r.width - 40, 34), ribbonDriverTex, Loc.T("★ QUIT TURBO CIRCUIT? ★", "★ ゲームの終了 ★"));
+
+        // 4. メッセージテキスト
+        var msgStyle = St(sSmall, 18, TextAnchor.MiddleCenter, FontStyle.Bold, false, new Color(0.14f, 0.20f, 0.35f));
+        GUI.Label(new Rect(r.x + 20, r.y + 58, r.width - 40, 26), Loc.T("Exit to desktop?", "デスクトップに戻りますか？"), msgStyle);
+
+        var subStyle = St(sSmall, 13, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.42f, 0.48f, 0.62f));
+        GUI.Label(new Rect(r.x + 20, r.y + 86, r.width - 40, 22), Loc.T("Are you sure you want to quit the game?", "ゲームを終了してもよろしいですか？"), subStyle);
+
+        // 5. ボタン群 (QUIT と CANCEL)
+        float bw = 185f, bh = 42f, gap = 20f;
+        float bx1 = r.x + (r.width - (bw * 2 + gap)) * 0.5f;
+        float bx2 = bx1 + bw + gap;
+        float by = r.y + 130f;
+
+        if (DrawModernButton(new Rect(bx1, by, bw, bh), Loc.T("✖  QUIT", "✖  終了"), "[ENTER / A]", new Color(0.92f, 0.32f, 0.32f), false, quitModalFocus == 0))
+        {
+            Application.Quit();
+        }
+
+        if (DrawModernButton(new Rect(bx2, by, bw, bh), Loc.T("◄  CANCEL", "◄  戻る"), "[ESC / B]", new Color(0.18f, 0.62f, 0.95f), false, quitModalFocus == 1))
+        {
+            CloseQuitModal();
+        }
     }
 
 }
