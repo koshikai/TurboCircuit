@@ -45,8 +45,8 @@ public partial class Kart
             }
 
             // 最大許容横加速度 a_lat = v^2 * kappa <= a_max
-            // 通常時: 16.5m/s^2, ドリフト時: 22.0m/s^2
-            float aLatMax = drifting ? 22f : 16.5f;
+            // ドリフト中のオーバースピードによる膨らみ・イン巻きを防ぐため安全マージンを確保
+            float aLatMax = drifting ? 18.0f : 16.5f;
             float cornerSpeedLimit = Mathf.Sqrt(aLatMax / Mathf.Max(curvature, 0.004f));
 
             // 制動安全速度: v_safe = sqrt(v_limit^2 + 2 * a_brake * dist)
@@ -64,15 +64,15 @@ public partial class Kart
         if (apexCurvature > 0.015f && Mathf.Abs(apexBend) > 12f)
         {
             float cornerDir = Mathf.Sign(apexBend); // 1 = 右カーブ, -1 = 左カーブ
-            if (apexOffset > 10)
+            if (apexOffset > 12)
             {
                 // コーナー手前（アプローチ）：わずかにアウト側に振る
                 targetLane = -cornerDir * 1.5f;
             }
             else
             {
-                // エペックス付近〜通過：適度にイン側へ寄せる（極端なインベタを避ける）
-                targetLane = cornerDir * 2.2f;
+                // エペックス付近〜通過：ドリフト中は中央寄り(0.8m)、通常旋回時は適度にイン(1.8m)
+                targetLane = cornerDir * (drifting ? 0.8f : 1.8f);
             }
         }
         else
@@ -84,15 +84,25 @@ public partial class Kart
         // 2b. アイテムボックス・ダッシュボード取得と、スリップストリーム／追い抜き・バナナ回避
         targetLane = ApplyTacticalLineAdjustments(curPos, currentLateral, targetLane, apexCurvature, apexBend);
 
-        // 3. 非線形 Stanley 操舵制御 (Smooth Path Tracking Control)
-        // 先読み距離を長めに取り、遠くを見て滑らかな円弧を描いて曲がる
-        int look = Mathf.Clamp(7 + Mathf.RoundToInt(v * 0.55f), 9, 22);
+        // 3. 曲率適応型ルックアヘッド & 非線形 Stanley 操舵制御
+        // 直近(12m先)と中距離(24m先)のコース旋回角を取得
+        float nearAngle = Vector3.SignedAngle(track.Dirs[Index], track.Dirs[track.Wrap(Index + 6)], Vector3.up);
+        float futureAngle = Vector3.SignedAngle(track.Dirs[Index], track.Dirs[track.Wrap(Index + 12)], Vector3.up);
+        float localCurv = Mathf.Abs(nearAngle) * Mathf.Deg2Rad / 12f;
+
+        // カーブ中やドリフト中に先読み(look)が遠すぎると、視線(弦)がコーナー内側のダートや内壁をショートカットして貫通してしまう。
+        // 直線では遠く(12〜16ステップ=24〜32m)を見て滑らかに、カーブやドリフト中は近く(5〜8ステップ=10〜16m)を見て路面中央に沿って旋回する。
+        int baseLook = Mathf.Clamp(6 + Mathf.RoundToInt(v * 0.35f), 7, 16);
+        int look = drifting
+            ? Mathf.Clamp(Mathf.RoundToInt(8f - localCurv * 55f), 5, 8)
+            : Mathf.Clamp(Mathf.RoundToInt(baseLook - localCurv * 140f), 6, 16);
         int targetIdx = track.Wrap(Index + look);
         Vector3 targetPos = track.PointAt(targetIdx, targetLane);
 
-        // 方位角誤差 theta_e
+        // 車体鼻先(fwd)の方位角誤差と、実際の進行方向ベクトル(VelDir)の方位角誤差
         Vector3 toTarget = (targetPos - curPos).normalized;
         float headingError = Vector3.SignedAngle(fwd, toTarget, Vector3.up);
+        float velHeadingError = Vector3.SignedAngle(VelDir, toTarget, Vector3.up);
 
         // 横偏差 e_lateral (目標レーシングラインからのズレ)
         float lateralError = currentLateral - targetLane;
@@ -101,11 +111,10 @@ public partial class Kart
         float crossSteer = -Mathf.Atan2(kCross * lateralError, Mathf.Max(v, 4.0f)) * Mathf.Rad2Deg;
 
         // 先読み曲率フィードフォワード（旋回遅れを緩やかに先回り補正）
-        float futureAngle = Vector3.SignedAngle(track.Dirs[Index], track.Dirs[track.Wrap(Index + 12)], Vector3.up);
-        float ffSteer = Mathf.Clamp(futureAngle * 0.02f, -0.30f, 0.30f);
+        float ffSteer = Mathf.Clamp(futureAngle * 0.022f, -0.32f, 0.32f);
 
         // 操舵入力の合算（ゲインを落ち着かせ、過敏な急ハンドルを防止）
-        float steerCmd = (headingError * 0.028f) + (crossSteer * 0.015f) + ffSteer;
+        float steerCmd = (headingError * 0.030f) + (crossSteer * 0.016f) + ffSteer;
         inp.steer = Mathf.Clamp(steerCmd, -1f, 1f);
 
         // 4. 速度・制動制御 (Speed Profiling & Longitudinal Control)
@@ -141,36 +150,74 @@ public partial class Kart
         }
         else
         {
-            // 5. 自己駆動ドリフト制御 (Self-Triggered Smooth Drift)
+            // 5. 自己駆動ドリフト制御 (Velocity-Vector Slip-Angle Drift Control)
             // ドリフト発動トリガー：
-            // 中速カーブは通常ステアで曲がり、ヘアピン等の急カーブ（曲率 > 0.026 または旋回角 > 34度）でのみ発動
+            // 中速〜急コーナー（24m先の旋回角 > 23度 または コーナー進入域で曲率 > 0.022）で積極的にホップ＆ドリフトを開始！
+            float turnDir = Mathf.Sign(Mathf.Abs(futureAngle) > 8f ? futureAngle : nearAngle);
+            float entryInwardLat = currentLateral * turnDir;
+            bool cornerApproaching = (Mathf.Abs(futureAngle) > 23f || (apexCurvature > 0.022f && apexOffset <= 14))
+                                  && Mathf.Abs(nearAngle) > 9f
+                                  && Mathf.Sign(nearAngle) == turnDir;
             bool canStartDrift = !drifting
-                && (apexCurvature > 0.026f || Mathf.Abs(futureAngle) > 34f)
-                && v > 15f
-                && Mathf.Sign(futureAngle) == Mathf.Sign(inp.steer)
-                && Mathf.Abs(headingError) > 8f;
+                && cornerApproaching
+                && entryInwardLat < 4.2f
+                && v > 14.0f
+                && (headingError * turnDir) > 4f;
 
             if (canStartDrift)
             {
                 inp.drift = true;
+                // Kart.cs のドリフト開始条件 (|steer| > 0.3f) を確実に満たすよう、踏み切り時にしっかりインへステアを入れる
+                if (inp.steer * turnDir < 0.48f) inp.steer = turnDir * 0.48f;
+                if (aiSteer * turnDir < 0.42f) aiSteer = turnDir * 0.42f;
             }
             else if (drifting)
             {
-                // ドリフト継続トリガー：カーブが続いており、かつ外壁に突っ込まない安全領域
-                bool curveRemains = Mathf.Abs(futureAngle) > 14f && Mathf.Sign(futureAngle) == driftDir;
-                bool wallSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 0.5f;
+                // ドリフト中は車体鼻先(fwd)が内側に傾く(スリップ角15〜25度)のが物理的に正常な状態（VelDir = Slerp(VelDir, fwd, 2.6*dt)）。
+                // そのため鼻先(headingError)ではなく「実際の進行方向ベクトル(VelDir)」が目標ライン(toTarget)に沿っているかで制御する。
+                float inwardLat = currentLateral * driftDir;
+                float inwardVel = Vector3.Dot(VelDir, track.Rights[Index] * driftDir);
+                float velInwardErr = velHeadingError * driftDir;
 
-                // 長いヘアピン・深いカーブ（先読み角 > 26度）がまだ続く間は Level 3（紫火花：ウルトラミニターボ）まで溜める
-                int targetDriftLv = (Mathf.Abs(futureAngle) > 26f && apexCurvature > 0.024f) ? 3 : 2;
+                // ドリフト継続条件：
+                // 1) カーブがまだ続いている（または青火花 Level 1 直前でまだ緩やかなカーブが残っている）
+                bool curveRemains = (Mathf.Abs(nearAngle) > 9f && Mathf.Sign(nearAngle) == driftDir)
+                                 || (Mathf.Abs(futureAngle) > 13f && Mathf.Sign(futureAngle) == driftDir)
+                                 || (DriftLevel < 1 && driftCharge > 0.25f && Mathf.Abs(futureAngle) > 7f && Mathf.Sign(futureAngle) == driftDir);
 
-                // ミニターボがチャージされ、コーナーの出口が見えたら即座に解除してロケットダッシュ！
-                if (curveRemains && wallSafe && DriftLevel < targetDriftLv)
+                // 2) 進行方向ベクトル(VelDir)ベースのイン巻き防止ガード：
+                // イン側5.2m以内、かつイン側深くでさらに内側へ突っ込んでいないこと
+                bool inwardSafe = inwardLat < 5.2f
+                               && !(inwardLat > 3.6f && inwardVel > 0.20f)
+                               && !(inwardLat > 2.2f && velInwardErr < -12f);
+
+                // 3) アウト側ガード：コース外縁から1.4m以上内側
+                bool outwardSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 1.4f;
+
+                // 長いカーブ・ヘアピンでは Level 3（紫火花）、中程度のコーナーでは Level 2（オレンジ火花）まで溜める
+                int targetDriftLv = (Mathf.Abs(nearAngle) > 18f && Mathf.Abs(futureAngle) > 30f && inwardLat < 3.0f) ? 3 : 2;
+
+                if (curveRemains && inwardSafe && outwardSafe && DriftLevel < targetDriftLv)
                 {
                     inp.drift = true;
-                    // ドリフト中はイン固定ではなく、目標方位に合わせて微調整（カウンターステア／微インステア）
-                    // これによりイン側への極端な巻き込み内壁激突を完全に防止！
-                    float driftSteer = headingError * 0.022f;
-                    inp.steer = Mathf.Clamp(driftSteer, -0.45f, 0.45f);
+
+                    // カスケード制御：
+                    // ① 進行方向(VelDir)を目標ラインに沿わせるために必要な旋回角速度 desiredVelTurnRate (deg/s)
+                    float roadTurnRate = (Mathf.Max(0f, nearAngle * driftDir) / 12f) * v;
+                    float laneInwardOffset = Mathf.Max(0f, (currentLateral - targetLane) * driftDir);
+                    float desiredVelTurnRate = roadTurnRate + (velInwardErr * 2.2f) - (laneInwardOffset * 6.5f);
+
+                    // ② VelDir = Slerp(VelDir, fwd, 2.6 * dt) より、desiredVelTurnRate を生むための目標スリップ角 desiredSlip
+                    float desiredSlip = Mathf.Clamp(desiredVelTurnRate / 2.6f, 3f, 30f);
+                    float currentSlip = Vector3.SignedAngle(VelDir, fwd, Vector3.up) * driftDir;
+
+                    // ③ 現在のスリップ角を目標スリップ角へ追従させるための車体鼻先旋回角速度 desiredNoseTurnRate
+                    float desiredNoseTurnRate = desiredVelTurnRate + (desiredSlip - currentSlip) * 4.5f;
+
+                    // ④ Kart.cs のドリフト旋回式 [36, 112] deg/s にマッピングして [-1.0, +1.0] のステア入力を決定
+                    float t01 = Mathf.Clamp01(((desiredNoseTurnRate / Mathf.Max(turnMul, 0.8f)) - 36f) / (112f - 36f));
+                    float u = Mathf.Lerp(-1.0f, 1.0f, t01);
+                    inp.steer = driftDir * u;
                 }
                 else
                 {
@@ -180,25 +227,28 @@ public partial class Kart
             }
 
             // 6. コントロール・バリア・ファンクション (CBF / 滑らかな境界反発)
-            float safeBoundary = Track.HalfWidth - 0.8f; // 8.2m
+            float safeBoundary = Track.HalfWidth - 1.3f; // 7.7m（ダート手前1.3mで反発）
             float distToEdge = safeBoundary - Mathf.Abs(currentLateral);
             float outwardVelocity = Vector3.Dot(VelDir, track.Rights[Index] * Mathf.Sign(currentLateral));
+            bool boundaryRepelling = false;
 
-            if (distToEdge < 2.0f && outwardVelocity > 0.05f)
+            if (distToEdge < 2.2f && outwardVelocity > 0.04f)
             {
-                // 距離に応じた滑らかな比例反発（急激なフルステア反発で蛇行するのを防ぐ）
-                float repelIntensity = Mathf.Clamp01((2.0f - distToEdge) / 1.5f);
-                float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.55f;
+                boundaryRepelling = true;
+                // 距離に応じた滑らかな比例反発
+                float repelIntensity = Mathf.Clamp01((2.2f - distToEdge) / 1.7f);
+                float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.80f;
                 inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
-                inp.drift = false; // コース端での横滑りを即座に収束
+                if (distToEdge < 1.0f) inp.drift = false; // ダート直前まで迫った場合はドリフトを即解除
                 if (distToEdge < 0.6f && outwardVelocity > 0.15f && Speed > 7.0f)
                 {
                     inp.throttle = -1f; // 十分な前進速度がある場合のみ減速ブレーキ
                 }
             }
 
-            // ステアリングの滑らかな補間（カクカクした急ハンドルを根絶）
-            aiSteer = Mathf.MoveTowards(aiSteer, inp.steer, dt * 4.5f);
+            // ステアリングの滑らかな補間（ドリフト中・境界反発中はカウンターステアが遅れないよう高速追従）
+            float steerRate = (drifting || boundaryRepelling) ? 10.0f : 5.0f;
+            aiSteer = Mathf.MoveTowards(aiSteer, inp.steer, dt * steerRate);
             inp.steer = aiSteer;
 
             // 最終的なステア量がドリフト開始閾値を満たし、かつ境界反発等で解除されていない場合のみドリフトジャンプ開始
@@ -426,6 +476,13 @@ public partial class Kart
 
                 lane = threatBananaLat + avoidDir * 2.9f;
             }
+        }
+
+        if (drifting)
+        {
+            // ドリフト中はイン側へ1.2m以上深いラインを目標にしない（イン巻きダート突入の防止）
+            if (driftDir > 0) lane = Mathf.Min(lane, 1.2f);
+            else lane = Mathf.Max(lane, -1.2f);
         }
 
         return Mathf.Clamp(lane, -maxSafeLane, maxSafeLane);
