@@ -207,16 +207,16 @@ public partial class Kart
             skidTrails[i] = tr;
         }
 
-        // シールド時のバリア
+        // スター時のレインボーバリア
         var bubble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         Destroy(bubble.GetComponent<Collider>());
         bubble.transform.SetParent(transform, false);
         bubble.transform.localPosition = new Vector3(0, 0.8f, 0);
         bubble.transform.localScale = new Vector3(3.2f, 2.6f, 3.8f);
-        shieldRenderer = bubble.GetComponent<Renderer>();
-        shieldRenderer.sharedMaterial = rm.glowMaterial;
-        shieldRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        shieldMpb = new MaterialPropertyBlock();
+        starRenderer = bubble.GetComponent<Renderer>();
+        starRenderer.sharedMaterial = rm.glowMaterial;
+        starRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        starMpb = new MaterialPropertyBlock();
         bubble.SetActive(false);
     }
 
@@ -694,16 +694,16 @@ public partial class Kart
             }
         }
 
-        bool sh = shieldTimer > 0;
-        if (shieldRenderer.gameObject.activeSelf != sh) shieldRenderer.gameObject.SetActive(sh);
-        if (sh)
+        bool st = starTimer > 0;
+        if (starRenderer.gameObject.activeSelf != st) starRenderer.gameObject.SetActive(st);
+        if (st)
         {
-            var c = Color.HSVToRGB(Mathf.Repeat(Time.time * 1.5f, 1f), 0.7f, 1f) * 0.35f;
-            if (shieldTimer < 1.5f && Mathf.Repeat(Time.time, 0.2f) < 0.1f) c *= 0.2f;
-            shieldMpb.SetColor("_TintColor", c);
-            shieldMpb.SetColor("_Color", c);
-            shieldMpb.SetColor("_BaseColor", c);
-            shieldRenderer.SetPropertyBlock(shieldMpb);
+            var c = Color.HSVToRGB(Mathf.Repeat(Time.time * 2.5f, 1f), 0.75f, 1f) * 0.45f;
+            if (starTimer < 1.8f && Mathf.Repeat(Time.time, 0.16f) < 0.08f) c *= 0.15f;
+            starMpb.SetColor("_TintColor", c);
+            starMpb.SetColor("_Color", c);
+            starMpb.SetColor("_BaseColor", c);
+            starRenderer.SetPropertyBlock(starMpb);
         }
     }
 
@@ -933,8 +933,19 @@ public partial class Kart
             }
         }
 
-        if (shieldTimer > 0 && Random.value < 0.5f)
-            Fx.Emit(transform.position + Vector3.up * 0.8f + Random.onUnitSphere * 1.5f, carry + Vector3.up, Color.HSVToRGB(Random.value, 0.6f, 1f), 0.3f, 0.4f);
+        if (starTimer > 0)
+        {
+            // キラキラ星屑スパークとレインボートレイル
+            Vector3 sparkPos = transform.position + Vector3.up * 0.7f + Random.insideUnitSphere * 1.4f;
+            Color sparkCol = Random.value < 0.45f
+                ? new Color(1f, 0.9f, 0.2f, 0.95f) // ゴールドスター
+                : Color.HSVToRGB(Random.value, 0.8f, 1f); // レインボー
+            Fx.Spark(sparkPos, -Forward * 3f + Random.insideUnitSphere * 1.8f, sparkCol, 0.16f, 0.22f, 2, 0.25f);
+            if (Random.value < 0.65f)
+            {
+                Fx.Emit(transform.position + Vector3.up * 0.6f + Random.onUnitSphere * 1.2f, carry * 0.5f + Vector3.up * 1.2f, sparkCol, 0.25f, 0.35f);
+            }
+        }
     }
 
     public void SetPreviewSpeedAndBoost(float previewSpeed, float boostDur = 0f, ItemType previewItem = ItemType.None)

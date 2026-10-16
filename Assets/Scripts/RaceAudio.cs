@@ -10,7 +10,7 @@ public class RaceAudio : MonoBehaviour
     AudioSource[] pool;
     int next;
     AudioSource engine, driftLoop, music;
-    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, shield, select, explosion;
+    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, star, shield, select, explosion;
     AudioClip[] bumps;
     readonly AudioClip[] bgm = new AudioClip[6];
 
@@ -73,7 +73,8 @@ public class RaceAudio : MonoBehaviour
         finalLap = Load("sfx_finallap", () => Make(1.0f, (t, d) => WarmTone(Arp(t, 0.14f, 523, 659, 784, 988, 1047, 1319), t) * 0.28f * Env(t, d)));
         finish = Load("sfx_finish", () => Make(1.8f, (t, d) => WarmTone(Arp(t, 0.16f, 523, 659, 784, 1047, 784, 1047, 1319, 1568), t) * 0.3f * Env(t, d)));
         pop = Load("sfx_pop", () => Make(0.28f, (t, d) => (Noise() * 0.2f + WarmTone(Mathf.Lerp(260, 620, t / d), t) * 0.3f) * Env(t, d)));
-        shield = Load("sfx_shield", () => Make(0.85f, (t, d) => WarmTone(Arp(t, 0.12f, 440, 554, 659, 880), t) * 0.25f * Env(t, d)));
+        star = Load("sfx_star", () => Make(1.1f, (t, d) => WarmTone(Arp(t, 0.10f, 523, 659, 784, 1047, 1319), t) * 0.32f * Env(t, d)));
+        shield = star;
         select = Load("sfx_select", () => beep);
         explosion = Load("sfx_explosion", () => hit);
         System.Func<AudioClip> bumpFallback = () => bump != null ? bump : (bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d)));
@@ -254,7 +255,8 @@ public class RaceAudio : MonoBehaviour
     public void Finish() => Play(finish, 0.46f);
     public void Pop(int level) => Play(pop, 0.32f, 0.88f + level * 0.12f);
     public void DriftSpark(int level) => Play(pop, 0.20f, 0.95f + level * 0.14f);
-    public void Shield() => Play(shield, 0.35f);
+    public void Star() => Play(star, 0.40f);
+    public void Shield() => Star();
 
     void Play(AudioClip clip, float vol, float pitch = 1f)
     {

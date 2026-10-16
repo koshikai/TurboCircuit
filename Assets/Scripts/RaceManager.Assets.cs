@@ -95,6 +95,7 @@ public partial class RaceManager
         iconBanana = LoadTexture("Icons/item_banana_pop", iconDir + "item_banana_pop.png") ?? LoadTexture("Icons/item_banana", iconDir + "item_banana.jpg");
         iconMissile = LoadTexture("Icons/item_missile_pop", iconDir + "item_missile_pop.png") ?? LoadTexture("Icons/item_missile", iconDir + "item_missile.jpg");
         iconShield = LoadTexture("Icons/item_shield_pop", iconDir + "item_shield_pop.png") ?? LoadTexture("Icons/item_shield", iconDir + "item_shield.jpg");
+        iconStar = LoadTexture("Icons/item_star_pop", iconDir + "item_star_pop.png") ?? iconShield;
         iconBomb = LoadTexture("Icons/item_bomb_pop", iconDir + "item_bomb_pop.png") ?? LoadTexture("Icons/item_bomb", iconDir + "item_bomb.jpg");
         iconThunder = LoadTexture("Icons/item_thunder_pop", iconDir + "item_thunder_pop.png");
         InitItemDefs();
@@ -190,11 +191,11 @@ public partial class RaceManager
         });
         ItemDefs.Add(new ItemDef
         {
-            Type = ItemType.Shield,
-            NameEn = "SHIELD", NameJp = "シールド",
-            AccentColor = new Color(0.2f, 0.85f, 1.0f),
-            Icon = iconShield,
-            WeightFunc = p => Mathf.Lerp(0.00f, 0.15f, p)
+            Type = ItemType.Star,
+            NameEn = "STAR", NameJp = "スター",
+            AccentColor = new Color(1.0f, 0.82f, 0.15f),
+            Icon = iconStar,
+            WeightFunc = p => Mathf.Lerp(0.00f, 0.18f, p)
         });
         ItemDefs.Add(new ItemDef
         {

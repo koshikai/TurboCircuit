@@ -15,7 +15,7 @@ public partial class Kart
         byte f = 0;
         if (drifting) f |= NetKartState.FDrift;
         if (boostTimer > 0) f |= NetKartState.FBoost;
-        if (shieldTimer > 0) f |= NetKartState.FShield;
+        if (starTimer > 0) f |= NetKartState.FStar;
         if (spinTimer > 0) f |= NetKartState.FSpin;
         if (isAirborne) f |= NetKartState.FAir;
         if (isAirborne && trickDone) f |= NetKartState.FTrick;
@@ -142,7 +142,7 @@ public partial class Kart
                 }
                 lastDriftLevel = 0;
             }
-            shieldTimer = (f & NetKartState.FShield) != 0 ? 3f : 0f;
+            starTimer = (f & NetKartState.FStar) != 0 ? 3f : 0f;
             spinTimer = (f & NetKartState.FSpin) != 0 ? 0.3f : 0f;
             isBraking = (f & NetKartState.FBrake) != 0;
             Lap = net.Lap;

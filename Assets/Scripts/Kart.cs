@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum ItemType { None, Turbo, Banana, Missile, Shield, Bomb, Thunder }
+public enum ItemType { None, Turbo, Banana, Missile, Star, Bomb, Thunder }
 
 public struct KartInput
 {
@@ -48,7 +48,8 @@ public partial class Kart : MonoBehaviour
     public float DriftCharge => driftCharge;
     public int DriftLevel => driftCharge >= 2.6f ? 3 : driftCharge >= 1.6f ? 2 : driftCharge >= 0.8f ? 1 : 0;
     public bool Boosting => boostTimer > 0;
-    public bool Shielded => shieldTimer > 0;
+    public bool StarInvincible => starTimer > 0;
+    public bool Shielded => StarInvincible; // 後方互換エイリアス
     public bool Shocked => shockTimer > 0;
     public bool Offroad { get; private set; }
     public bool IsAirborne => isAirborne;
@@ -66,7 +67,7 @@ public partial class Kart : MonoBehaviour
     bool aiTrickDecided;
     AudioSource engine3D;
 
-    float boostTimer, shieldTimer, shockTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
+    float boostTimer, starTimer, shockTimer, spinTimer, invulnTimer, driftCharge, hopT = 1f, spinAngle, visYaw, wheelAngle, steerVis;
     float driftFlarePopTimer;
     bool drifting;
     int driftDir, lastDriftLevel, boostColorLevel;
@@ -82,8 +83,8 @@ public partial class Kart : MonoBehaviour
     Transform driverHead;
     Transform[] wheelSpin = new Transform[4];
     Transform[] frontPivot = new Transform[2];
-    Renderer shieldRenderer;
-    MaterialPropertyBlock shieldMpb;
+    Renderer starRenderer;
+    MaterialPropertyBlock starMpb;
     Renderer[] tailLightRend = new Renderer[2];
     MaterialPropertyBlock tailMpb;
     TrailRenderer[] skidTrails = new TrailRenderer[2];
@@ -143,7 +144,7 @@ public partial class Kart : MonoBehaviour
         if (sk0 != null) { sk0.SetParent(null); sk0.gameObject.SetActive(false); Destroy(sk0.gameObject); }
         var sk1 = transform.Find("Skidmark_1");
         if (sk1 != null) { sk1.SetParent(null); sk1.gameObject.SetActive(false); Destroy(sk1.gameObject); }
-        if (shieldRenderer != null) { shieldRenderer.transform.SetParent(null); shieldRenderer.gameObject.SetActive(false); Destroy(shieldRenderer.gameObject); shieldRenderer = null; }
+        if (starRenderer != null) { starRenderer.transform.SetParent(null); starRenderer.gameObject.SetActive(false); Destroy(starRenderer.gameObject); starRenderer = null; }
 
         BuildModel();
     }
@@ -175,7 +176,7 @@ public partial class Kart : MonoBehaviour
         Finished = false;
         Item = ItemType.None;
         RouletteTimer = 0;
-        boostTimer = shieldTimer = spinTimer = invulnTimer = driftCharge = 0;
+        boostTimer = starTimer = spinTimer = invulnTimer = driftCharge = 0;
         slipstreamDraftTimer = slipstreamTimer = 0;
         trickWindowTimer = 0;
         trickDone = false;
@@ -268,7 +269,7 @@ public partial class Kart : MonoBehaviour
         if (boostTimer <= 0) boostColorLevel = 0;
         driftFlarePopTimer = Mathf.Max(0f, driftFlarePopTimer - dt);
         bumpCooldown = Mathf.Max(0f, bumpCooldown - dt);
-        shieldTimer -= dt;
+        starTimer -= dt;
         invulnTimer -= dt;
 
         if (RouletteTimer > 0)
@@ -366,11 +367,11 @@ public partial class Kart : MonoBehaviour
             }
 
             float max = MaxSpeed * topSpeedMul * AISpeedFactor();
-            if (shieldTimer > 0) max *= 1.12f;
+            if (starTimer > 0) max *= 1.15f;
             if (slipstreamTimer > 0) max *= 1.18f;
             if (shockTimer > 0) max *= 0.72f;
             Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
-            if (Offroad && boostTimer <= 0 && shieldTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
+            if (Offroad && boostTimer <= 0 && starTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
             if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, Mathf.Max(max * 1.25f, MaxSpeed * 1.4f * topSpeedMul * AISpeedFactor()), 60f * dt);
             else if (slipstreamTimer > 0) Speed = Mathf.MoveTowards(Speed, max, 45f * dt);
@@ -739,7 +740,7 @@ public partial class Kart : MonoBehaviour
     public bool Spin()
     {
         if (IsRemote) return false; // スピンの判定は持ち主側で行い、状態として届く
-        if (invulnTimer > 0 || shieldTimer > 0 || spinTimer > 0) return false;
+        if (invulnTimer > 0 || starTimer > 0 || spinTimer > 0) return false;
         spinTimer = 1.2f;
         invulnTimer = 2.2f;
         Speed *= 0.35f;
@@ -758,7 +759,7 @@ public partial class Kart : MonoBehaviour
     public bool Shock(float duration = 6.5f)
     {
         if (IsRemote) return false;
-        if (shieldTimer > 0) return false;
+        if (starTimer > 0) return false;
         shockTimer = duration;
         spinTimer = 1.3f;
         Speed *= 0.25f;
@@ -818,10 +819,10 @@ public partial class Kart : MonoBehaviour
                 rm.SpawnMissile(this);
                 if (IsPlayer) rm.Audio.Missile();
                 break;
-            case ItemType.Shield:
-                shieldTimer = 6f;
-                Boost(0.6f);
-                if (IsPlayer) rm.Audio.Shield();
+            case ItemType.Star:
+                starTimer = 7.5f;
+                Boost(0.8f);
+                if (IsPlayer) rm.Audio.Star();
                 break;
             case ItemType.Bomb:
                 bool throwBackward = inp.throttle < -0.1f;

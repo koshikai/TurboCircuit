@@ -12,7 +12,7 @@ using UnityEngine;
 // 1 台のカートの同期用スナップショット（持ち主が送り、相手側ではゴーストとして再現する）
 public struct NetKartState
 {
-    public const byte FDrift = 1, FBoost = 2, FShield = 4, FSpin = 8, FAir = 16, FBrake = 32, FDone = 64, FTrick = 128;
+    public const byte FDrift = 1, FBoost = 2, FShield = 4, FStar = 4, FSpin = 8, FAir = 16, FBrake = 32, FDone = 64, FTrick = 128;
 
     public Vector3 Pos;
     public float Heading, Speed, Steer, Progress, FinishTime;
