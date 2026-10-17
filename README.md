@@ -13,6 +13,7 @@
   </p>
 
   <p>
+    <img src="https://img.shields.io/badge/Version-v2.0.0-purple?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Windows%2064--bit-blue?logo=windows&style=flat-square" alt="Platform">
     <img src="https://img.shields.io/badge/Engine-Unity%206000.6%20(URP)-black?logo=unity&style=flat-square" alt="Unity">
     <img src="https://img.shields.io/badge/Players-1--8%20Players-brightgreen?style=flat-square" alt="Players">
@@ -42,6 +43,10 @@
 - 🏎️ **爽快なアーケード物理＆ドリフトアクション**
   - ボタン1つでホップ＆ドリフト！タイヤの火花が青からオレンジに変わる瞬間に開放して強烈な「ミニターボ」を発動！
   - 各所に設置されたジャンプ台でのトリックや、スタートカウントダウンに合わせたロケットスタートなど、走りを突き詰めるテクニックが満載。
+
+- 🎬 **臨場感あふれるコース紹介シネマティック ＆ グリッドアイドリング演出**
+  - レース開幕前に各コースの象徴的な見どころを滑らかに映し出す空撮シネマティックと、映画風レターボックス＆ポップなコース情報カードを導入！いつでも [SPACE / A] で即座にスキップ可能。
+  - グリッド待機中には車体のアイドリング微振動やドライバーの首振り見渡しアニメーションが臨場感を高めます。
 
 - 🗺️ **ギミック満載の6つの本格サーキット**
   - 緩やかな丘陵と高架橋立体交差が爽快な王道サーキットから、超巨大砂丘のジェットコースター、標高差35mの白銀雪山、サイバーなビル貫通トンネル、実在の道路網を再現した「北海道大学 札幌キャンパス」、そしてダイナミックな高低差15mの8の字立体交差と斜張橋が聳える**「スカイライン・オーバーパス」**まで！
