@@ -3,7 +3,8 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
-* [Kenney](https://kenney.nl/) - Music Jingles (Sax, Steel Drum, Pizzicato), Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
+* [Turbo Circuit Remastered Arcade SFX] - Countdown beep, Go burst, Lap chime, Final Lap fanfare, and Finish victory fanfare (Custom FM synthesis & synth brass remaster, CC0).
+* [Kenney](https://kenney.nl/) - Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
 * [qubodup / Scribe](https://opengameart.org/content/supertuxkart-sound-effects) - Kart engine & tire skid sound effects (CC0 / Public domain).
 
 ## Music (`bgm_*.ogg`, normalized and cross-faded for looping)
