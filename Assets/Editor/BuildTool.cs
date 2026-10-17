@@ -95,6 +95,25 @@ public static class BuildTool
         PlayerSettings.defaultScreenHeight = 720;
         PlayerSettings.resizableWindow = true;
 
+        var iconPath = "Assets/Resources/Icons/app_icon.png";
+        var importer = AssetImporter.GetAtPath(iconPath) as TextureImporter;
+        if (importer != null)
+        {
+            bool dirty = false;
+            if (!importer.alphaIsTransparency) { importer.alphaIsTransparency = true; dirty = true; }
+            if (dirty) importer.SaveAndReimport();
+        }
+        var iconTex = AssetDatabase.LoadAssetAtPath<Texture2D>(iconPath);
+        if (iconTex != null)
+        {
+            var standaloneSizes = PlayerSettings.GetIconSizesForTargetGroup(BuildTargetGroup.Standalone);
+            var standaloneIcons = new Texture2D[standaloneSizes.Length];
+            for (int i = 0; i < standaloneSizes.Length; i++) standaloneIcons[i] = iconTex;
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Standalone, standaloneIcons);
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Unknown, new[] { iconTex });
+            Debug.Log("[BuildTool] Configured game application icon: " + iconPath + " across " + standaloneSizes.Length + " Standalone slots.");
+        }
+
         AssetDatabase.Refresh();
         AssetDatabase.SaveAssets();
         Debug.Log("[BuildTool] Scene setup complete: " + ScenePath);
