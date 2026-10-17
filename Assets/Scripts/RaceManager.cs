@@ -1194,7 +1194,7 @@ public partial class RaceManager : MonoBehaviour
         lateral = slot % 2 == 0 ? -4f : 4f;
     }
 
-    void ResetRace()
+    void ResetRace(bool restartMusic = true)
     {
         foreach (var b in bananas) if (b) Destroy(b.gameObject);
         bananas.Clear();
@@ -1227,7 +1227,7 @@ public partial class RaceManager : MonoBehaviour
             bannerTimes[p] = 99f;
         }
         lastCountdownBeep = -1;
-        Audio.RestartMusic(SelectedCourse);
+        if (restartMusic && Audio != null) Audio.RestartMusic(SelectedCourse);
     }
 
     // ───────────────────────── Loop ─────────────────────────
@@ -1808,6 +1808,7 @@ public partial class RaceManager : MonoBehaviour
             else
             {
                 Audio.Go();
+                if (Audio != null) Audio.SetMusicVolume(0.30f);
                 state = State.Racing;
                 stateTime = 0;
                 foreach (var k in Karts) k.OnGo();
@@ -1938,6 +1939,8 @@ public partial class RaceManager : MonoBehaviour
         {
             if (!Net.IsHost) return;
             Net.SendStart(SelectedCourse);
+            StartCountdown(); // オンライン対戦時は同期ズレを防ぐため直接カウントダウンへ
+            return;
         }
         StartCourseIntro();
     }
@@ -1962,7 +1965,8 @@ public partial class RaceManager : MonoBehaviour
             if (ghostReplay != null) ghostReplay.ClearPlayback();
             ShowAllKarts();
         }
-        ResetRace();
+        ResetRace(restartMusic: true);
+        if (Audio != null) Audio.SetMusicVolume(0.22f); // コース紹介中は上品で落ち着いた音量
         if (track != null) track.UpdateStartSignals(-1);
         firstFinishTime = -1f;
         newRecordTime = false;
@@ -1973,7 +1977,7 @@ public partial class RaceManager : MonoBehaviour
         InitCourseIntro();
     }
 
-    void StartCountdown()
+    void StartCountdown(bool preserveMusic = false)
     {
         // 接続メニューが残ると Update が早期 return し、カウントダウンが進まない。
         netMenu = false;
@@ -1994,7 +1998,8 @@ public partial class RaceManager : MonoBehaviour
             if (ghostReplay != null) ghostReplay.ClearPlayback();
             ShowAllKarts();
         }
-        ResetRace();
+        ResetRace(restartMusic: !preserveMusic);
+        if (Audio != null) Audio.SetMusicVolume(0.27f); // カウントダウン音量へステップアップ
         if (track != null) track.UpdateStartSignals(-1);
         firstFinishTime = -1f;
         newRecordTime = false;

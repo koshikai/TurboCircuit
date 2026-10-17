@@ -104,7 +104,7 @@ public partial class RaceManager
 
         if (skipRequested || introTime >= IntroTotalDuration)
         {
-            StartCountdown();
+            StartCountdown(preserveMusic: true);
         }
     }
 
@@ -217,7 +217,7 @@ public partial class RaceManager
 
         if (DrawModernButton(new Rect(skipX, skipY, skipW, skipH), Loc.T("SKIP", "スキップ"), "[SPACE / A]", skipBtnCol, false, false))
         {
-            StartCountdown();
+            StartCountdown(preserveMusic: true);
         }
     }
 }
