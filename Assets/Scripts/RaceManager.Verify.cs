@@ -317,6 +317,19 @@ public partial class RaceManager
                     foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
                     ApplyLobbyKarts();
                     break;
+                case "intro":
+                    StartCourseIntro();
+                    introTime = 1.2f;
+                    break;
+                case "intro_campus":
+                    LoadCourse(4);
+                    StartCourseIntro();
+                    introTime = 1.2f;
+                    break;
+                case "intro_grid":
+                    StartCourseIntro();
+                    introTime = 3.4f;
+                    break;
                 case "countdown":
                     StartRaceFromTitle();
                     state = State.Countdown;

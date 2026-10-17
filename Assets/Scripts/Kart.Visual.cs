@@ -609,13 +609,28 @@ public partial class Kart
             : ((boostTimer > 0 || slipstreamTimer > 0) ? -3.4f : (isBraking && Speed > 4f ? 2.4f : 0f));
         visPitch = Mathf.Lerp(visPitch, targetPitch, 1f - Mathf.Exp(-10f * dt));
         float bob = Offroad && Speed > 5f ? Mathf.Sin(Time.time * 40f) * 0.04f : 0f;
-        model.localPosition = new Vector3(0, hop + bob, 0);
+
+        // グリッド待機中（Intro / Countdown）のエンジンアイドリング微振動演出
+        bool inGridWait = rm != null && (rm.InIntro || rm.InCountdown) && Mathf.Abs(Speed) < 1.0f;
+        float idleShake = 0f;
+        float idleRoll = 0f;
+        float idlePitch = 0f;
+        int kartSeedId = Index >= 0 ? Index : 0;
+        if (inGridWait)
+        {
+            float seed = kartSeedId * 1.73f;
+            idleShake = Mathf.Sin(Time.time * 38f + seed) * 0.012f + (Mathf.PerlinNoise(Time.time * 25f, seed) - 0.5f) * 0.008f;
+            idleRoll = Mathf.Sin(Time.time * 28f + seed) * 0.45f;
+            idlePitch = Mathf.Cos(Time.time * 32f + seed) * 0.35f;
+        }
+
+        model.localPosition = new Vector3(0, hop + bob + idleShake, 0);
 
         if (!isAirborne)
         {
             airTrickSpin = Mathf.MoveTowards(Mathf.Repeat(airTrickSpin + 180f, 360f) - 180f, 0f, 900f * dt);
         }
-        model.localRotation = Quaternion.Euler(visPitch, visYaw + spinAngle + airTrickSpin, roll);
+        model.localRotation = Quaternion.Euler(visPitch + idlePitch, visYaw + spinAngle + airTrickSpin, roll + idleRoll);
 
         if (blobShadow != null)
         {
@@ -636,11 +651,18 @@ public partial class Kart
             skidTrails[1].transform.position = wheelSpin[3].position + groundOffset;
         }
 
-        // ドライバーのアニメーション（ドリフト時のハングオン傾きと視線）
+        // ドライバーのアニメーション（ドリフト時のハングオン傾きと視線、グリッド待機時の見渡し）
         if (driverBody != null && driverHead != null)
         {
             float targetLean = drifting ? driftDir * 18f : -steerVis * 6f;
             float targetLook = drifting ? driftDir * 22f : steerVis * 20f;
+            if (inGridWait)
+            {
+                // レース開始前の緊張感：前方を見据えつつ、時折左右のライバルをちらっと見渡す
+                float lookT = Time.time * 2.0f + kartSeedId * 1.3f;
+                float headSwivel = Mathf.Sin(lookT) > 0.65f ? Mathf.Sin((lookT - 0.65f) * 4f) * 16f : 0f;
+                targetLook += headSwivel;
+            }
             driverBody.localRotation = Quaternion.Euler(0, 0, -targetLean);
             driverHead.localRotation = Quaternion.Euler(0, targetLook, -targetLean * 0.5f);
         }

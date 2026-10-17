@@ -45,8 +45,8 @@ public partial class RaceManager
         float dt = Time.unscaledDeltaTime;
         if (paused) return;
 
-        // 対戦中は左右 2 分割（P1 = 左、P2 = 右）
-        bool split = TwoPlayer && state != State.Title;
+        // 対戦中は左右 2 分割（P1 = 左、P2 = 右、Intro中は全画面でシネマティック表示）
+        bool split = TwoPlayer && state != State.Title && state != State.Intro;
         cam.rect = split ? new Rect(0f, 0f, 0.5f, 1f) : new Rect(0f, 0f, 1f, 1f);
         cam2.rect = new Rect(0.5f, 0f, 0.5f, 1f);
         if (cam2.enabled != split) cam2.enabled = split;
@@ -77,6 +77,12 @@ public partial class RaceManager
                 cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, targetRot, 1f - Mathf.Exp(-5f * dt));
                 cam.fieldOfView = 48f;
             }
+            return;
+        }
+
+        if (state == State.Intro)
+        {
+            UpdateIntroCamera(cam, dt);
             return;
         }
 
