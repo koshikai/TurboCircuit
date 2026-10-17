@@ -103,6 +103,10 @@ public partial class RaceManager
                     }
                 }
                 break;
+            case State.Intro:
+                GUI.enabled = !overlayModalOpen;
+                DrawIntroUI(w, h);
+                break;
             case State.Countdown:
                 GUI.enabled = !overlayModalOpen;
                 DrawHuds(w, h, true);

@@ -62,7 +62,7 @@ public partial class RaceManager : MonoBehaviour
     public int totalLaps = 3;
     public int playerGridSlot = 5;
 
-    enum State { Title, Countdown, Racing, Results }
+    enum State { Title, Intro, Countdown, Racing, Results }
     State state = State.Title;
     bool paused;
 
@@ -72,6 +72,8 @@ public partial class RaceManager : MonoBehaviour
     public Light Sun { get; private set; }
     public int SelectedCourse { get; private set; }
     public bool RaceRunning => state == State.Racing || state == State.Results;
+    public bool InIntro => state == State.Intro;
+    public bool InCountdown => state == State.Countdown;
     public float RaceTime => raceTime;
     // 起動オプション -demo：自動スタートし、プレイヤーも CPU が運転する（動作確認用）
     public bool Demo { get; private set; }
@@ -1192,7 +1194,7 @@ public partial class RaceManager : MonoBehaviour
         lateral = slot % 2 == 0 ? -4f : 4f;
     }
 
-    void ResetRace()
+    void ResetRace(bool restartMusic = true)
     {
         foreach (var b in bananas) if (b) Destroy(b.gameObject);
         bananas.Clear();
@@ -1225,7 +1227,7 @@ public partial class RaceManager : MonoBehaviour
             bannerTimes[p] = 99f;
         }
         lastCountdownBeep = -1;
-        Audio.RestartMusic(SelectedCourse);
+        if (restartMusic && Audio != null) Audio.RestartMusic(SelectedCourse);
     }
 
     // ───────────────────────── Loop ─────────────────────────
@@ -1332,6 +1334,7 @@ public partial class RaceManager : MonoBehaviour
         switch (state)
         {
             case State.Title: UpdateTitleInput(nav); break;
+            case State.Intro: UpdateIntro(nav, dt); break;
             case State.Countdown: UpdateCountdown(); break;
             case State.Racing: UpdateRacing(dt); break;
             case State.Results: UpdateResults(nav, dt); break;
@@ -1805,6 +1808,7 @@ public partial class RaceManager : MonoBehaviour
             else
             {
                 Audio.Go();
+                if (Audio != null) Audio.SetMusicVolume(0.30f);
                 state = State.Racing;
                 stateTime = 0;
                 foreach (var k in Karts) k.OnGo();
@@ -1935,11 +1939,45 @@ public partial class RaceManager : MonoBehaviour
         {
             if (!Net.IsHost) return;
             Net.SendStart(SelectedCourse);
+            StartCountdown(); // オンライン対戦時は同期ズレを防ぐため直接カウントダウンへ
+            return;
         }
-        StartCountdown();
+        StartCourseIntro();
     }
 
-    void StartCountdown()
+    void StartCourseIntro()
+    {
+        netMenu = false;
+        if (!Online) RestoreRoles();
+        if (IsTimeAttack && !Online)
+        {
+            currentRunGhost.Clear();
+            nextGhostSampleTime = 0f;
+            if (ghostReplay != null) ghostReplay.InitPlayback(SelectedCourse, glowMaterial, track);
+            for (int i = 0; i < Karts.Count; i++)
+            {
+                if (Karts[i] != Player) Karts[i].gameObject.SetActive(false);
+            }
+            if (Player != null) Player.Item = ItemType.Turbo; // タイムアタック開幕ターボ支給
+        }
+        else
+        {
+            if (ghostReplay != null) ghostReplay.ClearPlayback();
+            ShowAllKarts();
+        }
+        ResetRace(restartMusic: true);
+        if (Audio != null) Audio.SetMusicVolume(0.22f); // コース紹介中は上品で落ち着いた音量
+        if (track != null) track.UpdateStartSignals(-1);
+        firstFinishTime = -1f;
+        newRecordTime = false;
+        newRecordLap = false;
+        spectateIndex = -1;
+        state = State.Intro;
+        stateTime = 0f;
+        InitCourseIntro();
+    }
+
+    void StartCountdown(bool preserveMusic = false)
     {
         // 接続メニューが残ると Update が早期 return し、カウントダウンが進まない。
         netMenu = false;
@@ -1960,7 +1998,8 @@ public partial class RaceManager : MonoBehaviour
             if (ghostReplay != null) ghostReplay.ClearPlayback();
             ShowAllKarts();
         }
-        ResetRace();
+        ResetRace(restartMusic: !preserveMusic);
+        if (Audio != null) Audio.SetMusicVolume(0.27f); // カウントダウン音量へステップアップ
         if (track != null) track.UpdateStartSignals(-1);
         firstFinishTime = -1f;
         newRecordTime = false;
