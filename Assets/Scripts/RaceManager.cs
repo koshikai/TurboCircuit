@@ -1077,8 +1077,7 @@ public partial class RaceManager : MonoBehaviour
         RestoreRoles();
         ShowAllKarts();
         LoadCourse(SelectedCourse);
-        Audio.SetMusicTempo(1f);
-        Audio.SetMusicVolume(0.3f);
+        if (Audio != null) Audio.RestartMusic(SelectedCourse);
     }
 
     void RemoveBananaById(int id)
@@ -1845,7 +1844,11 @@ public partial class RaceManager : MonoBehaviour
                 resultsFocus = 0;
                 finishAt = Time.time;
                 GamepadHaptics.StopAll();
-                Audio.SetMusicVolume(0.15f);
+                if (Audio != null)
+                {
+                    Audio.SetMusicVolume(0.15f);
+                    Audio.SetMusicTempo(1f);
+                }
             }
         }
         if (AllHumansFinished())
@@ -1854,7 +1857,11 @@ public partial class RaceManager : MonoBehaviour
             resultsFocus = 0;
             finishAt = Time.time;
             GamepadHaptics.StopAll();
-            Audio.SetMusicVolume(0.15f);
+            if (Audio != null)
+            {
+                Audio.SetMusicVolume(0.15f);
+                Audio.SetMusicTempo(1f);
+            }
         }
     }
 
@@ -2018,6 +2025,7 @@ public partial class RaceManager : MonoBehaviour
             if (k.IsPlayer)
             {
                 Audio.Finish();
+                Audio.SetMusicTempo(1f);
                 Banner(Loc.T("FINISH!", "ゴール！"), Color.white, k.PlayerIndex);
                 RecordLap(k.PlayerIndex);
 
@@ -2048,7 +2056,11 @@ public partial class RaceManager : MonoBehaviour
                 resultsFocus = 0;
                 finishAt = Time.time;
                 GamepadHaptics.StopAll();
-                Audio.SetMusicVolume(0.15f);
+                if (Audio != null)
+                {
+                    Audio.SetMusicVolume(0.15f);
+                    Audio.SetMusicTempo(1f);
+                }
             }
             return;
         }
