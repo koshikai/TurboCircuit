@@ -3,11 +3,11 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
-* [Turbo Circuit Remastered Arcade SFX] - Countdown beep, Go burst, Lap chime, Final Lap fanfare, and Finish victory fanfare (Custom FM synthesis & synth brass remaster, CC0).
+* [Turbo Circuit Remastered Arcade SFX] - Countdown beep, Go burst, Lap chime, Final Lap fanfare, Finish victory fanfare, Drift charge spark/pop, Item roulette tick, and Item lock-in jingle (Custom FM synthesis & synth brass remaster, CC0).
 * [Kenney](https://kenney.nl/) - Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
 * [qubodup / Scribe](https://opengameart.org/content/supertuxkart-sound-effects) - Kart engine & tire skid sound effects (CC0 / Public domain).
 
-## Music (`bgm_*.ogg`, normalized and cross-faded for looping)
+## Music (`bgm_*.ogg`, 44.1kHz stereo remastered, normalized and loop-tailored)
 | File | Course | Track | Author | Source |
 |------|--------|-------|--------|--------|
 | bgm_0 | Turbo Circuit | Hyperflight Racing | cynicmusic | https://opengameart.org/content/hyperflight-racing |

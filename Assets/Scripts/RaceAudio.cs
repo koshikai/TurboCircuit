@@ -63,8 +63,8 @@ public class RaceAudio : MonoBehaviour
         beep = Load("sfx_beep", () => Make(0.26f, (t, d) => (WarmTone(1046.5f, t) * 0.40f + WarmTone(2093.0f, t) * 0.15f) * Env(t, d)));
         go = Load("sfx_go", () => Make(0.70f, (t, d) => (WarmTone(1046.5f, t) * 0.25f + WarmTone(1318.5f, t) * 0.22f + WarmTone(1568.0f, t) * 0.22f + WarmTone(2093.0f, t) * 0.20f) * Env(t, d)));
         pickup = Load("sfx_pickup", () => Make(0.30f, (t, d) => WarmTone(Arp(t, 0.06f, 523, 659, 784, 1047), t) * 0.3f * Env(t, d)));
-        tick = Load("sfx_tick", () => Make(0.06f, (t, d) => WarmTone(740, t) * 0.25f * Env(t, d)));
-        gotItem = Load("sfx_gotitem", () => Make(0.35f, (t, d) => (WarmTone(659.25f, t) + WarmTone(987.77f, t)) * 0.22f * Env(t, d)));
+        tick = Load("sfx_tick", () => Make(0.045f, (t, d) => (WarmTone(2800.0f, t) * 0.25f + Noise() * 0.10f) * Env(t, d)));
+        gotItem = Load("sfx_gotitem", () => Make(0.40f, (t, d) => WarmTone(Arp(t, 0.07f, 784, 1047, 1319, 1568), t) * 0.32f * Env(t, d)));
         boost = Load("sfx_boost", () => Make(0.8f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(140, 320, t / d), t) * 0.35f) * Mathf.Sin(Mathf.PI * t / d) * 0.5f));
         hit = Load("sfx_hit", () => Make(0.45f, (t, d) => (WarmTone(Mathf.Lerp(260, 95, t / d), t) * 0.35f + Noise() * 0.15f) * Env(t, d)));
         missile = Load("sfx_missile", () => Make(0.5f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(220, 520, t / d), t) * 0.25f) * Env(t, d)));
@@ -72,7 +72,7 @@ public class RaceAudio : MonoBehaviour
         lap = Load("sfx_lap", () => Make(0.50f, (t, d) => WarmTone(Arp(t, 0.07f, 784, 1047, 1319), t) * 0.32f * Env(t, d)));
         finalLap = Load("sfx_finallap", () => Make(1.10f, (t, d) => WarmTone(Arp(t, 0.09f, 523, 659, 784, 1047, 1568), t) * 0.35f * Env(t, d)));
         finish = Load("sfx_finish", () => Make(2.0f, (t, d) => WarmTone(Arp(t, 0.11f, 523, 659, 784, 880, 784, 1047, 1319, 1568), t) * 0.36f * Env(t, d)));
-        pop = Load("sfx_pop", () => Make(0.28f, (t, d) => (Noise() * 0.2f + WarmTone(Mathf.Lerp(260, 620, t / d), t) * 0.3f) * Env(t, d)));
+        pop = Load("sfx_pop", () => Make(0.18f, (t, d) => (Noise() * 0.20f + WarmTone(1318.5f, t) * 0.35f + WarmTone(2637.0f, t) * 0.15f) * Env(t, d)));
         star = Load("sfx_star", () => Make(1.1f, (t, d) => WarmTone(Arp(t, 0.10f, 523, 659, 784, 1047, 1319), t) * 0.32f * Env(t, d)));
         shield = star;
         select = Load("sfx_select", () => beep);
@@ -111,6 +111,7 @@ public class RaceAudio : MonoBehaviour
         if (music.clip == clip) return;
         music.clip = clip;
         music.time = 0;
+        music.pitch = 1f;
         music.Play();
     }
 
