@@ -210,7 +210,7 @@ public partial class Kart
                 // 1) カーブがまだ続いている（または青火花 Level 1 直前でまだ緩やかなカーブが残っている）
                 bool curveRemains = (Mathf.Abs(nearAngle) > 9f && Mathf.Sign(nearAngle) == driftDir)
                                  || (Mathf.Abs(futureAngle) > 13f && Mathf.Sign(futureAngle) == driftDir)
-                                 || (DriftLevel < 1 && driftCharge > 0.25f && Mathf.Abs(futureAngle) > 7f && Mathf.Sign(futureAngle) == driftDir);
+                                 || (DriftLevel < 1 && driftCharge > 0.5f && Mathf.Abs(futureAngle) > 7f && Mathf.Sign(futureAngle) == driftDir);
 
                 // 2) 進行方向ベクトル(VelDir)ベースのイン巻き防止ガード：
                 // イン側5.2m以内、かつイン側深くでさらに内側へ突っ込んでいないこと

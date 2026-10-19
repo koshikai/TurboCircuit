@@ -1,7 +1,7 @@
 """
 Remaster all course BGM tracks for Turbo Circuit using FFmpeg.
 - Fixes bgm_3.ogg (192,000 Hz -> 44,100 Hz pristine resampling).
-- Converts mono tracks (bgm_4.ogg, bgm_5.ogg) into rich stereo using Haas effect spatialization.
+- All tracks (bgm_0 through bgm_5) are pristine native stereo CC0 tracks.
 - Normalizes peak and loudness across all tracks (0.90 peak / -0.9dB) so tracks sound balanced and clear.
 """
 

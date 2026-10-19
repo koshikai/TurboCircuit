@@ -498,6 +498,7 @@ public partial class Kart : MonoBehaviour
             int di = track.Wrap(Index - pad.index);
             if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral - pad.lateral) < 2.4f && boostTimer < 0.8f)
             {
+                boostColorLevel = 2;
                 Boost(1.1f);
                 if (IsPlayer)
                 {
@@ -846,6 +847,7 @@ public partial class Kart : MonoBehaviour
         switch (it)
         {
             case ItemType.Turbo:
+                boostColorLevel = 3;
                 Boost(1.4f);
                 if (IsPlayer) rm.Audio.Boost();
                 break;
