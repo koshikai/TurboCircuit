@@ -280,6 +280,7 @@ public static class DataAssetGenerator
             asset.controlPoints = def.Control;
             asset.ramps = def.Ramps;
             asset.tunnels = def.Tunnels;
+            asset.branches = def.Branches;
             asset.skyTint = def.SkyTint;
             asset.groundColor = def.GroundColor;
             asset.sunColor = def.SunColor;

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 253b7e8b3da74589b8cc93cfa7015aee, type: 3}
+  m_Name: Course_06_CANYON_SPLIT
+  m_EditorClassIdentifier: Assembly-CSharp::CourseData
+  courseName: CANYON SPLIT
+  description: 'Dramatic red rock canyon raceway featuring the Great Split: take the safe riverside cruise or leap across the rapids to the wooden trestle shortcut.'
+  controlPoints:
+  - {x: 0, y: 0, z: -150}
+  - {x: 100, y: 0, z: -150}
+  - {x: 180, y: 2, z: -120}
+  - {x: 215, y: 4, z: -40}
+  - {x: 210, y: 7, z: 40}
+  - {x: 165, y: 8, z: 115}
+  - {x: 95, y: 7, z: 180}
+  - {x: 10, y: 6, z: 215}
+  - {x: -80, y: 5, z: 200}
+  - {x: -145, y: 4, z: 140}
+  - {x: -200, y: 3, z: 70}
+  - {x: -225, y: 2, z: -10}
+  - {x: -195, y: 1, z: -75}
+  - {x: -140, y: 0, z: -125}
+  - {x: -70, y: 0, z: -150}
+  ramps:
+  - Ratio: 0.36
+    Power: 17.5
+    Lateral: 10
+    Width: 8
+  tunnels: []
+  branches:
+  - Start: 0.37
+    End: 0.62
+    LeftOffset: -18.5
+    RightOffset: 18.5
+    LaneWidth: 6
+    DividerWidth: 12
+    RightHeight: 4.2
+  skyTint: {r: 0.38, g: 0.65, b: 0.98, a: 1}
+  groundColor: {r: 0.76, g: 0.44, b: 0.24, a: 1}
+  sunColor: {r: 1, g: 0.94, b: 0.82, a: 1}
+  sunIntensity: 1.35
+  sunRotation: {x: 46, y: -42, z: 0}
+  fogColor: {r: 0.85, g: 0.72, b: 0.62, a: 1}
+  fogDistance: 950
+  roadColor: {r: 0.32, g: 0.28, b: 0.27, a: 1}
+  curbColorA: {r: 0.98, g: 0.52, b: 0.1, a: 1}
+  curbColorB: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  wallColorA: {r: 0.85, g: 0.25, b: 0.12, a: 1}
+  wallColorB: {r: 1, g: 0.85, b: 0.35, a: 1}
+  shoulderColor: {r: 0.88, g: 0.65, b: 0.42, a: 1}
+  sceneryTheme: 1

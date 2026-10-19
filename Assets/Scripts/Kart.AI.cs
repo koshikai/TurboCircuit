@@ -4,6 +4,7 @@ using UnityEngine;
 public partial class Kart
 {
     // ───────────────────────── AI (Tanaka Control / Optimal Racing) ─────────────────────────
+    int aiBranchChoice = 0; // -1: 左ルート, 1: 右ルート, 0: 未定
 
     public KartInput AIInput(float dt)
     {
@@ -83,6 +84,32 @@ public partial class Kart
 
         // 2b. アイテムボックス・ダッシュボード取得と、スリップストリーム／追い抜き・バナナ回避
         targetLane = ApplyTacticalLineAdjustments(curPos, currentLateral, targetLane, apexCurvature, apexBend);
+
+        // 2c. 分岐ルート制御（二股コース対応）
+        if (aiBranchChoice == 0)
+        {
+            aiBranchChoice = (PlayerIndex % 2 == 1) ? 1 : -1;
+        }
+        float progressRatio = (float)Index / track.Count;
+        if (track.IsInBranch(progressRatio, out BranchDef branchDef, out float branchBlend))
+        {
+            float sideOffset = (aiBranchChoice > 0) ? branchDef.RightOffset : branchDef.LeftOffset;
+            targetLane = Mathf.Lerp(targetLane, sideOffset + aiLane * 0.3f, branchBlend);
+        }
+        else
+        {
+            var branches = Track.Courses[track.ActiveCourseIndex].Branches;
+            if (branches != null && branches.Length > 0)
+            {
+                var b = branches[0];
+                if (progressRatio >= b.Start - 0.05f && progressRatio < b.Start)
+                {
+                    float tApproach = Mathf.InverseLerp(b.Start - 0.05f, b.Start, progressRatio);
+                    float sideOffset = (aiBranchChoice > 0) ? b.RightOffset : b.LeftOffset;
+                    targetLane = Mathf.Lerp(targetLane, sideOffset + aiLane * 0.3f, tApproach * 0.75f);
+                }
+            }
+        }
 
         // 3. 曲率適応型ルックアヘッド & 非線形 Stanley 操舵制御
         // 直近(12m先)と中距離(24m先)のコース旋回角を取得
@@ -227,22 +254,38 @@ public partial class Kart
             }
 
             // 6. コントロール・バリア・ファンクション (CBF / 滑らかな境界反発)
-            float safeBoundary = Track.HalfWidth - 1.3f; // 7.7m（ダート手前1.3mで反発）
-            float distToEdge = safeBoundary - Mathf.Abs(currentLateral);
-            float outwardVelocity = Vector3.Dot(VelDir, track.Rights[Index] * Mathf.Sign(currentLateral));
             bool boundaryRepelling = false;
-
-            if (distToEdge < 2.2f && outwardVelocity > 0.04f)
+            if (track.IsInBranch(progressRatio, out BranchDef bDef, out float bBlend) && bBlend > 0.2f)
             {
-                boundaryRepelling = true;
-                // 距離に応じた滑らかな比例反発
-                float repelIntensity = Mathf.Clamp01((2.2f - distToEdge) / 1.7f);
-                float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.80f;
-                inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
-                if (distToEdge < 1.0f) inp.drift = false; // ダート直前まで迫った場合はドリフトを即解除
-                if (distToEdge < 0.6f && outwardVelocity > 0.15f && Speed > 7.0f)
+                float laneCenter = (aiBranchChoice > 0) ? bDef.RightOffset : bDef.LeftOffset;
+                float distFromLaneCenter = currentLateral - laneCenter;
+                float laneSafeHalf = bDef.LaneWidth - 1.2f;
+                if (Mathf.Abs(distFromLaneCenter) > laneSafeHalf)
                 {
-                    inp.throttle = -1f; // 十分な前進速度がある場合のみ減速ブレーキ
+                    boundaryRepelling = true;
+                    float repelSteer = -Mathf.Sign(distFromLaneCenter) * 0.75f;
+                    inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
+                    inp.drift = false;
+                }
+            }
+            else
+            {
+                float safeBoundary = Track.HalfWidth - 1.3f; // 7.7m（ダート手前1.3mで反発）
+                float distToEdge = safeBoundary - Mathf.Abs(currentLateral);
+                float outwardVelocity = Vector3.Dot(VelDir, track.Rights[Index] * Mathf.Sign(currentLateral));
+
+                if (distToEdge < 2.2f && outwardVelocity > 0.04f)
+                {
+                    boundaryRepelling = true;
+                    // 距離に応じた滑らかな比例反発
+                    float repelIntensity = Mathf.Clamp01((2.2f - distToEdge) / 1.7f);
+                    float repelSteer = -Mathf.Sign(currentLateral) * repelIntensity * 0.80f;
+                    inp.steer = Mathf.Clamp(inp.steer + repelSteer, -1f, 1f);
+                    if (distToEdge < 1.0f) inp.drift = false; // ダート直前まで迫った場合はドリフトを即解除
+                    if (distToEdge < 0.6f && outwardVelocity > 0.15f && Speed > 7.0f)
+                    {
+                        inp.throttle = -1f; // 十分な前進速度がある場合のみ減速ブレーキ
+                    }
                 }
             }
 

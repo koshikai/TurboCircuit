@@ -72,7 +72,8 @@ public static class Loc
         "フロスト・ピーク",
         "ネオン・メトロポリス",
         "北大札幌キャンパス",
-        "スカイライン・オーバーパス"
+        "スカイライン・オーバーパス",
+        "キャニオン・スプリット"
     };
 
     static readonly string[] CourseDescsJa =
@@ -82,7 +83,8 @@ public static class Loc
         "標高差35mの白銀アルペン雪山コース！連続ヘアピンと氷河スロープ、断崖クレバスの大ジャンプが待ち受ける。",
         "ネオン輝く黄昏のサイバー都市！摩天楼の谷間や高架ハイウェイ、ビル群を貫通する近未来トンネルを疾走せよ。",
         "北海道大学札幌キャンパスを完全再現！メインストリート、クラーク像、黄金のイチョウ並木、第2農場モデルバーン、ポプラ並木を巡る特別コース。",
-        "海岸ベイエリアを舞台にした8の字立体交差ハイウェイ！下層アンダーパスと上空15mの巨大斜張橋が交差するスリリングなコース。"
+        "海岸ベイエリアを舞台にした8の字立体交差ハイウェイ！下層アンダーパスと上空15mの巨大斜張橋が交差するスリリングなコース。",
+        "巨大な赤岩渓谷を舞台にした二股分岐コース！激流を臨む安全なリバーサイド舗装路か、大ジャンプで川を跳び越えてダッシュ板が連続する高架木橋ショートカットか、選択はあなた次第。"
     };
 
     static readonly string[] CourseDiffEn =
@@ -92,7 +94,8 @@ public static class Loc
         "★★★  EXPERT",
         "★★☆  URBAN",
         "★★☆  CAMPUS",
-        "★★★  OVERPASS"
+        "★★★  OVERPASS",
+        "★★☆  SPLIT"
     };
 
     static readonly string[] CourseDiffJa =
@@ -102,7 +105,8 @@ public static class Loc
         "★★★  上級・雪山",
         "★★☆  中級・都市",
         "★★☆  中級・北大",
-        "★★★  上級・高架橋"
+        "★★★  上級・高架橋",
+        "★★☆  中級・分岐"
     };
 
     static readonly string[] CourseShortDiffEn =
@@ -112,7 +116,8 @@ public static class Loc
         "★★★ EXPERT",
         "★★☆ URBAN",
         "★★☆ CAMPUS",
-        "★★★ OVERPASS"
+        "★★★ OVERPASS",
+        "★★☆ SPLIT"
     };
 
     static readonly string[] CourseShortDiffJa =
@@ -122,7 +127,8 @@ public static class Loc
         "★★★ 上級",
         "★★☆ 都市",
         "★★☆ 北大",
-        "★★★ 高架橋"
+        "★★★ 高架橋",
+        "★★☆ 分岐"
     };
 
     static readonly string[] DriverNamesJa =

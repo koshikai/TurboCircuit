@@ -5,8 +5,10 @@ using UnityEngine;
 [System.Serializable]
 public struct JumpRampDef
 {
-    public float Ratio; // 0.0 ~ 1.0 (コースの進行度)
-    public float Power; // 射出上向き速度 (例: 14f)
+    public float Ratio;   // 0.0 ~ 1.0 (コースの進行度)
+    public float Power;   // 射出上向き速度 (例: 14f)
+    public float Lateral; // 横オフセット (0なら中央、正なら右、負なら左)
+    public float Width;   // ジャンプ台の幅 (0ならコース幅に合わせた既定値)
 }
 
 [System.Serializable]
@@ -17,9 +19,22 @@ public struct TunnelDef
 }
 
 [System.Serializable]
+public struct BranchDef
+{
+    public float Start;              // 0.0 ~ 1.0 (分岐開始位置)
+    public float End;                // 0.0 ~ 1.0 (分岐合流位置)
+    public float LeftOffset;         // 左車線の中心横オフセット (例: -9.5f)
+    public float RightOffset;        // 右車線の中心横オフセット (例: +9.5f)
+    public float LaneWidth;          // 各車線の半幅 (例: 5.5f)
+    public float DividerWidth;       // 中央分離帯の半幅 (例: 4.0f)
+    public float RightHeight;        // 右車線の持ち上げ高さ (例: 1.8f 高架/木橋風)
+}
+
+[System.Serializable]
 public struct TrackDef
 {
     public TunnelDef[] Tunnels; // ビルを貫通する屋根付き区間
+    public BranchDef[] Branches; // ルート分岐（二股コース）区間
     public string Name;
     public string Description;
     public Vector3[] Control;
@@ -315,6 +330,61 @@ public partial class Track : MonoBehaviour
             WallColorB = new Color(1f, 0.35f, 0.55f),
             ShoulderColor = new Color(0.88f, 0.82f, 0.68f),
             SceneryTheme = 5
+        },
+        // 7. Canyon Split - 激流の川を挟んで道が二手に分かれる二股渓谷サーキット！
+        // 序盤のオアシス峡谷から大河アプローチへ駆け上がり、運命の分岐点へ突入。
+        // 左ルート：激流を臨む安全な川沿いロード（アイテムボックス多数）。
+        // 右ルート：ジャンプ台で川を跳び越え、高架トレッスル橋（ダッシュ板連続）を駆け抜けるハイリスク・ショートカット！
+        new TrackDef
+        {
+            Name = "CANYON SPLIT",
+            Description = "Dramatic red rock canyon raceway featuring the Great Split: take the safe riverside cruise or leap across the rapids to the wooden trestle shortcut.",
+            Control = new[]
+            {
+                new Vector3(0, 0, -150),        // 0: スタート/フィニッシュ（オアシス大通り）
+                new Vector3(100, 0, -150),      // 1: ストレート加速区間
+                new Vector3(180, 2, -120),      // 2: 第1コーナー（キャニオンイースト）
+                new Vector3(215, 4, -40),       // 3: 峡谷の登り坂
+                new Vector3(210, 7, 40),        // 4: リバーサイド高台
+                new Vector3(165, 8, 115),       // 5: 【分岐アプローチ】分岐標識 & ジャンプ台！
+                new Vector3(95, 7, 180),        // 6: 【二股区間 序盤】川を挟んで左右へ！
+                new Vector3(10, 6, 215),        // 7: 【二股区間 ピーク】北端の大赤岩モニュメントを周回
+                new Vector3(-80, 5, 200),       // 8: 【二股区間 終盤】左の川沿い & 右のトレッスル橋
+                new Vector3(-145, 4, 140),      // 9: 【合流ポイント】二つの道が再び一つに！
+                new Vector3(-200, 3, 70),       // 10: キャニオンウエスト
+                new Vector3(-225, 2, -10),      // 11: 赤岩アーチのS字入口
+                new Vector3(-195, 1, -75),      // 12: アーチ通過・下り坂
+                new Vector3(-140, 0, -125),     // 13: 最終コーナー手前
+                new Vector3(-70, 0, -150)       // 14: ホームストレートへ合流
+            },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.36f, Power = 17.5f, Lateral = 10.0f, Width = 8.0f } },
+            Branches = new[]
+            {
+                new BranchDef
+                {
+                    Start = 0.37f,
+                    End = 0.62f,
+                    LeftOffset = -18.5f,
+                    RightOffset = 18.5f,
+                    LaneWidth = 6.0f,
+                    DividerWidth = 12.0f,
+                    RightHeight = 4.2f
+                }
+            },
+            SkyTint = new Color(0.38f, 0.65f, 0.98f),
+            GroundColor = new Color(0.76f, 0.44f, 0.24f),
+            SunColor = new Color(1f, 0.94f, 0.82f),
+            SunIntensity = 1.35f,
+            SunRotation = new Vector3(46f, -42f, 0f),
+            FogColor = new Color(0.85f, 0.72f, 0.62f),
+            FogDistance = 950f,
+            RoadColor = new Color(0.32f, 0.28f, 0.27f),
+            CurbColorA = new Color(0.98f, 0.52f, 0.1f),
+            CurbColorB = new Color(0.95f, 0.95f, 0.95f),
+            WallColorA = new Color(0.85f, 0.25f, 0.12f),
+            WallColorB = new Color(1.0f, 0.85f, 0.35f),
+            ShoulderColor = new Color(0.88f, 0.65f, 0.42f),
+            SceneryTheme = 1
         }
     };
 
@@ -414,7 +484,7 @@ public partial class Track : MonoBehaviour
             foreach (var ramp in Courses[ActiveCourseIndex].Ramps)
             {
                 int ri = Mathf.Clamp(Mathf.RoundToInt(ramp.Ratio * c), 0, c - 1);
-                JumpRamps.Add((ri, 0f, ramp.Power));
+                JumpRamps.Add((ri, ramp.Lateral, ramp.Power));
             }
         }
 
@@ -487,11 +557,44 @@ public partial class Track : MonoBehaviour
         progress = Mathf.Repeat(Dist[best] + along, Length);
     }
 
+    public bool IsInBranch(float ratio, out BranchDef branch, out float blend)
+    {
+        blend = 0f;
+        branch = default;
+        var branches = Courses[ActiveCourseIndex].Branches;
+        if (branches == null || branches.Length == 0) return false;
+        const float transLen = 0.035f;
+        for (int i = 0; i < branches.Length; i++)
+        {
+            var b = branches[i];
+            float startTrans = b.Start - transLen;
+            float endTrans = b.End + transLen;
+            if (ratio >= startTrans && ratio <= endTrans)
+            {
+                branch = b;
+                if (ratio < b.Start)
+                    blend = Mathf.SmoothStep(0f, 1f, (ratio - startTrans) / transLen);
+                else if (ratio > b.End)
+                    blend = Mathf.SmoothStep(1f, 0f, (ratio - b.End) / transLen);
+                else
+                    blend = 1f;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public Vector3 PointAt(int index, float lateral)
     {
         if (Count == 0 || Pts == null) return Vector3.zero;
         int i = Wrap(index);
-        return Pts[i] + Rights[i] * lateral;
+        float hOffset = 0f;
+        float ratio = (float)i / Count;
+        if (lateral > 0f && IsInBranch(ratio, out BranchDef b, out float blend))
+        {
+            hOffset = b.RightHeight * blend;
+        }
+        return Pts[i] + Rights[i] * lateral + Normals[i] * hOffset;
     }
 
     // ミニマップ用テクスチャ
@@ -516,8 +619,27 @@ public partial class Track : MonoBehaviour
                 px[py0 * size + px0] = col;
             }
         }
-        foreach (var p in Pts) Stamp(p, size / 45f, new Color(0, 0, 0, 0.6f));
-        foreach (var p in Pts) Stamp(p, size / 80f, new Color(1, 1, 1, 0.95f));
+
+        for (int i = 0; i < Count; i++)
+        {
+            float ratio = (float)i / Count;
+            if (IsInBranch(ratio, out BranchDef b, out float blend) && blend > 0.05f)
+            {
+                // 分岐区間：左右2つのルートをスタンプ
+                Vector3 leftP = PointAt(i, b.LeftOffset * blend);
+                Vector3 rightP = PointAt(i, b.RightOffset * blend);
+                Stamp(leftP, size / 55f, new Color(0, 0, 0, 0.6f));
+                Stamp(leftP, size / 100f, new Color(1, 1, 1, 0.95f));
+                Stamp(rightP, size / 55f, new Color(0, 0, 0, 0.6f));
+                Stamp(rightP, size / 100f, new Color(1, 1, 1, 0.95f));
+            }
+            else
+            {
+                Stamp(Pts[i], size / 45f, new Color(0, 0, 0, 0.6f));
+                Stamp(Pts[i], size / 80f, new Color(1, 1, 1, 0.95f));
+            }
+        }
+
         for (int k = -2; k <= 2; k++) Stamp(PointAt(0, k * 3f), size / 110f, new Color(0.1f, 0.1f, 0.1f, 1));
         tex.SetPixels(px);
         tex.Apply();
