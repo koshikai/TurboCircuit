@@ -549,32 +549,50 @@ public partial class Track
             foreach (float side in new[] { -1f, 1f })
             {
                 var pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                Destroy(pole.GetComponent<Collider>());
+                SafeDestroy(pole.GetComponent<Collider>());
                 pole.transform.SetParent(rampGo.transform, false);
                 pole.transform.localPosition = new Vector3(side * (w * 0.5f), h + 0.8f, len * 0.5f);
                 pole.transform.localScale = new Vector3(0.24f, 0.8f, 0.24f);
                 pole.GetComponent<Renderer>().sharedMaterial = poleMat;
 
                 var beacon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                Destroy(beacon.GetComponent<Collider>());
+                SafeDestroy(beacon.GetComponent<Collider>());
                 beacon.transform.SetParent(rampGo.transform, false);
                 beacon.transform.localPosition = new Vector3(side * (w * 0.5f), h + 1.65f, len * 0.5f);
                 beacon.transform.localScale = Vector3.one * 0.55f;
                 beacon.GetComponent<Renderer>().sharedMaterial = beaconMat;
             }
 
-            // 4. スロープ左右のサイドガードレール（走行安全バー）
+            // 4. スロープ先端の離陸リップフレーム（テイクオフエッジバー）
             float slopeAngle = Mathf.Atan2(h - 0.06f, len) * Mathf.Rad2Deg;
             float slopeLen = Mathf.Sqrt(len * len + (h - 0.06f) * (h - 0.06f));
+
+            var lipGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            SafeDestroy(lipGo.GetComponent<Collider>());
+            lipGo.name = "TakeoffLip";
+            lipGo.transform.SetParent(rampGo.transform, false);
+            lipGo.transform.localPosition = new Vector3(0f, h + 0.04f, len * 0.5f);
+            lipGo.transform.localRotation = Quaternion.Euler(-slopeAngle, 0f, 0f);
+            lipGo.transform.localScale = new Vector3(w + 0.05f, 0.12f, 0.35f);
+            lipGo.GetComponent<Renderer>().sharedMaterial = rampBaseMat;
+
+            // 5. スロープ左右のサイドガードレール（走行安全バー）
             foreach (float side in new[] { -1f, 1f })
             {
                 var rail = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                Destroy(rail.GetComponent<Collider>());
+                SafeDestroy(rail.GetComponent<Collider>());
                 rail.transform.SetParent(rampGo.transform, false);
                 rail.transform.localPosition = new Vector3(side * (w * 0.5f + 0.1f), (h + 0.06f) * 0.5f + 0.15f, 0f);
                 rail.transform.localRotation = Quaternion.Euler(-slopeAngle, 0f, 0f);
                 rail.transform.localScale = new Vector3(0.18f, 0.35f, slopeLen);
                 rail.GetComponent<Renderer>().sharedMaterial = rm.standMaterial;
+            }
+
+            // 最初のジャンプ台にアニメーション制御コンポーネントをアタッチ（共有マテリアルを一括駆動）
+            if (r == 0)
+            {
+                var anim = rampGo.AddComponent<JumpRampAnimator>();
+                anim.Init(rampSurfaceMat, beaconMat);
             }
         }
     }
@@ -1371,7 +1389,39 @@ public partial class Track
         }
         return Mathf.Sqrt(best);
     }
-
-
-
 }
+
+// ジャンプ台のシェブロン矢印推進アニメーション＆警告ビーコンのストロボ点滅制御
+public class JumpRampAnimator : MonoBehaviour
+{
+    Material slopeMat;
+    Material beaconMat;
+
+    public void Init(Material sMat, Material bMat)
+    {
+        slopeMat = sMat;
+        beaconMat = bMat;
+    }
+
+    void Update()
+    {
+        // 1. スロープ面の矢印推進アニメーション (手前から奥・テイクオフ側へ滑らかに高速スクロール)
+        if (slopeMat != null)
+        {
+            float vOffset = -Mathf.Repeat(Time.time * 1.6f, 1f);
+            var offset = new Vector2(0f, vOffset);
+            slopeMat.mainTextureOffset = offset;
+            slopeMat.SetTextureOffset("_BaseMap", offset);
+            slopeMat.SetTextureOffset("_EmissionMap", offset);
+        }
+
+        // 2. 警告ビーコンのストロボパルス点滅 (0.4秒周期でピカッと強く発光し、余韻を持って減衰)
+        if (beaconMat != null)
+        {
+            float t = Mathf.Repeat(Time.time * 2.5f, 1f);
+            float flash = Mathf.Pow(Mathf.Clamp01(1f - t), 2.2f);
+            beaconMat.color = Color.Lerp(new Color(0.7f, 0.4f, 0.05f), new Color(1.8f, 1.4f, 0.25f), flash);
+        }
+    }
+}
+
