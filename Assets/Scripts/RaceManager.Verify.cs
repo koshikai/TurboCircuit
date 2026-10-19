@@ -435,8 +435,15 @@ public partial class RaceManager
             p01 = Mathf.Repeat(p01, 1f);
             int idx = Mathf.Clamp(Mathf.RoundToInt(p01 * track.Count), 0, track.Count - 1);
 
-            Player.transform.position = track.PointAt(idx, 0f) + Vector3.up * 0.4f;
+            float lat = 0f;
+            if (track.IsInBranch(p01, out BranchDef br, out float blend) && blend > 0.05f)
+            {
+                lat = br.LeftOffset * blend;
+            }
+
+            Player.transform.position = track.PointAt(idx, lat) + Vector3.up * 0.4f;
             Player.Index = idx;
+            Player.Lateral = lat;
             Player.Progress = track.Dist[idx];
             float trackHeading = Mathf.Atan2(track.Dirs[idx].x, track.Dirs[idx].z) * Mathf.Rad2Deg;
             float camHeading = trackHeading + yawOffset;

@@ -380,7 +380,7 @@ public partial class Track
             int segs = endIdx - startIdx;
             if (segs <= 0) segs += Count;
 
-            // 1. 中央の激流リバーベッド（路面高さに合わせてしっかり見えるようにする）
+            // 1. 中央の激流リバーベッド（25m幅の大河、高低差をつけて渓谷の谷底を流れるように）
             StripDynamic("SplitRiver", k =>
             {
                 float ratio = (float)k / Count;
@@ -388,10 +388,41 @@ public partial class Track
                 {
                     float leftInner = br.LeftOffset + br.LaneWidth;
                     float rightInner = br.RightOffset - br.LaneWidth;
-                    return (new Vector2(leftInner, 0.04f), new Vector2(rightInner, 0.04f));
+                    float riverH = -0.35f * blend;
+                    return (new Vector2(leftInner, riverH), new Vector2(rightInner, riverH));
                 }
                 return (Vector2.zero, Vector2.zero);
             }, riverMat, 6f, startIdx, segs);
+
+            // 1b. 川の赤岩マテリアル（護岸・巨岩用）
+            var rockMat = new Material(rm.wallMaterial) { color = new Color(0.80f, 0.42f, 0.22f) };
+            createdMaterials.Add(rockMat);
+
+            // 1c. 左岸の赤岩バンク（道路から川面へ下る斜面・護岸）
+            StripDynamic("SplitRiverBankL", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+                {
+                    float roadEdge = br.LeftOffset + br.LaneWidth;
+                    float riverEdge = roadEdge + 0.8f;
+                    return (new Vector2(roadEdge, 0.05f), new Vector2(riverEdge, -0.35f * blend));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, rockMat, 4f, startIdx, segs);
+
+            // 1d. 右岸の赤岩バンク（川面から木橋下・地面へ上がる斜面・護岸）
+            StripDynamic("SplitRiverBankR", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+                {
+                    float riverEdge = br.RightOffset - br.LaneWidth - 0.8f;
+                    float groundEdge = br.RightOffset - br.LaneWidth;
+                    return (new Vector2(riverEdge, -0.35f * blend), new Vector2(groundEdge, 0.05f));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, rockMat, 4f, startIdx, segs);
 
             // 2. 左車線の内側縁石 & ガードレール
             StripDynamic("SplitDividerL", k =>
@@ -429,6 +460,20 @@ public partial class Track
                 return (Vector2.zero, Vector2.zero);
             }, woodMat, 4f, startIdx, segs);
 
+            // 3b. 右車線（高架トレッスル橋）の木製底面
+            StripDynamic("SplitBridgeUnderR", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.1f)
+                {
+                    float leftInner = br.RightOffset - br.LaneWidth;
+                    float rightOuter = br.RightOffset + br.LaneWidth;
+                    float h = br.RightHeight * blend - 0.25f;
+                    return (new Vector2(leftInner, h), new Vector2(rightOuter, h));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, woodMat, 6f, startIdx, segs);
+
             // 4. 右車線下のトレッスル木製橋脚
             for (int k = startIdx; k <= endIdx; k += 4)
             {
@@ -444,6 +489,53 @@ public partial class Track
                 }
             }
 
+            // 4b. 川の中の巨岩・奇岩群（River Rocks & Rapids - スタイライズド自然岩）
+            var rockFbxList = new[]
+            {
+                Resources.Load<GameObject>("Props/StylizedNature/Rock_1"),
+                Resources.Load<GameObject>("Props/StylizedNature/Rock_2"),
+                Resources.Load<GameObject>("Props/StylizedNature/Rock_3"),
+                Resources.Load<GameObject>("Props/StylizedNature/Rock_4"),
+                Resources.Load<GameObject>("Props/StylizedNature/Rock_5")
+            };
+            var texRedDesert = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks_Red_Desert");
+            var redRockMat = new Material(rm.wallMaterial)
+            {
+                mainTexture = texRedDesert != null ? texRedDesert : TextureGen.Sand(),
+                color = new Color(0.95f, 0.55f, 0.35f)
+            };
+            createdMaterials.Add(redRockMat);
+
+            var riverRng = new System.Random(77);
+            for (int k = startIdx + 2; k <= endIdx - 2; k += 3)
+            {
+                int idx = k % Count;
+                float ratio = (float)idx / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.25f)
+                {
+                    // 川の中央付近（-6.5m〜+6.5m）に配置（川幅25mの中央部）
+                    float rLat = (float)(riverRng.NextDouble() * 13.0 - 6.5);
+                    float rScale = 2.0f + (float)riverRng.NextDouble() * 2.8f;
+                    Vector3 rockPos = Pts[idx] + Rights[idx] * rLat + Vector3.up * (-0.35f * blend + 0.05f);
+                    Quaternion rockRot = Quaternion.Euler((float)riverRng.NextDouble() * 12f, (float)riverRng.NextDouble() * 360f, (float)riverRng.NextDouble() * 12f);
+
+                    var fbx = rockFbxList[riverRng.Next(rockFbxList.Length)];
+                    if (fbx != null)
+                    {
+                        var rockGo = Instantiate(fbx, rockPos, rockRot, transform);
+                        rockGo.name = "RiverRock";
+                        rockGo.transform.localScale = Vector3.one * rScale;
+                        StripColliders(rockGo);
+                        foreach (var r in rockGo.GetComponentsInChildren<Renderer>())
+                            r.sharedMaterial = redRockMat;
+                    }
+                    else
+                    {
+                        Box("RiverRock", rockPos + Vector3.up * (rScale * 0.45f), new Vector3(rScale * 1.2f, rScale * 1.3f, rScale * 1.2f), rockRot, redRockMat);
+                    }
+                }
+            }
+
             // 5. 分岐ノーズ（大型案内標識「◀ SPLIT ROUTE ▶」& クッションバリア）
             int noseIdx = (startIdx - 4 + Count) % Count;
             Vector3 nosePos = Pts[noseIdx] + Normals[noseIdx] * 0.05f;
@@ -452,10 +544,10 @@ public partial class Track
             // 黄色と黒の衝撃吸収ドラム缶 / クッションバリア
             var cushionMat = new Material(rm.wallMaterial) { mainTexture = TextureGen.HazardStripes() };
             createdMaterials.Add(cushionMat);
-            Box("SplitCushion", nosePos + Vector3.up * 0.6f, new Vector3(2.5f, 1.2f, 2.5f), noseRot, cushionMat, PrimitiveType.Cylinder);
+            Box("SplitCushion", nosePos + Vector3.up * 0.6f, new Vector3(3.0f, 1.3f, 3.0f), noseRot, cushionMat, PrimitiveType.Cylinder);
 
             // 大型案内看板（SPLIT SIGN - ポップなトイ・アーケードデザイン！）
-            Vector3 signPos = nosePos + Vector3.up * 3.8f;
+            Vector3 signPos = nosePos + Vector3.up * 4.2f;
             var signMat = new Material(rm.wallMaterial)
             {
                 mainTexture = TextureGen.SplitSign(),
@@ -468,13 +560,26 @@ public partial class Track
             createdMaterials.Add(signMat);
 
             // メタリック外枠フレーム
-            Box("SplitSignFrame", signPos, new Vector3(8.4f, 3.4f, 0.25f), noseRot, rm.chromeMaterial);
-            // サインボード（正面が走行カートに対面するように180度回転）
-            Box("SplitSignBoard", signPos - noseRot * new Vector3(0, 0, 0.05f), new Vector3(8.0f, 3.0f, 0.20f), noseRot * Quaternion.Euler(0, 180, 0), signMat);
+            Box("SplitSignFrame", signPos, new Vector3(10.4f, 3.8f, 0.25f), noseRot, rm.chromeMaterial);
+
+            // サインボード（Quadメッシュで走行カートに正対）
+            var boardGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            SafeDestroy(boardGo.GetComponent<Collider>());
+            boardGo.name = "SplitSignBoard";
+            boardGo.transform.SetParent(transform, false);
+            boardGo.transform.position = signPos - noseRot * new Vector3(0, 0, 0.14f);
+            boardGo.transform.rotation = noseRot;
+            boardGo.transform.localScale = new Vector3(10.0f, 3.4f, 1f);
+            boardGo.GetComponent<Renderer>().sharedMaterial = signMat;
 
             // 支柱（クロームポール）
-            Box("SplitSignPoleL", signPos + noseRot * new Vector3(-3.2f, -2.1f, 0), new Vector3(0.35f, 4.2f, 0.35f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
-            Box("SplitSignPoleR", signPos + noseRot * new Vector3(3.2f, -2.1f, 0), new Vector3(0.35f, 4.2f, 0.35f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("SplitSignPoleL", signPos + noseRot * new Vector3(-4.2f, -2.3f, 0), new Vector3(0.38f, 4.6f, 0.38f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("SplitSignPoleR", signPos + noseRot * new Vector3(4.2f, -2.3f, 0), new Vector3(0.38f, 4.6f, 0.38f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+
+            // 川の水流アニメーションコンポーネントをアタッチ
+            var riverAnim = gameObject.GetComponent<RiverFlowAnimator>();
+            if (riverAnim == null) riverAnim = gameObject.AddComponent<RiverFlowAnimator>();
+            riverAnim.riverMat = riverMat;
         }
     }
 
@@ -1702,10 +1807,35 @@ public partial class Track
             var d = Pts[i] - p;
             if (flat) d.y = 0f;
             best = Mathf.Min(best, d.sqrMagnitude);
+
+            float ratio = (float)i / Count;
+            if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+            {
+                var dL = (Pts[i] + Rights[i] * (br.LeftOffset * blend)) - p;
+                var dR = (Pts[i] + Rights[i] * (br.RightOffset * blend)) - p;
+                if (flat) { dL.y = 0f; dR.y = 0f; }
+                best = Mathf.Min(best, dL.sqrMagnitude);
+                best = Mathf.Min(best, dR.sqrMagnitude);
+            }
         }
         return Mathf.Sqrt(best);
     }
+}
 
+// 激流・川の水面テクスチャを滑らかにスクロールさせるアニメーションコンポーネント
+public class RiverFlowAnimator : MonoBehaviour
+{
+    public Material riverMat;
 
-
+    void Update()
+    {
+        if (riverMat != null)
+        {
+            float vOffset = -Mathf.Repeat(Time.time * 0.75f, 1f);
+            var offset = new Vector2(0f, vOffset);
+            riverMat.mainTextureOffset = offset;
+            riverMat.SetTextureOffset("_BaseMap", offset);
+            riverMat.SetTextureOffset("_EmissionMap", offset);
+        }
+    }
 }

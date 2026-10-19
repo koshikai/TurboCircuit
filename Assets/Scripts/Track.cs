@@ -357,18 +357,18 @@ public partial class Track : MonoBehaviour
                 new Vector3(-140, 0, -125),     // 13: 最終コーナー手前
                 new Vector3(-70, 0, -150)       // 14: ホームストレートへ合流
             },
-            Ramps = new[] { new JumpRampDef { Ratio = 0.36f, Power = 16f, Lateral = 5.2f, Width = 6.8f } },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.36f, Power = 17.5f, Lateral = 10.0f, Width = 8.0f } },
             Branches = new[]
             {
                 new BranchDef
                 {
                     Start = 0.37f,
                     End = 0.62f,
-                    LeftOffset = -9.5f,
-                    RightOffset = 9.5f,
-                    LaneWidth = 5.5f,
-                    DividerWidth = 4.0f,
-                    RightHeight = 1.8f
+                    LeftOffset = -18.5f,
+                    RightOffset = 18.5f,
+                    LaneWidth = 6.0f,
+                    DividerWidth = 12.0f,
+                    RightHeight = 4.2f
                 }
             },
             SkyTint = new Color(0.38f, 0.65f, 0.98f),

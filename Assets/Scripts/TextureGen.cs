@@ -690,65 +690,101 @@ public static class TextureGen
 
         const int w = 256, h = 128;
         var px = new Color[w * h];
-        Color bgDark = new Color(0.10f, 0.12f, 0.18f);
-        Color leftBlue = new Color(0.12f, 0.55f, 0.95f);
-        Color rightOrange = new Color(0.98f, 0.48f, 0.08f);
+        Color bgDark = new Color(0.12f, 0.14f, 0.20f);
+        Color leftBlue = new Color(0.08f, 0.46f, 0.88f);
+        Color rightOrange = new Color(0.96f, 0.36f, 0.04f);
         Color white = Color.white;
-        Color yellow = new Color(1.0f, 0.85f, 0.15f);
+        Color yellow = new Color(1.0f, 0.84f, 0.12f);
+        Color shadow = new Color(0.04f, 0.06f, 0.10f);
 
         for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
         {
-            float u = x / (float)(w - 1);
-            float v = y / (float)(h - 1);
-
-            // 外枠
-            if (u < 0.02f || u > 0.98f || v < 0.04f || v > 0.96f)
+            // 外枠（白いアルミフレーム）
+            if (x < 4 || x >= w - 4 || y < 4 || y >= h - 4)
             {
-                px[y * w + x] = new Color(0.85f, 0.88f, 0.92f);
+                px[y * w + x] = new Color(0.88f, 0.90f, 0.94f);
                 continue;
             }
 
-            // 上部リボンバー (SPLIT ROUTE)
-            if (v > 0.76f)
+            // 上部リボンバー (黄色ヘッダー)
+            if (y >= 96)
             {
-                px[y * w + x] = yellow;
-                // リボンのボーダー
-                if (v < 0.79f) px[y * w + x] = Color.black;
+                if (y == 96 || y == 97) px[y * w + x] = bgDark;
+                else if (x % 32 < 2) px[y * w + x] = bgDark;
+                else px[y * w + x] = yellow;
                 continue;
             }
 
-            // メインエリア
-            if (u < 0.48f)
+            // 中央のハザード仕切り（黒×黄）
+            if (x >= 122 && x <= 134)
             {
-                // 左パネル (CRUISE / RIVER)
+                bool stripe = ((x + y) / 8) % 2 == 0;
+                px[y * w + x] = stripe ? yellow : bgDark;
+                continue;
+            }
+
+            // 左パネル (CRUISE / RIVER)
+            if (x < 122)
+            {
                 Color c = leftBlue;
-                // 左向きの矢印（◀ ◀）シェブロン
-                float arrowU = Mathf.Repeat(u * 5f + v * 0.2f, 1f);
-                float dy = Mathf.Abs(v - 0.45f) * 2.8f;
-                if (u > 0.10f && u < 0.42f && arrowU < 0.35f && arrowU > dy * 0.15f)
+                // パネル内側枠
+                if (x == 4 || x == 121 || y == 4 || y == 95) c = bgDark;
+                else
                 {
-                    c = white;
+                    // 左向きの大型シェブロン矢印 ◀ ◀ (2連)
+                    for (int a = 0; a < 2; a++)
+                    {
+                        float tipX = 22f + a * 44f;
+                        float dx = x - tipX;
+                        float dy = Mathf.Abs(y - 50f);
+                        if (dx >= 0f && dx <= 32f && dy <= dx * 0.95f)
+                        {
+                            if (dx <= 12f || dy >= (dx - 12f) * 0.95f)
+                            {
+                                c = (dx > 28f || dy > dx * 0.95f - 2f) ? shadow : white;
+                            }
+                        }
+                    }
+                    // 下部の波模様（川のアイコン）
+                    if (y >= 14 && y <= 22)
+                    {
+                        float wave = Mathf.Sin(x * 0.35f);
+                        if (Mathf.Abs((y - 18f) - wave * 2.5f) < 1.8f) c = white;
+                    }
                 }
                 px[y * w + x] = c;
             }
-            else if (u > 0.52f)
-            {
-                // 右パネル (JUMP / SHORTCUT)
-                Color c = rightOrange;
-                // 右向きの矢印（▶ ▶）シェブロン
-                float arrowU = Mathf.Repeat((1f - u) * 5f + v * 0.2f, 1f);
-                float dy = Mathf.Abs(v - 0.45f) * 2.8f;
-                if (u > 0.58f && u < 0.90f && arrowU < 0.35f && arrowU > dy * 0.15f)
-                {
-                    c = white;
-                }
-                px[y * w + x] = c;
-            }
+            // 右パネル (JUMP / SHORTCUT)
             else
             {
-                // 中央の区切り
-                px[y * w + x] = bgDark;
+                Color c = rightOrange;
+                // パネル内側枠
+                if (x == 135 || x == w - 5 || y == 4 || y == 95) c = bgDark;
+                else
+                {
+                    // 右向きの大型シェブロン矢印 ▶ ▶ (2連)
+                    for (int a = 0; a < 2; a++)
+                    {
+                        float tipX = 234f - a * 44f;
+                        float dx = tipX - x;
+                        float dy = Mathf.Abs(y - 50f);
+                        if (dx >= 0f && dx <= 32f && dy <= dx * 0.95f)
+                        {
+                            if (dx <= 12f || dy >= (dx - 12f) * 0.95f)
+                            {
+                                c = (dx > 28f || dy > dx * 0.95f - 2f) ? shadow : white;
+                            }
+                        }
+                    }
+                    // 下部のジャンプスロープアイコン
+                    if (y >= 12 && y <= 26 && x >= 150 && x <= 220)
+                    {
+                        float slopeY = 12f + (x - 150f) * 0.18f;
+                        if (Mathf.Abs(y - slopeY) < 2f) c = white;
+                    }
+                }
+                px[y * w + x] = c;
             }
         }
 

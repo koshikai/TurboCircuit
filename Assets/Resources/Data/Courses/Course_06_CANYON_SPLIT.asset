@@ -32,18 +32,18 @@ MonoBehaviour:
   - {x: -70, y: 0, z: -150}
   ramps:
   - Ratio: 0.36
-    Power: 16
-    Lateral: 5.2
-    Width: 6.8
+    Power: 17.5
+    Lateral: 10
+    Width: 8
   tunnels: []
   branches:
   - Start: 0.37
     End: 0.62
-    LeftOffset: -9.5
-    RightOffset: 9.5
-    LaneWidth: 5.5
-    DividerWidth: 4
-    RightHeight: 1.8
+    LeftOffset: -18.5
+    RightOffset: 18.5
+    LaneWidth: 6
+    DividerWidth: 12
+    RightHeight: 4.2
   skyTint: {r: 0.38, g: 0.65, b: 0.98, a: 1}
   groundColor: {r: 0.76, g: 0.44, b: 0.24, a: 1}
   sunColor: {r: 1, g: 0.94, b: 0.82, a: 1}
