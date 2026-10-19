@@ -12,7 +12,7 @@ All audio in this folder is released under CC0 (public domain). Credit is not re
 |------|--------|-------|--------|--------|
 | bgm_0 | Turbo Circuit | Hyperflight Racing | cynicmusic | https://opengameart.org/content/hyperflight-racing |
 | bgm_1 | Sunset Dunes | Some sorta kinda 80's sounding theme but not really | Julie Damsgaard | https://opengameart.org/content/some-sorta-kinda-80s-sounding-theme-but-not-really |
-| bgm_2 | Frost Peak | Dance field | Centurion_of_war | https://opengameart.org/content/dance-field |
+| bgm_2 | Frost Peak | Trance Boss Battle | MintoDog | https://opengameart.org/content/trance-boss-battle |
 | bgm_3 | Neon Metropolis | City Loop | wipics | https://opengameart.org/content/city-loop-0 |
 | bgm_4 | Hokkaido Campus | Awake! (Megawall-10) | cynicmusic | https://opengameart.org/content/awake-megawall-10 |
-| bgm_5 | Skyline Overpass | Cool Highway Remake | MedicineStorm | https://opengameart.org/content/cool-highway-remake |
+| bgm_5 | Skyline Overpass | Pure Raceway | MintoDog | https://opengameart.org/content/pure-raceway |
