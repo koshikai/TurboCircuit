@@ -3,6 +3,7 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
+* [Stable Audio 3 / Audio Studio MCP] - Item pickup sound (`sfx_pickup.ogg`, generated via Stable Audio 3 small-sfx, normalized and tailored).
 * [Turbo Circuit Remastered Arcade SFX] - Countdown beep, Go burst, Lap chime, Final Lap fanfare, Finish victory fanfare, Drift charge spark/pop, Item roulette tick, and Item lock-in jingle (Custom FM synthesis & synth brass remaster, CC0).
 * [Kenney](https://kenney.nl/) - Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
 * [qubodup / Scribe](https://opengameart.org/content/supertuxkart-sound-effects) - Kart engine & tire skid sound effects (CC0 / Public domain).
