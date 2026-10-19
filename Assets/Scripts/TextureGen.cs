@@ -502,7 +502,7 @@ public static class TextureGen
         return cache["chevrons"] = New(n, n, px);
     }
 
-    // ジャンプ台スロープ（カタパルトランプ）用テクスチャ (256x256)
+    // ジャンプ台スロープ（カタパルトランプ）用テクスチャ (256x256, V軸シームレスループ対応)
     public static Texture2D JumpRamp()
     {
         string key = "jump_ramp_albedo";
@@ -513,74 +513,59 @@ public static class TextureGen
         for (int y = 0; y < n; y++)
         for (int x = 0; x < n; x++)
         {
-            float u = x / (float)(n - 1); // 0=左, 1=右
-            float v = y / (float)(n - 1); // 0=手前, 1=奥(離陸点)
+            float u = x / (float)n; // 0=左, 1=右
+            float v = y / (float)n; // 0=手前, 1=奥(離陸点)
             float distCenter = Mathf.Abs(u - 0.5f);
 
             Color c;
 
-            // 1. 最外縁のサイドボーダー (distCenter > 0.43: u < 0.07 または u > 0.93)
-            if (distCenter > 0.43f)
+            // 1. 最外縁のサイドボーダー (distCenter > 0.42: 左右の警告レーシングチェッカー)
+            if (distCenter > 0.42f)
             {
-                // 赤と白の警告レーシングチェッカー・ストライプ
-                bool red = Mathf.Repeat(v * 14f, 1f) < 0.5f;
-                c = red ? new Color(0.92f, 0.15f, 0.15f) : new Color(0.95f, 0.95f, 0.95f);
+                // 赤と白の警告レーシングチェッカー・ストライプ (16周期でV方向シームレス)
+                bool red = Mathf.Repeat(v * 16f, 1f) < 0.5f;
+                c = red ? new Color(0.92f, 0.15f, 0.15f) : new Color(0.96f, 0.96f, 0.98f);
             }
-            // 2. サイド内側のネオンブルー/シアンガイドライン (distCenter 0.40〜0.43)
-            else if (distCenter > 0.40f)
+            // 2. サイド内側のネオンブルー/シアンガイドライン (distCenter 0.39〜0.42)
+            else if (distCenter > 0.39f)
             {
-                c = new Color(0.1f, 0.85f, 1f);
+                c = new Color(0.12f, 0.90f, 1.0f);
             }
-            // 3. 先端テイクオフライン (v > 0.91)
-            else if (v > 0.91f)
-            {
-                if (v > 0.97f)
-                {
-                    // 最先端のホワイトリップ
-                    c = Color.white;
-                }
-                else
-                {
-                    // テイクオフのイエロー＆ブラック警告チェッカー
-                    bool chk = (Mathf.Repeat(u * 18f, 1f) < 0.5f) ^ (Mathf.Repeat(v * 16f, 1f) < 0.5f);
-                    c = chk ? new Color(1f, 0.85f, 0.1f) : new Color(0.15f, 0.15f, 0.18f);
-                }
-            }
-            // 4. メイン走行面（多層シェブロン矢印 ∧ とハイテクスチール路面）
+            // 3. メイン走行面（多層シェブロン矢印 ∧ とハイテクノンスリップ路面）
             else
             {
-                // ∧型のシェブロン矢印計算（中央 u=0.5 が先端）
-                float arrowV = v + (0.40f - distCenter) * 0.95f;
-                float phase = Mathf.Repeat(arrowV * 3.6f, 1f);
+                // ∧型のシェブロン矢印計算（中央 u=0.5 が進行方向先端・3周期でV方向完全シームレス）
+                float arrowV = v - (0.39f - distCenter) * 0.85f;
+                float phase = Mathf.Repeat(arrowV * 3.0f, 1f);
 
-                // シェブロン矢印の領域
-                if (phase >= 0.26f && phase <= 0.80f)
+                // シェブロン矢印の領域 (幅 約50%)
+                if (phase >= 0.25f && phase <= 0.75f)
                 {
-                    float arrowCore = Mathf.Abs(phase - 0.53f); // 0.0が矢印の真ん中
-                    bool isEdge = phase < 0.30f || phase > 0.76f;
+                    float arrowCore = Mathf.Abs(phase - 0.50f); // 0.0が矢印の真ん中
+                    bool isEdge = phase < 0.29f || phase > 0.71f;
 
                     if (isEdge)
                     {
                         // クッキリとしたホワイトのアウトライン
                         c = new Color(1f, 1f, 1f);
                     }
-                    else if (arrowCore < 0.08f)
+                    else if (arrowCore < 0.07f)
                     {
-                        // 矢印中央のハイライトコア（ブライトイエロー〜ホワイト）
-                        c = new Color(1f, 0.98f, 0.55f);
+                        // 矢印中央のハイライトコア（ブライトレモンイエロー〜ホワイト）
+                        c = new Color(1f, 0.98f, 0.65f);
                     }
                     else
                     {
-                        // 鮮やかなネオンオレンジ〜ゴールドイエローのグラデーション
-                        float grad = Mathf.Clamp01((arrowCore - 0.08f) / 0.15f);
-                        c = Color.Lerp(new Color(1f, 0.85f, 0.12f), new Color(1f, 0.42f, 0.04f), grad);
+                        // 鮮やかなネオンゴールド〜ホットオレンジのグラデーション
+                        float grad = Mathf.Clamp01((arrowCore - 0.07f) / 0.18f);
+                        c = Color.Lerp(new Color(1f, 0.88f, 0.15f), new Color(1f, 0.42f, 0.04f), grad);
                     }
                 }
                 else
                 {
-                    // 背景：ダークスチールメッシュ路面
-                    bool grid = Mathf.Repeat(u * 32f, 1f) < 0.07f || Mathf.Repeat(v * 32f, 1f) < 0.07f;
-                    c = grid ? new Color(0.20f, 0.21f, 0.24f) : new Color(0.12f, 0.12f, 0.14f);
+                    // 背景：カタパルトデッキのハイテクダークメタリック路面＋ダイアモンドトレッド
+                    bool diamond = ((x + y) % 16 < 2) || ((x - y + 256) % 16 < 2);
+                    c = diamond ? new Color(0.20f, 0.22f, 0.26f) : new Color(0.13f, 0.14f, 0.17f);
                 }
             }
 
@@ -593,7 +578,7 @@ public static class TextureGen
         return t;
     }
 
-    // ジャンプ台スロープ発光マップ用テクスチャ (256x256)
+    // ジャンプ台スロープ発光マップ用テクスチャ (256x256, V軸シームレスループ対応)
     public static Texture2D JumpRampEmission()
     {
         string key = "jump_ramp_emission";
@@ -604,39 +589,34 @@ public static class TextureGen
         for (int y = 0; y < n; y++)
         for (int x = 0; x < n; x++)
         {
-            float u = x / (float)(n - 1);
-            float v = y / (float)(n - 1);
+            float u = x / (float)n;
+            float v = y / (float)n;
             float distCenter = Mathf.Abs(u - 0.5f);
 
             Color c = Color.black; // 背景のダークスチールは発光させない
 
             // ネオンブルーガイドライン
-            if (distCenter > 0.40f && distCenter <= 0.43f)
+            if (distCenter > 0.39f && distCenter <= 0.42f)
             {
-                c = new Color(0.1f, 0.85f, 1f) * 0.9f;
-            }
-            // 先端テイクオフライン
-            else if (v > 0.91f && distCenter <= 0.40f)
-            {
-                c = new Color(1f, 0.85f, 0.3f) * 0.85f;
+                c = new Color(0.12f, 0.90f, 1.0f) * 1.1f;
             }
             // シェブロン矢印
-            else if (distCenter <= 0.40f && v <= 0.91f)
+            else if (distCenter <= 0.39f)
             {
-                float arrowV = v + (0.40f - distCenter) * 0.95f;
-                float phase = Mathf.Repeat(arrowV * 3.6f, 1f);
+                float arrowV = v - (0.39f - distCenter) * 0.85f;
+                float phase = Mathf.Repeat(arrowV * 3.0f, 1f);
 
-                if (phase >= 0.26f && phase <= 0.80f)
+                if (phase >= 0.25f && phase <= 0.75f)
                 {
-                    float arrowCore = Mathf.Abs(phase - 0.53f);
-                    bool isEdge = phase < 0.30f || phase > 0.76f;
-                    if (isEdge || arrowCore < 0.08f)
+                    float arrowCore = Mathf.Abs(phase - 0.50f);
+                    bool isEdge = phase < 0.29f || phase > 0.71f;
+                    if (isEdge || arrowCore < 0.07f)
                     {
-                        c = new Color(1f, 0.95f, 0.7f) * 0.95f;
+                        c = new Color(1f, 0.96f, 0.75f) * 1.25f;
                     }
                     else
                     {
-                        c = new Color(1f, 0.65f, 0.15f) * 0.85f;
+                        c = new Color(1f, 0.65f, 0.15f) * 0.95f;
                     }
                 }
             }
