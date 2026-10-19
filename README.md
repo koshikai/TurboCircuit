@@ -13,7 +13,7 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Version-v2.0.1-purple?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v2.1.0-purple?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/Platform-Windows%2064--bit-blue?logo=windows&style=flat-square" alt="Platform">
     <img src="https://img.shields.io/badge/Engine-Unity%206000.6%20(URP)-black?logo=unity&style=flat-square" alt="Unity">
     <img src="https://img.shields.io/badge/Players-1--8%20Players-brightgreen?style=flat-square" alt="Players">

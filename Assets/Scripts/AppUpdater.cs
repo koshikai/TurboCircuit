@@ -13,7 +13,7 @@ public class AppUpdater : MonoBehaviour
     public static AppUpdater Instance { get; private set; }
 
     // 現在のアプリバージョン
-    public const string CurrentVersion = "v2.0.1";
+    public const string CurrentVersion = "v2.1.0";
 
     // GitHub リポジトリ情報
     public const string GitHubRepo = "koshikai/TurboCircuit";
@@ -637,10 +637,10 @@ exit
             "- ドライバー10名 × カートマシン8種の自由なセッティングに対応\n" +
             "- アイテム3Dモデル・ポップアイコン・白煙エフェクトを全面刷新\n" +
             "- アップデート画面の日本語表示およびボタンクリック判定を改善");
-        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v2.0.1/TurboCircuit-win64.zip";
+        DownloadUrl = "https://github.com/koshikai/TurboCircuit/releases/download/v2.1.0/TurboCircuit-win64.zip";
         TotalBytes = 67500000UL;
         State = UpdateState.UpdateAvailable;
-        StatusMessage = "New update available: v2.0.1";
+        StatusMessage = "New update available: v2.1.0";
         ShowModal = true;
     }
 }
