@@ -71,42 +71,51 @@ public partial class Track
         groundMat.mainTextureScale = new Vector2(160, 160);
         createdMaterials.Add(groundMat);
 
-        Strip("Road", new Vector2(-HalfWidth, 0.03f), new Vector2(HalfWidth, 0.03f), roadMat, HalfWidth * 2f);
-        Strip("CurbL", new Vector2(-HalfWidth - CurbWidth, 0.05f), new Vector2(-HalfWidth, 0.05f), curbMat, 4f);
-        Strip("CurbR", new Vector2(HalfWidth, 0.05f), new Vector2(HalfWidth + CurbWidth, 0.05f), curbMat, 4f);
-
-        // 路肩
         var shoulderMat = new Material(rm.grassMaterial) { color = def.ShoulderColor, mainTexture = groundTex };
         createdMaterials.Add(shoulderMat);
-        Strip("ShoulderL", new Vector2(-WallOffset, 0.02f), new Vector2(-HalfWidth - CurbWidth, 0.02f), shoulderMat, 6f);
-        Strip("ShoulderR", new Vector2(HalfWidth + CurbWidth, 0.02f), new Vector2(WallOffset, 0.02f), shoulderMat, 6f);
 
-        // 北大キャンパス専用：北13条イチョウ並木区間の路肩＆路面に敷き詰められる黄金の落ち葉の絨毯
-        if (def.SceneryTheme == 4)
+        bool hasBranches = def.Branches != null && def.Branches.Length > 0;
+        if (hasBranches)
         {
-            var ginkgoCarpetMat = new Material(rm.grassMaterial) { color = Color.white, mainTexture = TextureGen.GinkgoCarpet() };
-            createdMaterials.Add(ginkgoCarpetMat);
-            int gStart = (int)(0.26f * Count);
-            int gEnd = (int)(0.39f * Count);
-            int gSegs = gEnd - gStart;
-            // 路肩の絨毯
-            Strip("GinkgoCarpetL", new Vector2(-WallOffset + 0.1f, 0.035f), new Vector2(-HalfWidth - CurbWidth, 0.035f), ginkgoCarpetMat, 4f, gStart, gSegs);
-            Strip("GinkgoCarpetR", new Vector2(HalfWidth + CurbWidth, 0.035f), new Vector2(WallOffset - 0.1f, 0.035f), ginkgoCarpetMat, 4f, gStart, gSegs);
-            // 道路端（アスファルトの左右端に溜まった落ち葉帯）
-            Strip("GinkgoRoadEdgeL", new Vector2(-HalfWidth, 0.038f), new Vector2(-HalfWidth + 1.2f, 0.038f), ginkgoCarpetMat, 3f, gStart, gSegs);
-            Strip("GinkgoRoadEdgeR", new Vector2(HalfWidth - 1.2f, 0.038f), new Vector2(HalfWidth, 0.038f), ginkgoCarpetMat, 3f, gStart, gSegs);
+            BuildSplitTrack(rm, def, roadMat, curbMat, wallMat, shoulderMat, groundTex);
         }
+        else
+        {
+            Strip("Road", new Vector2(-HalfWidth, 0.03f), new Vector2(HalfWidth, 0.03f), roadMat, HalfWidth * 2f);
+            Strip("CurbL", new Vector2(-HalfWidth - CurbWidth, 0.05f), new Vector2(-HalfWidth, 0.05f), curbMat, 4f);
+            Strip("CurbR", new Vector2(HalfWidth, 0.05f), new Vector2(HalfWidth + CurbWidth, 0.05f), curbMat, 4f);
 
-        // 壁は両面
-        Strip("WallL", new Vector2(-WallOffset, 0f), new Vector2(-WallOffset, 1.2f), wallMat, 6f);
-        Strip("WallL2", new Vector2(-WallOffset, 1.2f), new Vector2(-WallOffset, 0f), wallMat, 6f);
-        Strip("WallR", new Vector2(WallOffset, 1.2f), new Vector2(WallOffset, 0f), wallMat, 6f);
-        Strip("WallR2", new Vector2(WallOffset, 0f), new Vector2(WallOffset, 1.2f), wallMat, 6f);
-        Strip("WallTopL", new Vector2(-WallOffset - 0.4f, 1.2f), new Vector2(-WallOffset, 1.2f), rm.chromeMaterial, 6f);
-        Strip("WallTopR", new Vector2(WallOffset, 1.2f), new Vector2(WallOffset + 0.4f, 1.2f), rm.chromeMaterial, 6f);
+            // 路肩
+            Strip("ShoulderL", new Vector2(-WallOffset, 0.02f), new Vector2(-HalfWidth - CurbWidth, 0.02f), shoulderMat, 6f);
+            Strip("ShoulderR", new Vector2(HalfWidth + CurbWidth, 0.02f), new Vector2(WallOffset, 0.02f), shoulderMat, 6f);
 
-        // 高架橋の底面（下から見上げたときに道路の裏が見えるように）
-        Strip("RoadUnder", new Vector2(WallOffset, -0.35f), new Vector2(-WallOffset, -0.35f), rm.standMaterial, 8f);
+            // 北大キャンパス専用：北13条イチョウ並木区間の路肩＆路面に敷き詰められる黄金の落ち葉の絨毯
+            if (def.SceneryTheme == 4)
+            {
+                var ginkgoCarpetMat = new Material(rm.grassMaterial) { color = Color.white, mainTexture = TextureGen.GinkgoCarpet() };
+                createdMaterials.Add(ginkgoCarpetMat);
+                int gStart = (int)(0.26f * Count);
+                int gEnd = (int)(0.39f * Count);
+                int gSegs = gEnd - gStart;
+                // 路肩の絨毯
+                Strip("GinkgoCarpetL", new Vector2(-WallOffset + 0.1f, 0.035f), new Vector2(-HalfWidth - CurbWidth, 0.035f), ginkgoCarpetMat, 4f, gStart, gSegs);
+                Strip("GinkgoCarpetR", new Vector2(HalfWidth + CurbWidth, 0.035f), new Vector2(WallOffset - 0.1f, 0.035f), ginkgoCarpetMat, 4f, gStart, gSegs);
+                // 道路端（アスファルトの左右端に溜まった落ち葉帯）
+                Strip("GinkgoRoadEdgeL", new Vector2(-HalfWidth, 0.038f), new Vector2(-HalfWidth + 1.2f, 0.038f), ginkgoCarpetMat, 3f, gStart, gSegs);
+                Strip("GinkgoRoadEdgeR", new Vector2(HalfWidth - 1.2f, 0.038f), new Vector2(HalfWidth, 0.038f), ginkgoCarpetMat, 3f, gStart, gSegs);
+            }
+
+            // 壁は両面
+            Strip("WallL", new Vector2(-WallOffset, 0f), new Vector2(-WallOffset, 1.2f), wallMat, 6f);
+            Strip("WallL2", new Vector2(-WallOffset, 1.2f), new Vector2(-WallOffset, 0f), wallMat, 6f);
+            Strip("WallR", new Vector2(WallOffset, 1.2f), new Vector2(WallOffset, 0f), wallMat, 6f);
+            Strip("WallR2", new Vector2(WallOffset, 0f), new Vector2(WallOffset, 1.2f), wallMat, 6f);
+            Strip("WallTopL", new Vector2(-WallOffset - 0.4f, 1.2f), new Vector2(-WallOffset, 1.2f), rm.chromeMaterial, 6f);
+            Strip("WallTopR", new Vector2(WallOffset, 1.2f), new Vector2(WallOffset + 0.4f, 1.2f), rm.chromeMaterial, 6f);
+
+            // 高架橋の底面（下から見上げたときに道路の裏が見えるように）
+            Strip("RoadUnder", new Vector2(WallOffset, -0.35f), new Vector2(-WallOffset, -0.35f), rm.standMaterial, 8f);
+        }
 
         // 地面（コースの起伏に寄り添って自然に盛り上がるプロシージャル地形システム）
         BuildProceduralTerrain(rm, def, groundMat);
@@ -182,6 +191,291 @@ public partial class Track
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         MeshObject(name, mesh, mat);
+    }
+
+    // 動的オフセットによるメッシュ生成（ルート分岐や可変幅用）
+    void StripDynamic(string name, System.Func<int, (Vector2 a, Vector2 b)> getOffsets, Material mat, float vScale, int from = 0, int segments = -1)
+    {
+        int c = Count;
+        bool full = segments < 0;
+        int segs = full ? c : segments;
+        var verts = new Vector3[(segs + 1) * 2];
+        var uvs = new Vector2[(segs + 1) * 2];
+        var tris = new int[segs * 6];
+        for (int i = 0; i <= segs; i++)
+        {
+            int k = (from + i) % c;
+            float v = (full && i == c ? Length : Dist[k]) / vScale;
+            var (a, b) = getOffsets(k);
+            verts[i * 2] = Pts[k] + Rights[k] * a.x + Normals[k] * a.y;
+            verts[i * 2 + 1] = Pts[k] + Rights[k] * b.x + Normals[k] * b.y;
+            uvs[i * 2] = new Vector2(0, v);
+            uvs[i * 2 + 1] = new Vector2(1, v);
+        }
+        for (int i = 0; i < segs; i++)
+        {
+            int a0 = i * 2, b0 = i * 2 + 1, a1 = i * 2 + 2, b1 = i * 2 + 3;
+            tris[i * 6 + 0] = a0; tris[i * 6 + 1] = a1; tris[i * 6 + 2] = b0;
+            tris[i * 6 + 3] = b0; tris[i * 6 + 4] = a1; tris[i * 6 + 5] = b1;
+        }
+        var mesh = new Mesh { name = name, vertices = verts, uv = uvs, triangles = tris };
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        MeshObject(name, mesh, mat);
+    }
+
+    void BuildSplitTrack(RaceManager rm, TrackDef def, Material roadMat, Material curbMat, Material wallMat, Material shoulderMat, Texture2D groundTex)
+    {
+        // 1. 左車線道路 & 右車線道路
+        StripDynamic("RoadL", k =>
+        {
+            float ratio = (float)k / Count;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                float leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+                float rightEdge = Mathf.Lerp(0f, b.LeftOffset + b.LaneWidth, blend);
+                return (new Vector2(leftEdge, 0.03f), new Vector2(rightEdge, 0.03f));
+            }
+            return (new Vector2(-HalfWidth, 0.03f), new Vector2(0f, 0.03f));
+        }, roadMat, HalfWidth * 2f);
+
+        // 木橋（ウッドデッキ）風マテリアル
+        var woodMat = new Material(rm.standMaterial) { color = new Color(0.55f, 0.35f, 0.20f) };
+        createdMaterials.Add(woodMat);
+
+        StripDynamic("RoadR", k =>
+        {
+            float ratio = (float)k / Count;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                float leftEdge = Mathf.Lerp(0f, b.RightOffset - b.LaneWidth, blend);
+                float rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+                float h = 0.03f + b.RightHeight * blend;
+                return (new Vector2(leftEdge, h), new Vector2(rightEdge, h));
+            }
+            return (new Vector2(0f, 0.03f), new Vector2(HalfWidth, 0.03f));
+        }, roadMat, HalfWidth * 2f);
+
+        // 2. 外側縁石 (CurbL, CurbR)
+        StripDynamic("CurbL", k =>
+        {
+            float ratio = (float)k / Count;
+            float leftEdge = -HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+            return (new Vector2(leftEdge - CurbWidth, 0.05f), new Vector2(leftEdge, 0.05f));
+        }, curbMat, 4f);
+
+        StripDynamic("CurbR", k =>
+        {
+            float ratio = (float)k / Count;
+            float rightEdge = HalfWidth;
+            float h = 0.05f;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+                h += b.RightHeight * blend;
+            }
+            return (new Vector2(rightEdge, h), new Vector2(rightEdge + CurbWidth, h));
+        }, curbMat, 4f);
+
+        // 3. 外側路肩 (ShoulderL, ShoulderR)
+        StripDynamic("ShoulderL", k =>
+        {
+            float ratio = (float)k / Count;
+            float leftEdge = -HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+            return (new Vector2(leftEdge - CurbWidth - 4f, 0.02f), new Vector2(leftEdge - CurbWidth, 0.02f));
+        }, shoulderMat, 6f);
+
+        StripDynamic("ShoulderR", k =>
+        {
+            float ratio = (float)k / Count;
+            float rightEdge = HalfWidth;
+            float h = 0.02f;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+                h += b.RightHeight * blend;
+            }
+            return (new Vector2(rightEdge + CurbWidth, h), new Vector2(rightEdge + CurbWidth + 4f, h));
+        }, shoulderMat, 6f);
+
+        // 4. 外壁 (WallL, WallR)
+        StripDynamic("WallL", k =>
+        {
+            float ratio = (float)k / Count;
+            float leftEdge = -HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+            float wallX = leftEdge - CurbWidth - 4f;
+            return (new Vector2(wallX, 0f), new Vector2(wallX, 1.2f));
+        }, wallMat, 6f);
+
+        StripDynamic("WallL2", k =>
+        {
+            float ratio = (float)k / Count;
+            float leftEdge = -HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+            float wallX = leftEdge - CurbWidth - 4f;
+            return (new Vector2(wallX, 1.2f), new Vector2(wallX, 0f));
+        }, wallMat, 6f);
+
+        StripDynamic("WallR", k =>
+        {
+            float ratio = (float)k / Count;
+            float rightEdge = HalfWidth;
+            float h = 0f;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+                h = b.RightHeight * blend;
+            }
+            float wallX = rightEdge + CurbWidth + 4f;
+            return (new Vector2(wallX, h), new Vector2(wallX, h + 1.2f));
+        }, wallMat, 6f);
+
+        StripDynamic("WallR2", k =>
+        {
+            float ratio = (float)k / Count;
+            float rightEdge = HalfWidth;
+            float h = 0f;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+            {
+                rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+                h = b.RightHeight * blend;
+            }
+            float wallX = rightEdge + CurbWidth + 4f;
+            return (new Vector2(wallX, h + 1.2f), new Vector2(wallX, h));
+        }, wallMat, 6f);
+
+        // 5. 分岐区間の中央ディバイダー（激流リバー、中央壁、トレッスル支柱、分岐標識）
+        BuildSplitFeatures(rm, def, curbMat, wallMat, woodMat);
+    }
+
+    void BuildSplitFeatures(RaceManager rm, TrackDef def, Material curbMat, Material wallMat, Material woodMat)
+    {
+        if (def.Branches == null) return;
+
+        // 激流エメラルドグリーンの水面マテリアル
+        var riverMat = new Material(rm.boostPadMaterial)
+        {
+            mainTexture = TextureGen.RiverWater(),
+            color = Color.white
+        };
+        riverMat.SetTexture("_BaseMap", TextureGen.RiverWater());
+        riverMat.EnableKeyword("_EMISSION");
+        riverMat.SetTexture("_EmissionMap", TextureGen.RiverWater());
+        riverMat.SetColor("_EmissionColor", new Color(0.2f, 0.8f, 0.9f) * 0.5f);
+        riverMat.mainTextureScale = new Vector2(2f, 16f);
+        createdMaterials.Add(riverMat);
+
+        for (int bi = 0; bi < def.Branches.Length; bi++)
+        {
+            var b = def.Branches[bi];
+            int startIdx = Mathf.RoundToInt(b.Start * Count);
+            int endIdx = Mathf.RoundToInt(b.End * Count);
+            int segs = endIdx - startIdx;
+            if (segs <= 0) segs += Count;
+
+            // 1. 中央の激流リバーベッド（路面高さに合わせてしっかり見えるようにする）
+            StripDynamic("SplitRiver", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+                {
+                    float leftInner = br.LeftOffset + br.LaneWidth;
+                    float rightInner = br.RightOffset - br.LaneWidth;
+                    return (new Vector2(leftInner, 0.04f), new Vector2(rightInner, 0.04f));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, riverMat, 6f, startIdx, segs);
+
+            // 2. 左車線の内側縁石 & ガードレール
+            StripDynamic("SplitDividerL", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.1f)
+                {
+                    float innerX = br.LeftOffset + br.LaneWidth;
+                    return (new Vector2(innerX, 0.05f), new Vector2(innerX + CurbWidth, 0.05f));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, curbMat, 4f, startIdx, segs);
+
+            StripDynamic("SplitDividerWallL", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.1f)
+                {
+                    float wallX = br.LeftOffset + br.LaneWidth + CurbWidth;
+                    return (new Vector2(wallX, 0f), new Vector2(wallX, 0.9f));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, wallMat, 4f, startIdx, segs);
+
+            // 3. 右車線の木製手すりフェンス
+            StripDynamic("SplitWoodFenceR", k =>
+            {
+                float ratio = (float)k / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.1f)
+                {
+                    float wallX = br.RightOffset - br.LaneWidth;
+                    float h = br.RightHeight * blend;
+                    return (new Vector2(wallX, h), new Vector2(wallX, h + 0.9f));
+                }
+                return (Vector2.zero, Vector2.zero);
+            }, woodMat, 4f, startIdx, segs);
+
+            // 4. 右車線下のトレッスル木製橋脚
+            for (int k = startIdx; k <= endIdx; k += 4)
+            {
+                int idx = k % Count;
+                float ratio = (float)idx / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.3f)
+                {
+                    Vector3 bridgeCenter = PointAt(idx, br.RightOffset);
+                    float h = br.RightHeight * blend;
+                    Vector3 postPos = bridgeCenter - Normals[idx] * (h * 0.5f);
+                    Box("TrestlePillar", postPos, new Vector3(br.LaneWidth * 1.6f, h + 0.4f, 1.2f),
+                        Quaternion.LookRotation(Dirs[idx]), woodMat);
+                }
+            }
+
+            // 5. 分岐ノーズ（大型案内標識「◀ SPLIT ROUTE ▶」& クッションバリア）
+            int noseIdx = (startIdx - 4 + Count) % Count;
+            Vector3 nosePos = Pts[noseIdx] + Normals[noseIdx] * 0.05f;
+            Quaternion noseRot = Quaternion.LookRotation(Dirs[noseIdx]);
+
+            // 黄色と黒の衝撃吸収ドラム缶 / クッションバリア
+            var cushionMat = new Material(rm.wallMaterial) { mainTexture = TextureGen.HazardStripes() };
+            createdMaterials.Add(cushionMat);
+            Box("SplitCushion", nosePos + Vector3.up * 0.6f, new Vector3(2.5f, 1.2f, 2.5f), noseRot, cushionMat, PrimitiveType.Cylinder);
+
+            // 大型案内看板（SPLIT SIGN - ポップなトイ・アーケードデザイン！）
+            Vector3 signPos = nosePos + Vector3.up * 3.8f;
+            var signMat = new Material(rm.wallMaterial)
+            {
+                mainTexture = TextureGen.SplitSign(),
+                color = Color.white
+            };
+            signMat.SetTexture("_BaseMap", TextureGen.SplitSign());
+            signMat.EnableKeyword("_EMISSION");
+            signMat.SetTexture("_EmissionMap", TextureGen.SplitSign());
+            signMat.SetColor("_EmissionColor", new Color(0.9f, 0.9f, 0.9f));
+            createdMaterials.Add(signMat);
+
+            // メタリック外枠フレーム
+            Box("SplitSignFrame", signPos, new Vector3(8.4f, 3.4f, 0.25f), noseRot, rm.chromeMaterial);
+            // サインボード（正面が走行カートに対面するように180度回転）
+            Box("SplitSignBoard", signPos - noseRot * new Vector3(0, 0, 0.05f), new Vector3(8.0f, 3.0f, 0.20f), noseRot * Quaternion.Euler(0, 180, 0), signMat);
+
+            // 支柱（クロームポール）
+            Box("SplitSignPoleL", signPos + noseRot * new Vector3(-3.2f, -2.1f, 0), new Vector3(0.35f, 4.2f, 0.35f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+            Box("SplitSignPoleR", signPos + noseRot * new Vector3(3.2f, -2.1f, 0), new Vector3(0.35f, 4.2f, 0.35f), noseRot, rm.chromeMaterial, PrimitiveType.Cylinder);
+        }
     }
 
     // 高架橋・立体交差セクションの橋脚（ピラー）
@@ -444,11 +738,12 @@ public partial class Track
         };
         createdMaterials.Add(beaconMat);
 
+        var curDef = Courses[ActiveCourseIndex];
         for (int r = 0; r < JumpRamps.Count; r++)
         {
             var ramp = JumpRamps[r];
             int i = ramp.index;
-            var pos = Pts[i];
+            var pos = PointAt(i, ramp.lateral);
             var fwd = Dirs[i];
             var up = Normals[i];
 
@@ -457,7 +752,7 @@ public partial class Track
             rampGo.transform.position = pos;
             rampGo.transform.rotation = Quaternion.LookRotation(fwd, up);
 
-            float w = HalfWidth * 1.7f;
+            float w = (curDef.Ramps != null && r < curDef.Ramps.Length && curDef.Ramps[r].Width > 0f) ? curDef.Ramps[r].Width : HalfWidth * 1.7f;
             float len = 8.5f;
             float h = 1.6f;
 
@@ -840,11 +1135,29 @@ public partial class Track
 
     void BuildBoostPads(RaceManager rm)
     {
+        var def = Courses[ActiveCourseIndex];
         var padMat = new Material(rm.boostPadMaterial) { mainTexture = TextureGen.Chevrons() };
         createdMaterials.Add(padMat);
         padMat.SetTexture("_EmissionMap", padMat.mainTexture);
-        int[] spots = { Count * 22 / 100, Count * 48 / 100, Count * 81 / 100 };
-        float[] lats = { 4.5f, -4.5f, 0f };
+
+        int[] spots;
+        float[] lats;
+
+        if (def.Branches != null && def.Branches.Length > 0)
+        {
+            var b = def.Branches[0];
+            // 分岐手前、右トレッスル橋上（2連）、終盤
+            int bMid1 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.35f) * Count);
+            int bMid2 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.70f) * Count);
+            spots = new[] { Count * 20 / 100, bMid1, bMid2, Count * 82 / 100 };
+            lats = new[] { 3.5f, b.RightOffset, b.RightOffset, 0f };
+        }
+        else
+        {
+            spots = new[] { Count * 22 / 100, Count * 48 / 100, Count * 81 / 100 };
+            lats = new[] { 4.5f, -4.5f, 0f };
+        }
+
         for (int i = 0; i < spots.Length; i++)
         {
             int idx = spots[i];
@@ -856,10 +1169,31 @@ public partial class Track
 
     void PlanItemBoxes()
     {
-        int[] rows = { Count * 12 / 100, Count * 38 / 100, Count * 63 / 100, Count * 90 / 100 };
-        foreach (int idx in rows)
-            for (int k = -2; k <= 2; k++)
-                ItemBoxSpots.Add((idx, k * 3.4f));
+        var def = Courses[ActiveCourseIndex];
+        if (def.Branches != null && def.Branches.Length > 0)
+        {
+            var b = def.Branches[0];
+            int bItem1 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.30f) * Count);
+            int bItem2 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.65f) * Count);
+            // 通常区間
+            int[] normalRows = { Count * 15 / 100, Count * 85 / 100 };
+            foreach (int idx in normalRows)
+                for (int k = -2; k <= 2; k++)
+                    ItemBoxSpots.Add((idx, k * 3.4f));
+
+            // 分岐左ルート（川沿いコース）
+            int[] splitRows = { bItem1, bItem2 };
+            foreach (int idx in splitRows)
+                for (int k = -1; k <= 1; k++)
+                    ItemBoxSpots.Add((idx, b.LeftOffset + k * 2.2f));
+        }
+        else
+        {
+            int[] rows = { Count * 12 / 100, Count * 38 / 100, Count * 63 / 100, Count * 90 / 100 };
+            foreach (int idx in rows)
+                for (int k = -2; k <= 2; k++)
+                    ItemBoxSpots.Add((idx, k * 3.4f));
+        }
     }
 
 

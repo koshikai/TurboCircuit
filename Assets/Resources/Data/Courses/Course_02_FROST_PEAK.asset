@@ -36,7 +36,10 @@ MonoBehaviour:
   ramps:
   - Ratio: 0.36
     Power: 16
+    Lateral: 0
+    Width: 0
   tunnels: []
+  branches: []
   skyTint: {r: 0.55, g: 0.72, b: 1, a: 1}
   groundColor: {r: 0.9, g: 0.94, b: 1, a: 1}
   sunColor: {r: 0.95, g: 0.98, b: 1, a: 1}

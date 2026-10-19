@@ -423,8 +423,49 @@ public partial class Kart : MonoBehaviour
         }
         else if (prevProgress < L * 0.25f && Progress > L * 0.75f) Lap--;
 
-        // 壁
+        // 壁（外壁 & 分岐区間の中央分離帯）
         float limit = Track.WallOffset - 1.7f; // 車体の半幅(ホイール含む)ぶん内側で止める
+        float progressRatio = (float)Index / track.Count;
+        bool inBranch = track.IsInBranch(progressRatio, out BranchDef branch, out float branchBlend);
+
+        if (inBranch && branchBlend > 0.05f)
+        {
+            // 分岐区間の外壁リミット
+            limit = Mathf.Lerp(limit, Mathf.Abs(branch.LeftOffset) + branch.LaneWidth + Track.CurbWidth + 1.5f, branchBlend);
+
+            // 中央分離帯の壁判定
+            float dividerLimit = (branch.DividerWidth + 0.8f) * branchBlend;
+            if (Mathf.Abs(Lateral) < dividerLimit)
+            {
+                float side = Lateral >= 0 ? 1f : -1f;
+                // 分離帯から外側（左車線または右車線）へ押し戻す
+                var pushDir = track.Rights[Index] * side;
+                transform.position += pushDir * (dividerLimit - Mathf.Abs(Lateral));
+                Lateral = side * dividerLimit;
+
+                // 中央に向かう速度成分（-pushDir）に対する衝突判定
+                float impact = -Vector3.Dot(VelDir, pushDir);
+                if (impact > 0)
+                {
+                    VelDir = (VelDir + pushDir * impact * 1.4f).normalized;
+                    Speed *= 1f - 0.45f * impact;
+                    if (impact > 0.25f && Speed > 8f && bumpCooldown <= 0f)
+                    {
+                        bumpCooldown = 0.25f;
+                        Fx.Burst(transform.position - pushDir * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
+                        if (IsPlayer)
+                        {
+                            float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
+                            rm.Audio.Bump(bumpInt);
+                            rm.Shake(0.25f * bumpInt);
+                            if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 外壁判定
         if (Mathf.Abs(Lateral) > limit)
         {
             float side = Mathf.Sign(Lateral);
@@ -473,7 +514,8 @@ public partial class Kart : MonoBehaviour
             foreach (var ramp in track.JumpRamps)
             {
                 int di = track.Wrap(Index - ramp.index);
-                if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral) <= 7.8f && Speed > 8f)
+                float tol = Mathf.Abs(ramp.lateral) > 1f ? 4.8f : 7.8f;
+                if ((di <= 1 || di >= track.Count - 2) && Mathf.Abs(Lateral - ramp.lateral) <= tol && Speed > 8f)
                 {
                     LaunchJump(ramp.power);
                     break;

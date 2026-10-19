@@ -13,6 +13,7 @@ public class CourseData : ScriptableObject
     public Vector3[] controlPoints;
     public JumpRampDef[] ramps;
     public TunnelDef[] tunnels;
+    public BranchDef[] branches;
 
     [Header("Environment & Lighting")]
     public Color skyTint = new Color(0.45f, 0.6f, 1f);
@@ -44,6 +45,7 @@ public class CourseData : ScriptableObject
             Control = controlPoints,
             Ramps = ramps,
             Tunnels = tunnels,
+            Branches = branches,
             SkyTint = skyTint,
             GroundColor = groundColor,
             SunColor = sunColor,

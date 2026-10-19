@@ -682,6 +682,116 @@ public static class TextureGen
         return t;
     }
 
+    // 分岐案内看板用テクスチャ (256x128)
+    public static Texture2D SplitSign()
+    {
+        string key = "split_sign";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int w = 256, h = 128;
+        var px = new Color[w * h];
+        Color bgDark = new Color(0.10f, 0.12f, 0.18f);
+        Color leftBlue = new Color(0.12f, 0.55f, 0.95f);
+        Color rightOrange = new Color(0.98f, 0.48f, 0.08f);
+        Color white = Color.white;
+        Color yellow = new Color(1.0f, 0.85f, 0.15f);
+
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            float u = x / (float)(w - 1);
+            float v = y / (float)(h - 1);
+
+            // 外枠
+            if (u < 0.02f || u > 0.98f || v < 0.04f || v > 0.96f)
+            {
+                px[y * w + x] = new Color(0.85f, 0.88f, 0.92f);
+                continue;
+            }
+
+            // 上部リボンバー (SPLIT ROUTE)
+            if (v > 0.76f)
+            {
+                px[y * w + x] = yellow;
+                // リボンのボーダー
+                if (v < 0.79f) px[y * w + x] = Color.black;
+                continue;
+            }
+
+            // メインエリア
+            if (u < 0.48f)
+            {
+                // 左パネル (CRUISE / RIVER)
+                Color c = leftBlue;
+                // 左向きの矢印（◀ ◀）シェブロン
+                float arrowU = Mathf.Repeat(u * 5f + v * 0.2f, 1f);
+                float dy = Mathf.Abs(v - 0.45f) * 2.8f;
+                if (u > 0.10f && u < 0.42f && arrowU < 0.35f && arrowU > dy * 0.15f)
+                {
+                    c = white;
+                }
+                px[y * w + x] = c;
+            }
+            else if (u > 0.52f)
+            {
+                // 右パネル (JUMP / SHORTCUT)
+                Color c = rightOrange;
+                // 右向きの矢印（▶ ▶）シェブロン
+                float arrowU = Mathf.Repeat((1f - u) * 5f + v * 0.2f, 1f);
+                float dy = Mathf.Abs(v - 0.45f) * 2.8f;
+                if (u > 0.58f && u < 0.90f && arrowU < 0.35f && arrowU > dy * 0.15f)
+                {
+                    c = white;
+                }
+                px[y * w + x] = c;
+            }
+            else
+            {
+                // 中央の区切り
+                px[y * w + x] = bgDark;
+            }
+        }
+
+        var t = New(w, h, px);
+        cache[key] = t;
+        return t;
+    }
+
+    // 激流・川の水面テクスチャ (128x128)
+    public static Texture2D RiverWater()
+    {
+        string key = "river_water";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+
+        const int n = 128;
+        var px = new Color[n * n];
+        Color deep = new Color(0.05f, 0.52f, 0.65f);
+        Color shallow = new Color(0.12f, 0.78f, 0.85f);
+        Color foam = new Color(0.85f, 0.96f, 1.0f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float u = x / (float)(n - 1);
+            float v = y / (float)(n - 1);
+
+            // 水流の波模様
+            float wave1 = Mathf.Sin(v * 28f + Mathf.Sin(u * 14f) * 2f);
+            float wave2 = Mathf.Cos(v * 40f - u * 8f);
+            float tVal = (wave1 + wave2) * 0.25f + 0.5f;
+
+            Color c = Color.Lerp(deep, shallow, tVal);
+            if (tVal > 0.82f) c = Color.Lerp(c, foam, (tVal - 0.82f) / 0.18f);
+
+            c.a = 0.92f;
+            px[y * n + x] = c;
+        }
+
+        var t = New(n, n, px);
+        cache[key] = t;
+        return t;
+    }
+
     public static Texture2D SoftDot()
     {
         const string key = "soft_dot";
