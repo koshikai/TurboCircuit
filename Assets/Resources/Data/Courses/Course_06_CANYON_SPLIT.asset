@@ -39,10 +39,10 @@ MonoBehaviour:
   - {x: -160, y: 0, z: -145}
   - {x: -85, y: 0, z: -160}
   ramps:
-  - Ratio: 0.315
+  - Ratio: 0.306
     Power: 17.5
-    Lateral: 10
-    Width: 8
+    Lateral: 3.8
+    Width: 6.2
   tunnels: []
   branches:
   - Start: 0.325

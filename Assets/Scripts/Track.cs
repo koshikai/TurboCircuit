@@ -365,7 +365,7 @@ public partial class Track : MonoBehaviour
                 new Vector3(-160, 0, -145),     // 21: 最終シケイン（左→右）
                 new Vector3(-85, 0, -160)       // 22: ホームストレートへ合流
             },
-            Ramps = new[] { new JumpRampDef { Ratio = 0.315f, Power = 17.5f, Lateral = 10.0f, Width = 8.0f } },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.306f, Power = 17.5f, Lateral = 3.8f, Width = 6.2f } },
             Branches = new[]
             {
                 new BranchDef
