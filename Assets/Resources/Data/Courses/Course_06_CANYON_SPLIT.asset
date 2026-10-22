@@ -15,35 +15,43 @@ MonoBehaviour:
   courseName: CANYON SPLIT
   description: 'Dramatic red rock canyon raceway featuring the Great Split: take the safe riverside cruise or leap across the rapids to the wooden trestle shortcut.'
   controlPoints:
-  - {x: 0, y: 0, z: -150}
-  - {x: 100, y: 0, z: -150}
-  - {x: 180, y: 2, z: -120}
-  - {x: 215, y: 4, z: -40}
-  - {x: 210, y: 7, z: 40}
-  - {x: 165, y: 8, z: 115}
-  - {x: 95, y: 7, z: 180}
-  - {x: 10, y: 6, z: 215}
-  - {x: -80, y: 5, z: 200}
-  - {x: -145, y: 4, z: 140}
-  - {x: -200, y: 3, z: 70}
-  - {x: -225, y: 2, z: -10}
-  - {x: -195, y: 1, z: -75}
-  - {x: -140, y: 0, z: -125}
-  - {x: -70, y: 0, z: -150}
+  - {x: 0, y: 0, z: -160}
+  - {x: 80, y: 0, z: -160}
+  - {x: 155, y: 2, z: -145}
+  - {x: 195, y: 5, z: -100}
+  - {x: 170, y: 8, z: -45}
+  - {x: 215, y: 12, z: 15}
+  - {x: 210, y: 15, z: 80}
+  - {x: 165, y: 14, z: 135}
+  - {x: 105, y: 11, z: 190}
+  - {x: 30, y: 8, z: 225}
+  - {x: -55, y: 7, z: 230}
+  - {x: -125, y: 6, z: 195}
+  - {x: -170, y: 5, z: 140}
+  - {x: -205, y: 4, z: 80}
+  - {x: -185, y: 3, z: 20}
+  - {x: -135, y: 2, z: -25}
+  - {x: -145, y: 1.5, z: -80}
+  - {x: -195, y: 1, z: -70}
+  - {x: -240, y: 1.5, z: -20}
+  - {x: -255, y: 1, z: -75}
+  - {x: -230, y: 0.5, z: -125}
+  - {x: -160, y: 0, z: -145}
+  - {x: -85, y: 0, z: -160}
   ramps:
-  - Ratio: 0.36
+  - Ratio: 0.306
     Power: 17.5
-    Lateral: 10
-    Width: 8
+    Lateral: 10.6
+    Width: 6.2
   tunnels: []
   branches:
-  - Start: 0.37
-    End: 0.62
+  - Start: 0.325
+    End: 0.535
     LeftOffset: -18.5
     RightOffset: 18.5
     LaneWidth: 6
     DividerWidth: 12
-    RightHeight: 4.2
+    RightHeight: 4.5
   skyTint: {r: 0.38, g: 0.65, b: 0.98, a: 1}
   groundColor: {r: 0.76, g: 0.44, b: 0.24, a: 1}
   sunColor: {r: 1, g: 0.94, b: 0.82, a: 1}

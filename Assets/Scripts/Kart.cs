@@ -433,32 +433,35 @@ public partial class Kart : MonoBehaviour
             // 分岐区間の外壁リミット
             limit = Mathf.Lerp(limit, Mathf.Abs(branch.LeftOffset) + branch.LaneWidth + Track.CurbWidth + 1.5f, branchBlend);
 
-            // 中央分離帯の壁判定
-            float dividerLimit = (branch.DividerWidth + 0.8f) * branchBlend;
-            if (Mathf.Abs(Lateral) < dividerLimit)
+            // 中央分離帯（川・内壁）の壁判定：実際に道路が二股に分かれている区間（Start〜End）でのみ有効
+            if (progressRatio >= branch.Start && progressRatio <= branch.End)
             {
-                float side = Lateral >= 0 ? 1f : -1f;
-                // 分離帯から外側（左車線または右車線）へ押し戻す
-                var pushDir = track.Rights[Index] * side;
-                transform.position += pushDir * (dividerLimit - Mathf.Abs(Lateral));
-                Lateral = side * dividerLimit;
-
-                // 中央に向かう速度成分（-pushDir）に対する衝突判定
-                float impact = -Vector3.Dot(VelDir, pushDir);
-                if (impact > 0)
+                float dividerLimit = (branch.DividerWidth + 0.8f) * branchBlend;
+                if (Mathf.Abs(Lateral) < dividerLimit)
                 {
-                    VelDir = (VelDir + pushDir * impact * 1.4f).normalized;
-                    Speed *= 1f - 0.45f * impact;
-                    if (impact > 0.25f && Speed > 8f && bumpCooldown <= 0f)
+                    float side = Lateral >= 0 ? 1f : -1f;
+                    // 分離帯から外側（左車線または右車線）へ押し戻す
+                    var pushDir = track.Rights[Index] * side;
+                    transform.position += pushDir * (dividerLimit - Mathf.Abs(Lateral));
+                    Lateral = side * dividerLimit;
+
+                    // 中央に向かう速度成分（-pushDir）に対する衝突判定
+                    float impact = -Vector3.Dot(VelDir, pushDir);
+                    if (impact > 0)
                     {
-                        bumpCooldown = 0.25f;
-                        Fx.Burst(transform.position - pushDir * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
-                        if (IsPlayer)
+                        VelDir = (VelDir + pushDir * impact * 1.4f).normalized;
+                        Speed *= 1f - 0.45f * impact;
+                        if (impact > 0.25f && Speed > 8f && bumpCooldown <= 0f)
                         {
-                            float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
-                            rm.Audio.Bump(bumpInt);
-                            rm.Shake(0.25f * bumpInt);
-                            if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
+                            bumpCooldown = 0.25f;
+                            Fx.Burst(transform.position - pushDir * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
+                            if (IsPlayer)
+                            {
+                                float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
+                                rm.Audio.Bump(bumpInt);
+                                rm.Shake(0.25f * bumpInt);
+                                if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
+                            }
                         }
                     }
                 }

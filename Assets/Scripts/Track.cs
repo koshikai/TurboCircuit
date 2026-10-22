@@ -341,34 +341,42 @@ public partial class Track : MonoBehaviour
             Description = "Dramatic red rock canyon raceway featuring the Great Split: take the safe riverside cruise or leap across the rapids to the wooden trestle shortcut.",
             Control = new[]
             {
-                new Vector3(0, 0, -150),        // 0: スタート/フィニッシュ（オアシス大通り）
-                new Vector3(100, 0, -150),      // 1: ストレート加速区間
-                new Vector3(180, 2, -120),      // 2: 第1コーナー（キャニオンイースト）
-                new Vector3(215, 4, -40),       // 3: 峡谷の登り坂
-                new Vector3(210, 7, 40),        // 4: リバーサイド高台
-                new Vector3(165, 8, 115),       // 5: 【分岐アプローチ】分岐標識 & ジャンプ台！
-                new Vector3(95, 7, 180),        // 6: 【二股区間 序盤】川を挟んで左右へ！
-                new Vector3(10, 6, 215),        // 7: 【二股区間 ピーク】北端の大赤岩モニュメントを周回
-                new Vector3(-80, 5, 200),       // 8: 【二股区間 終盤】左の川沿い & 右のトレッスル橋
-                new Vector3(-145, 4, 140),      // 9: 【合流ポイント】二つの道が再び一つに！
-                new Vector3(-200, 3, 70),       // 10: キャニオンウエスト
-                new Vector3(-225, 2, -10),      // 11: 赤岩アーチのS字入口
-                new Vector3(-195, 1, -75),      // 12: アーチ通過・下り坂
-                new Vector3(-140, 0, -125),     // 13: 最終コーナー手前
-                new Vector3(-70, 0, -150)       // 14: ホームストレートへ合流
+                new Vector3(0, 0, -160),        // 0: スタート/フィニッシュ（オアシス大通り）
+                new Vector3(80, 0, -160),       // 1: ストレート加速区間
+                new Vector3(155, 2, -145),      // 2: 第1コーナー（高速右ターン）
+                new Vector3(195, 5, -100),      // 3: 峡谷の岩肌へ突入、登り坂
+                new Vector3(170, 8, -45),       // 4: 【キャニオンワインディング】テクニカル左切り返し
+                new Vector3(215, 12, 15),       // 5: 【キャニオンワインディング】右への登坂切り返し
+                new Vector3(210, 15, 80),       // 6: 峡谷の尾根（キャニオン・リッジ）標高15mピーク
+                new Vector3(165, 14, 135),      // 7: 【分岐アプローチ】分岐標識 & ジャンプ台！
+                new Vector3(105, 11, 190),      // 8: 【二股区間 序盤】川を挟んで左右へスプリット
+                new Vector3(30, 8, 225),        // 9: 【二股区間 ピーク北東】激流沿いの旋回
+                new Vector3(-55, 7, 230),       // 10: 【二股区間 ピーク北西】大赤岩モニュメント周回
+                new Vector3(-125, 6, 195),      // 11: 【二股区間 終盤】左の川沿い & 右のトレッスル橋
+                new Vector3(-170, 5, 140),      // 12: 【合流ポイント】二つの道が再び一つに合流
+                new Vector3(-205, 4, 80),       // 13: 合流からのダウンヒル加速
+                new Vector3(-185, 3, 20),       // 14: 【キャニオン・キャズム】内側へ切れ込むS字アプローチ
+                new Vector3(-135, 2, -25),      // 15: 【オアシス・インサイド】低地への駆け抜け
+                new Vector3(-145, 1.5f, -80),   // 16: テクニカルS字の切り返し
+                new Vector3(-195, 1, -70),      // 17: 外側赤岩へのアプローチ
+                new Vector3(-240, 1.5f, -20),   // 18: 赤岩の断崖へ迫る中速コーナー
+                new Vector3(-255, 1, -75),      // 19: 【キャニオン・ヘアピン入口】ブレーキング！
+                new Vector3(-230, 0.5f, -125),  // 20: 【キャニオン・ヘアピン脱出】赤岩を抱え込むターン
+                new Vector3(-160, 0, -145),     // 21: 最終シケイン（左→右）
+                new Vector3(-85, 0, -160)       // 22: ホームストレートへ合流
             },
-            Ramps = new[] { new JumpRampDef { Ratio = 0.36f, Power = 17.5f, Lateral = 10.0f, Width = 8.0f } },
+            Ramps = new[] { new JumpRampDef { Ratio = 0.306f, Power = 17.5f, Lateral = 10.6f, Width = 6.2f } },
             Branches = new[]
             {
                 new BranchDef
                 {
-                    Start = 0.37f,
-                    End = 0.62f,
+                    Start = 0.325f,
+                    End = 0.535f,
                     LeftOffset = -18.5f,
                     RightOffset = 18.5f,
                     LaneWidth = 6.0f,
                     DividerWidth = 12.0f,
-                    RightHeight = 4.2f
+                    RightHeight = 4.5f
                 }
             },
             SkyTint = new Color(0.38f, 0.65f, 0.98f),
