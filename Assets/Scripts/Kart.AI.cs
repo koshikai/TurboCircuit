@@ -86,31 +86,47 @@ public partial class Kart
         targetLane = ApplyTacticalLineAdjustments(curPos, currentLateral, targetLane, apexCurvature, apexBend);
 
         // 2c. 分岐ルート制御（二股コース対応）
-        if (aiBranchChoice == 0)
-        {
-            aiBranchChoice = (PlayerIndex % 2 == 1) ? 1 : -1;
-        }
+        var courseBranches = Track.Courses[track.ActiveCourseIndex].Branches;
         float progressRatio = (float)Index / track.Count;
-        if (track.IsInBranch(progressRatio, out BranchDef branchDef, out float branchBlend))
+        if (courseBranches != null && courseBranches.Length > 0)
         {
-            float sideOffset = (aiBranchChoice > 0) ? branchDef.RightOffset : branchDef.LeftOffset;
-            targetLane = Mathf.Lerp(targetLane, sideOffset + aiLane * 0.3f, branchBlend);
-        }
-        else
-        {
-            var branches = Track.Courses[track.ActiveCourseIndex].Branches;
-            if (branches != null && branches.Length > 0)
+            var b = courseBranches[0];
+
+            // 初回または合流通過後に周回ごとのルートを決定（奇数/偶数カート & ラップで分散）
+            if (aiBranchChoice == 0 || (progressRatio > b.End + 0.05f && progressRatio < b.End + 0.12f))
             {
-                var b = branches[0];
-                if (progressRatio >= b.Start - 0.05f && progressRatio < b.Start)
-                {
-                    float tApproach = Mathf.InverseLerp(b.Start - 0.05f, b.Start, progressRatio);
-                    float sideOffset = (aiBranchChoice > 0) ? b.RightOffset : b.LeftOffset;
-                    targetLane = Mathf.Lerp(targetLane, sideOffset + aiLane * 0.3f, tApproach * 0.75f);
-                }
+                aiBranchChoice = ((PlayerIndex + Lap) % 2 == 1) ? 1 : -1;
+            }
+
+            float halfW = Track.HalfWidth * 0.5f; // 4.5m (一本道の左右車線中央)
+            float approachStart = b.Start - 0.075f;
+            float branchStart = b.Start - 0.035f;  // IsInBranch の開始点
+            float branchEnd = b.End + 0.035f;      // IsInBranch の終了点
+            float mergeEnd = b.End + 0.075f;
+
+            if (track.IsInBranch(progressRatio, out BranchDef branchDef, out float branchBlend) && branchBlend > 0.001f)
+            {
+                // 分岐遷移〜本格分岐〜合流遷移：道路メッシュの数学的中心を滑らかにトレース
+                float baseLane = (aiBranchChoice > 0) ? halfW : -halfW;
+                float branchTarget = (aiBranchChoice > 0) ? branchDef.RightOffset : branchDef.LeftOffset;
+                float laneCenter = Mathf.Lerp(baseLane, branchTarget, branchBlend);
+                targetLane = laneCenter + aiLane * 0.25f;
+            }
+            else if (progressRatio >= approachStart && progressRatio < branchStart)
+            {
+                // 分岐アプローチ区間：一本道の中で右ルートは右車線(+4.5m)、左ルートは左車線(-4.5m)へ整列
+                float tApp = Mathf.InverseLerp(approachStart, branchStart, progressRatio);
+                float prefLane = (aiBranchChoice > 0) ? halfW : -halfW;
+                targetLane = Mathf.Lerp(targetLane, prefLane + aiLane * 0.25f, tApp);
+            }
+            else if (progressRatio >= branchEnd && progressRatio <= mergeEnd)
+            {
+                // 合流完了後：一本道の中央レーンへ自然に復帰
+                float tPost = Mathf.InverseLerp(branchEnd, mergeEnd, progressRatio);
+                float baseLane = (aiBranchChoice > 0) ? halfW : -halfW;
+                targetLane = Mathf.Lerp(baseLane + aiLane * 0.25f, aiLane * 0.4f, tPost);
             }
         }
-
         // 3. 曲率適応型ルックアヘッド & 非線形 Stanley 操舵制御
         // 直近(12m先)と中距離(24m先)のコース旋回角を取得
         float nearAngle = Vector3.SignedAngle(track.Dirs[Index], track.Dirs[track.Wrap(Index + 6)], Vector3.up);
@@ -255,11 +271,14 @@ public partial class Kart
 
             // 6. コントロール・バリア・ファンクション (CBF / 滑らかな境界反発)
             bool boundaryRepelling = false;
-            if (track.IsInBranch(progressRatio, out BranchDef bDef, out float bBlend) && bBlend > 0.2f)
+            if (track.IsInBranch(progressRatio, out BranchDef bDef, out float bBlend) && bBlend > 0.1f)
             {
-                float laneCenter = (aiBranchChoice > 0) ? bDef.RightOffset : bDef.LeftOffset;
+                float halfW = Track.HalfWidth * 0.5f;
+                float baseLane = (aiBranchChoice > 0) ? halfW : -halfW;
+                float branchTarget = (aiBranchChoice > 0) ? bDef.RightOffset : bDef.LeftOffset;
+                float laneCenter = Mathf.Lerp(baseLane, branchTarget, bBlend);
                 float distFromLaneCenter = currentLateral - laneCenter;
-                float laneSafeHalf = bDef.LaneWidth - 1.2f;
+                float laneSafeHalf = Mathf.Lerp(Track.HalfWidth * 0.5f - 1.0f, bDef.LaneWidth - 1.2f, bBlend);
                 if (Mathf.Abs(distFromLaneCenter) > laneSafeHalf)
                 {
                     boundaryRepelling = true;

@@ -41,7 +41,7 @@ MonoBehaviour:
   ramps:
   - Ratio: 0.306
     Power: 17.5
-    Lateral: 3.8
+    Lateral: 10.6
     Width: 6.2
   tunnels: []
   branches:
