@@ -82,10 +82,10 @@ public partial class RaceManager
         // 6: CANYON SPLIT - 激流の川を挟んで道が二手に分かれる二股渓谷とトレッスル高架木橋
         new CourseIntroCut
         {
-            camPosStart = new Vector3(190f, 24f, 85f),
-            camPosEnd = new Vector3(135f, 18f, 155f),
-            lookTargetStart = new Vector3(165f, 8f, 115f),
-            lookTargetEnd = new Vector3(95f, 7f, 180f),
+            camPosStart = new Vector3(200f, 26f, 95f),
+            camPosEnd = new Vector3(145f, 20f, 160f),
+            lookTargetStart = new Vector3(165f, 14f, 135f),
+            lookTargetEnd = new Vector3(105f, 11f, 190f),
             fovStart = 62f,
             fovEnd = 54f
         }

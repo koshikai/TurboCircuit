@@ -1269,11 +1269,11 @@ public partial class Track
         if (def.Branches != null && def.Branches.Length > 0)
         {
             var b = def.Branches[0];
-            // 分岐手前、右トレッスル橋上（2連）、終盤
+            // 序盤ワインディング登坂、右トレッスル橋上（2連）、ヘアピン前、ホームストレート手前
             int bMid1 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.35f) * Count);
             int bMid2 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.70f) * Count);
-            spots = new[] { Count * 20 / 100, bMid1, bMid2, Count * 82 / 100 };
-            lats = new[] { 3.5f, b.RightOffset, b.RightOffset, 0f };
+            spots = new[] { Count * 20 / 100, bMid1, bMid2, Count * 78 / 100, Count * 91 / 100 };
+            lats = new[] { 3.5f, b.RightOffset, b.RightOffset, 0f, 0f };
         }
         else
         {
@@ -1298,8 +1298,8 @@ public partial class Track
             var b = def.Branches[0];
             int bItem1 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.30f) * Count);
             int bItem2 = Mathf.RoundToInt(Mathf.Lerp(b.Start, b.End, 0.65f) * Count);
-            // 通常区間
-            int[] normalRows = { Count * 15 / 100, Count * 85 / 100 };
+            // 通常区間（序盤、合流後インサイド、最終コーナー手前）
+            int[] normalRows = { Count * 12 / 100, Count * 64 / 100, Count * 87 / 100 };
             foreach (int idx in normalRows)
                 for (int k = -2; k <= 2; k++)
                     ItemBoxSpots.Add((idx, k * 3.4f));
