@@ -507,15 +507,15 @@ public partial class Track
             createdMaterials.Add(redRockMat);
 
             var riverRng = new System.Random(77);
-            for (int k = startIdx + 2; k <= endIdx - 2; k += 3)
+            for (int k = startIdx + 3; k <= endIdx - 3; k += 5)
             {
                 int idx = k % Count;
                 float ratio = (float)idx / Count;
                 if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.25f)
                 {
-                    // 川の中央付近（-6.5m〜+6.5m）に配置（川幅25mの中央部）
-                    float rLat = (float)(riverRng.NextDouble() * 13.0 - 6.5);
-                    float rScale = 2.0f + (float)riverRng.NextDouble() * 2.8f;
+                    // 川の中央付近（-6.0m〜+6.0m）に配置（川幅25mの中央部で白波を立てる奇岩群）
+                    float rLat = (float)(riverRng.NextDouble() * 12.0 - 6.0);
+                    float rScale = 1.8f + (float)riverRng.NextDouble() * 2.2f;
                     Vector3 rockPos = Pts[idx] + Rights[idx] * rLat + Vector3.up * (-0.35f * blend + 0.05f);
                     Quaternion rockRot = Quaternion.Euler((float)riverRng.NextDouble() * 12f, (float)riverRng.NextDouble() * 360f, (float)riverRng.NextDouble() * 12f);
 
@@ -1436,24 +1436,52 @@ public partial class Track
                     SpawnProp(prefabGrassLarge ?? prefabBush, pos, rot, Vector3.one * (s * 0.6f), circuitBushMat);
                 }
             }
-            else if (def.SceneryTheme == 1) // Desert Dunes: ヤシの木、砂漠枯れ木、砂岩・赤岩
+            else if (def.SceneryTheme == 1) // Desert Dunes / CANYON SPLIT
             {
+                bool isCanyon = (def.Branches != null && def.Branches.Length > 0);
                 double r = rng.NextDouble();
-                if (r < 0.45) // ヤシの木
+                if (isCanyon)
                 {
-                    var palmPrefab = (rng.Next(3) == 0) ? prefabPalm1 : ((rng.Next(2) == 0) ? prefabPalm2 : prefabPalm3);
-                    SpawnNatureProp(palmPrefab, pos, rot, Vector3.one * (s * 1.15f), palmTrunkMat, palmLeafMat);
+                    // CANYON SPLIT: 雄大な赤岩キャニオン・ビュート・メサ・乾燥した枯れ木
+                    // ヤシの木はスタート・フィニッシュ（オアシス低地）付近のみ限定的に出現
+                    bool nearOasis = (pos.y < 4.0f && DistanceToTrack(pos, true) < 80f);
+                    if (nearOasis && r < 0.15) // オアシス低地のごく一部にのみヤシの木
+                    {
+                        var palmPrefab = (rng.Next(3) == 0) ? prefabPalm1 : ((rng.Next(2) == 0) ? prefabPalm2 : prefabPalm3);
+                        SpawnNatureProp(palmPrefab, pos, rot, Vector3.one * (s * 1.15f), palmTrunkMat, palmLeafMat);
+                    }
+                    else if (r < 0.25) // 砂漠の枯れ木
+                    {
+                        var deadPrefab = (rng.Next(3) == 0) ? prefabDead1 : ((rng.Next(2) == 0) ? prefabDead2 : prefabDead3);
+                        SpawnNatureProp(deadPrefab, pos, rot, Vector3.one * (s * 1.05f), deadTreeMat, deadTreeMat);
+                    }
+                    else // 雄大な赤岩・断崖・モニュメント群（キャニオンの主役）
+                    {
+                        var rockPrefab = (rng.Next(5) == 0) ? prefabRock1 : ((rng.Next(4) == 0) ? prefabRock2 : ((rng.Next(3) == 0) ? prefabRock3 : ((rng.Next(2) == 0) ? prefabRock4 : prefabRock5)));
+                        var rMat = (rng.Next(4) == 0) ? desertRockMat1 : desertRockMat2; // 赤岩マテリアルを優先
+                        float canyonScale = s * (1.5f + (float)rng.NextDouble() * 0.9f); // ダイナミックな巨岩
+                        SpawnProp(rockPrefab, pos, rot, Vector3.one * canyonScale, rMat);
+                    }
                 }
-                else if (r < 0.72) // 砂漠の枯れ木
+                else
                 {
-                    var deadPrefab = (rng.Next(3) == 0) ? prefabDead1 : ((rng.Next(2) == 0) ? prefabDead2 : prefabDead3);
-                    SpawnNatureProp(deadPrefab, pos, rot, Vector3.one * (s * 0.95f), deadTreeMat, deadTreeMat);
-                }
-                else // 砂漠の自然岩・砂岩群
-                {
-                    var rockPrefab = (rng.Next(5) == 0) ? prefabRock1 : ((rng.Next(4) == 0) ? prefabRock2 : ((rng.Next(3) == 0) ? prefabRock3 : ((rng.Next(2) == 0) ? prefabRock4 : prefabRock5)));
-                    var rMat = (rng.Next(2) == 0) ? desertRockMat1 : desertRockMat2;
-                    SpawnProp(rockPrefab, pos, rot, Vector3.one * (s * 1.4f), rMat);
+                    // SUNSET DUNES: 従来の砂漠オアシス景観
+                    if (r < 0.45) // ヤシの木
+                    {
+                        var palmPrefab = (rng.Next(3) == 0) ? prefabPalm1 : ((rng.Next(2) == 0) ? prefabPalm2 : prefabPalm3);
+                        SpawnNatureProp(palmPrefab, pos, rot, Vector3.one * (s * 1.15f), palmTrunkMat, palmLeafMat);
+                    }
+                    else if (r < 0.72) // 砂漠の枯れ木
+                    {
+                        var deadPrefab = (rng.Next(3) == 0) ? prefabDead1 : ((rng.Next(2) == 0) ? prefabDead2 : prefabDead3);
+                        SpawnNatureProp(deadPrefab, pos, rot, Vector3.one * (s * 0.95f), deadTreeMat, deadTreeMat);
+                    }
+                    else // 砂漠の自然岩・砂岩群
+                    {
+                        var rockPrefab = (rng.Next(5) == 0) ? prefabRock1 : ((rng.Next(4) == 0) ? prefabRock2 : ((rng.Next(3) == 0) ? prefabRock3 : ((rng.Next(2) == 0) ? prefabRock4 : prefabRock5)));
+                        var rMat = (rng.Next(2) == 0) ? desertRockMat1 : desertRockMat2;
+                        SpawnProp(rockPrefab, pos, rot, Vector3.one * (s * 1.4f), rMat);
+                    }
                 }
             }
             else // Frost Peak: スノーパイン、氷柱結晶、雪岩、雪低木
@@ -1521,6 +1549,12 @@ public partial class Track
         // 所々の旗
         for (int i = 0; i < Count; i += 25)
         {
+            float ratio = (float)i / Count;
+            if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+            {
+                // 分岐区間内は川や車線との干渉を防ぐため旗をスキップ
+                continue;
+            }
             foreach (float side in new[] { -1f, 1f })
             {
                 var p = PointAt(i, side * (WallOffset + 1.2f));
@@ -1568,6 +1602,13 @@ public partial class Track
         // 1. コース壁沿いのスポンサー/キャンパス案内看板（画像のアスペクト比に完全一致＆ドライバー視線に合わせて正対）
         for (int i = 18; i < Count - 15; i += 22)
         {
+            float ratio = (float)i / Count;
+            if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.08f)
+            {
+                // 分岐区間内は中央の川や二股車線があり、固定 WallOffset では車線内・川沿いに浮くためスキップ
+                // （分岐区間内は専用の「SPLIT SIGN」案内看板や自然の赤岩景観が主役）
+                continue;
+            }
             float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 12)], Vector3.up);
             float side = bend > 2f ? -1f : 1f; // カーブ外側を優先
             var pos = PointAt(i, side * (WallOffset + 0.6f)) + Vector3.up * 1.9f;
@@ -1649,7 +1690,17 @@ public partial class Track
             }
         }
 
-        int[] bridgeSpots = { Count * 33 / 100, Count * 72 / 100 };
+        int[] bridgeSpots;
+        if (def.Branches != null && def.Branches.Length > 0)
+        {
+            // 分岐コース（CANYON SPLIT等）: 分岐区間（0.30〜0.55）やジャンプ台・分岐標識を避け、
+            // 序盤の直線アプローチと合流後の直線に配置
+            bridgeSpots = new[] { Count * 22 / 100, Count * 68 / 100 };
+        }
+        else
+        {
+            bridgeSpots = new[] { Count * 33 / 100, Count * 72 / 100 };
+        }
         for (int b = 0; b < bridgeSpots.Length; b++)
         {
             int idx = bridgeSpots[b];
@@ -1693,7 +1744,14 @@ public partial class Track
             if (isCampus) createdMaterials.Add(poleMat);
             for (int i = 0; i < Count; i += Count / 8)
             {
-                var pos = PointAt(i, WallOffset + (isCampus ? 3.0f : 4.2f));
+                float ratio = (float)i / Count;
+                float offset = WallOffset + (isCampus ? 3.0f : 4.2f);
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
+                {
+                    // 分岐区間では右車線の外壁外側に正しくオフセットして走行ライン上への配置を防止
+                    offset = Mathf.Lerp(offset, br.RightOffset + br.LaneWidth + CurbWidth + 4.2f, blend);
+                }
+                var pos = PointAt(i, offset);
                 pos.y = GetTerrainHeight(pos.x, pos.z, def);
                 var rot = Quaternion.LookRotation(-Rights[i], Vector3.up);
                 var go = Instantiate(lightPost, pos, rot, transform);
@@ -1711,6 +1769,12 @@ public partial class Track
             createdMaterials.Add(coneMat);
             for (int i = 15; i < Count - 15; i += 14)
             {
+                float ratio = (float)i / Count;
+                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.08f)
+                {
+                    // 分岐区間は中央が川およびガードレール/手すりで完全に分離されているためコーン配置をスキップ
+                    continue;
+                }
                 float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 8)], Vector3.up);
                 if (Mathf.Abs(bend) > 10f)
                 {
