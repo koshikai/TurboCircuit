@@ -73,7 +73,7 @@ public class RaceAudio : MonoBehaviour
         finalLap = Load("sfx_finallap", () => Make(1.10f, (t, d) => WarmTone(Arp(t, 0.09f, 523, 659, 784, 1047, 1568), t) * 0.35f * Env(t, d)));
         finish = Load("sfx_finish", () => Make(2.0f, (t, d) => WarmTone(Arp(t, 0.11f, 523, 659, 784, 880, 784, 1047, 1319, 1568), t) * 0.36f * Env(t, d)));
         pop = Load("sfx_pop", () => Make(0.18f, (t, d) => (Noise() * 0.20f + WarmTone(1318.5f, t) * 0.35f + WarmTone(2637.0f, t) * 0.15f) * Env(t, d)));
-        star = Load("sfx_star", () => Make(1.1f, (t, d) => WarmTone(Arp(t, 0.10f, 523, 659, 784, 1047, 1319), t) * 0.32f * Env(t, d)));
+        star = Load("sfx_star", () => Load("sfx_shield", () => Make(1.1f, (t, d) => WarmTone(Arp(t, 0.10f, 523, 659, 784, 1047, 1319), t) * 0.32f * Env(t, d))));
         shield = star;
         select = Load("sfx_select", () => beep);
         explosion = Load("sfx_explosion", () => hit);
@@ -206,19 +206,19 @@ public class RaceAudio : MonoBehaviour
         RefreshMusicVolume();
     }
 
-    public void Select() => Play(select, 0.30f, Random.Range(0.97f, 1.03f));
+    public void Select() => Play(select, 0.28f, Random.Range(0.97f, 1.03f));
 
     public void Explode(float volumeScale = 1f)
     {
         float now = Time.unscaledTime;
         if (now - lastExplodeTime < 0.14f) return;
         lastExplodeTime = now;
-        float v = 0.22f * Mathf.Clamp01(volumeScale);
+        float v = 0.35f * Mathf.Clamp01(volumeScale);
         if (v > 0.01f) Play(explosion, v, Random.Range(0.95f, 1.05f));
     }
 
-    public void Beep() => Play(beep, 0.36f);
-    public void Go() => Play(go, 0.42f);
+    public void Beep() => Play(beep, 0.38f);
+    public void Go() => Play(go, 0.44f);
     public void Pickup() => Play(pickup, 0.35f, Random.Range(0.97f, 1.04f));
 
     public void Tick()
@@ -226,37 +226,37 @@ public class RaceAudio : MonoBehaviour
         float now = Time.unscaledTime;
         if (now - lastTickTime < 0.045f) return;
         lastTickTime = now;
-        Play(tick, 0.24f, Random.Range(0.96f, 1.05f));
+        Play(tick, 0.22f, Random.Range(0.96f, 1.05f));
     }
 
     public void GotItem() => Play(gotItem, 0.36f);
-    public void Boost() => Play(boost, 0.34f, Random.Range(0.96f, 1.05f));
+    public void Boost() => Play(boost, 0.36f, Random.Range(0.96f, 1.05f));
 
     public void Hit()
     {
         float now = Time.unscaledTime;
         if (now - lastHitTime < 0.20f) return;
         lastHitTime = now;
-        Play(hit, 0.22f, Random.Range(0.95f, 1.05f));
+        Play(hit, 0.34f, Random.Range(0.95f, 1.05f));
     }
 
     public void Bump(float intensity = 1f)
     {
         float now = Time.unscaledTime;
-        if (now - lastBumpTime < 0.18f) return;
+        if (now - lastBumpTime < 0.16f) return;
         lastBumpTime = now;
-        float v = 0.18f * Mathf.Clamp(intensity, 0.35f, 1.0f);
-        Play(bumps[Random.Range(0, bumps.Length)], v, Random.Range(0.92f, 1.10f));
+        float v = 0.26f * Mathf.Clamp(intensity, 0.40f, 1.0f);
+        Play(bumps[Random.Range(0, bumps.Length)], v, Random.Range(0.92f, 1.08f));
     }
 
-    public void Missile() => Play(missile, 0.32f, Random.Range(0.96f, 1.05f));
+    public void Missile() => Play(missile, 0.34f, Random.Range(0.96f, 1.05f));
     public void Drop() => Play(drop, 0.32f, Random.Range(0.95f, 1.05f));
     public void Lap() => Play(lap, 0.40f);
     public void FinalLap() => Play(finalLap, 0.44f);
     public void Finish() => Play(finish, 0.46f);
     public void Pop(int level) => Play(pop, 0.32f, 0.88f + level * 0.12f);
     public void DriftSpark(int level) => Play(pop, 0.20f, 0.95f + level * 0.14f);
-    public void Star() => Play(star, 0.40f);
+    public void Star() => Play(star, 0.38f);
     public void Shield() => Star();
 
     void Play(AudioClip clip, float vol, float pitch = 1f)

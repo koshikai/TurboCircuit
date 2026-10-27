@@ -3,9 +3,13 @@
 All audio in this folder is released under CC0 (public domain). Credit is not required but appreciated.
 
 ## Sound effects
-* [Stable Audio 3 / Audio Studio MCP] - Item pickup sound (`sfx_pickup.ogg`, generated via Stable Audio 3 small-sfx, normalized and tailored).
-* [Turbo Circuit Remastered Arcade SFX] - Countdown beep, Go burst, Lap chime, Final Lap fanfare, Finish victory fanfare, Drift charge spark/pop, Item roulette tick, and Item lock-in jingle (Custom FM synthesis & synth brass remaster, CC0).
-* [Kenney](https://kenney.nl/) - Impact Sounds, Interface Sounds, UI Audio, RPG Audio, Casino Audio (CC0). Mixed and normalized for this game.
+* [OpenGameArt / kheetor](https://opengameart.org/content/race-start-countdown) - Race start countdown beeps and Go sound (`sfx_beep.ogg`, `sfx_go.ogg`, CC0). Stereo remastered, trimmed & normalized.
+* [Kenney](https://kenney.nl/) - High-fidelity CC0 audio assets (remastered, stereo-widened & normalized to -1.0 dBFS):
+  * **Sci-Fi Sounds**: Dash thruster boost (`sfx_boost.ogg`), Supersonic missile firing (`sfx_missile.ogg`), Heavy explosion (`sfx_explosion.ogg`), Slime/banana drop (`sfx_drop.ogg`), Force field invincibility aura (`sfx_shield.ogg`, `sfx_star.ogg`).
+  * **Impact Sounds**: Chassis and guardrail collision variations (`sfx_bump_0.ogg`, `sfx_bump_1.ogg`, `sfx_bump_2.ogg`), Heavy spin-out/kart impact smash (`sfx_hit.ogg`).
+  * **Interface Sounds**: Crisp UI selection prompt (`sfx_select.ogg`).
+* [Stable Audio 3 / Audio Studio MCP] - Item pickup sound (`sfx_pickup.ogg`, generated via Stable Audio 3 small-sfx, normalized and tailored, CC0).
+* [Turbo Circuit Remastered Arcade SFX] - Lap chime (`sfx_lap.ogg`), Final Lap fanfare (`sfx_finallap.ogg`), Finish victory fanfare (`sfx_finish.ogg`), Drift charge spark/pop (`sfx_pop.ogg`), Item roulette tick (`sfx_tick.ogg`), and Item lock-in jingle (`sfx_gotitem.ogg`) (CC0).
 * [qubodup / Scribe](https://opengameart.org/content/supertuxkart-sound-effects) - Kart engine & tire skid sound effects (CC0 / Public domain).
 
 ## Music (`bgm_*.ogg`, 44.1kHz stereo remastered, normalized and loop-tailored)
