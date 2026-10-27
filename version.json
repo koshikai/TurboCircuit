@@ -1,9 +1,9 @@
 {
-  "version": "v2.2.1",
-  "name": "Turbo Circuit v2.2.1",
-  "published_at": "2026-10-27T12:59:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v2.2.1/TurboCircuit-win64.zip",
-  "size": 67270951,
+  "version": "v2.2.2",
+  "name": "Turbo Circuit v2.2.2",
+  "published_at": "2026-10-27T14:00:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v2.2.2/TurboCircuit-win64.zip",
+  "size": 68184212,
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "■ What's New in Turbo Circuit v2.2.1\n• Input System Migration (#74)\n  - Keyboard / mouse / gamepad-fallback input now runs on Unity's Input System (the legacy Input Manager has been removed)\n  - Key bindings saved by previous versions keep working\n  - Gameplay and controls are unchanged\n• Internal Improvements\n  - Runtime / Editor assembly split (#68) and an automated EditMode test suite (#72)\n\n■ 主なアップデート内容 (v2.2.1)\n• 入力システムを Unity の Input System へ移行 (#74)\n  - キーボード・マウス・ゲームパッド補助入力を Input System で処理（旧 Input Manager は撤去）\n  - 旧バージョンで保存したキー設定はそのまま引き継がれます\n  - ゲームプレイ・操作方法に変更はありません\n• 内部改善\n  - Runtime / Editor のアセンブリ分離 (#68) と、自動テスト（EditMode）基盤の導入 (#72)"
+  "notes": "■ What's New in Turbo Circuit v2.2.2\n• Course Updates: Canyon Split (#85, #88)\n  - Added dedicated track badge icon and custom high-energy trance BGM (bgm_6)\n  - Fixed unintentional off-road slowdown and invisible median collisions in the split fork section\n• Audio Overhaul (#86)\n  - Completely refreshed sound effects with high-quality Kenney / OpenGameArt assets and rebalanced mixing\n• Gamepad Input Improvements (#83)\n  - Replaced XInput P/Invoke with Unity Input System's native Gamepad API for cleaner and more robust controller support\n• Stability & Testing (#80, #82)\n  - Added Track geometry test suite (142 EditMode tests) and optimized release packaging\n\n■ 主なアップデート内容 (v2.2.2)\n• CANYON SPLIT の仕上げ・挙動改善 (#85, #88)\n  - 専用コースバッジアイコンと専用BGM (bgm_6) を追加\n  - 分岐区間での常時オフロード減速と見えない中央分離帯の衝突判定を修正\n• 効果音(SFX)の刷新 (#86)\n  - Kenney / OpenGameArt の高品質サウンドへ刷新し、ミキシングバランスを適正化\n• ゲームパッド入力の Input System 統一 (#83)\n  - XInput P/Invoke を廃止し、Unity Input System の Gamepad API へ一本化\n• 品質管理・テスト基盤強化 (#80, #82)\n  - Track 経路幾何テストスイートを導入 (EditMode 142件テスト) し、パッケージサイズを適正化"
 }
