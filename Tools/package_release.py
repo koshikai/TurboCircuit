@@ -25,8 +25,8 @@ def package_release():
             dirs[:] = [d for d in dirs if d.lower() not in exclude_dirs]
             
             for file in files:
-                # Exclude verification pngs and model bounds
-                if file.startswith("verify_") or file.endswith(".pdb"):
+                # Exclude verification pngs (verify_*, AutoShot の shot_*) and model bounds
+                if file.startswith(("verify_", "shot_")) or file.endswith(".pdb"):
                     continue
                     
                 full_path = os.path.join(root, file)
