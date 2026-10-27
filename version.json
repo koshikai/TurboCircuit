@@ -1,9 +1,9 @@
 {
-  "version": "v2.2.0",
-  "name": "Turbo Circuit v2.2.0",
-  "published_at": "2026-10-22T05:32:00Z",
-  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v2.2.0/TurboCircuit-win64.zip",
-  "size": 66882236,
+  "version": "v2.2.1",
+  "name": "Turbo Circuit v2.2.1",
+  "published_at": "2026-10-27T12:59:00Z",
+  "download_url": "https://github.com/koshikai/TurboCircuit/releases/download/v2.2.1/TurboCircuit-win64.zip",
+  "size": 67270951,
   "release_url": "https://github.com/koshikai/TurboCircuit/releases/latest",
-  "notes": "■ What's New in Turbo Circuit v2.2.0\n• Canyon Split Track Full Overhaul (#62, #63)\n  - 23 control points (1,630m total length) featuring rich verticality and technical canyon sections\n  - S-curve climb from the Oasis Avenue up to Canyon Ridge (elevation 15m)\n  - The Great Split: Safe riverside cruise vs. high-altitude wooden trestle bridge jump shortcut\n  - Hairpin turn following the merge section and high-speed chicane leading into the home straight\n• CPU Navigation & Physics Fix in Split Routes (#64)\n  - Mathematical path alignment following procedural road mesh geometry\n  - Pre-split approach lane alignment (jump ramp targeting at Lateral 10.6m)\n  - Fixed unintended median barrier collisions on the straight approaching the split\n  - Lap-by-lap dynamic split route alternating for CPU racers\n• Audio Overhaul: New Item Box Pickup Sound (#59, #60)\n  - Replaced the item pickup SFX with high-fidelity bouncy pop audio generated via Stable Audio 3\n\n■ 主なアップデート内容 (v2.2.0)\n• キャニオン・スプリット (CANYON SPLIT) のコース形状全面刷新 (#62, #63)\n  - 制御点23点（全長約1,630m）の起伏とコーナーに富んだテクニカルな立体サーキットへ進化\n  - オアシス大通りから赤岩の尾根（標高15m）へ駆け上がる登坂S字セクション\n  - 二股分岐「THE GREAT SPLIT」: 水際を攻める安全な川沿いロードと、川越え大ジャンプから突入する高架木橋ショートカット\n  - 合流直後のテクニカルな180度キャニオンヘアピン＆最終ダウンヒルシケイン\n• 分岐区間におけるCPU AI挙動および物理衝突の最適化 (#64)\n  - 道路メッシュの数学的中心に完全同期した滑らかなライン取り\n  - 分岐進入前の左右車線整列誘導（Lateral = 10.6mのジャンプ台への精密誘導）\n  - 分岐手前の一本道で発生していた見えない中央分離帯への誤反発バグを完全解消\n  - 周回ごとにCPUが左右ルートをダイナミックに切り替えて走行\n• Stable Audio 3 による新アイテム取得音（sfx_pickup）の導入 (#59, #60)\n  - ポップで弾む高品位なアイテムボックス獲得サウンドへ全面リニューアル"
+  "notes": "■ What's New in Turbo Circuit v2.2.1\n• Input System Migration (#74)\n  - Keyboard / mouse / gamepad-fallback input now runs on Unity's Input System (the legacy Input Manager has been removed)\n  - Key bindings saved by previous versions keep working\n  - Gameplay and controls are unchanged\n• Internal Improvements\n  - Runtime / Editor assembly split (#68) and an automated EditMode test suite (#72)\n\n■ 主なアップデート内容 (v2.2.1)\n• 入力システムを Unity の Input System へ移行 (#74)\n  - キーボード・マウス・ゲームパッド補助入力を Input System で処理（旧 Input Manager は撤去）\n  - 旧バージョンで保存したキー設定はそのまま引き継がれます\n  - ゲームプレイ・操作方法に変更はありません\n• 内部改善\n  - Runtime / Editor のアセンブリ分離 (#68) と、自動テスト（EditMode）基盤の導入 (#72)"
 }
