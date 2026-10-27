@@ -102,7 +102,7 @@ public partial class RaceManager
 
         string uiDir = Application.dataPath + "/Resources/UI/";
         titleLogoTex = LoadTexture("UI/title_logo_pop", uiDir + "title_logo_pop.png") ?? LoadTexture("UI/title_logo", uiDir + "title_logo.png");
-        int numCourses = Mathf.Max(Track.Courses.Length, 6);
+        int numCourses = Mathf.Max(Track.Courses.Length, 7);
         if (trackBadgeTex == null || trackBadgeTex.Length < numCourses)
             trackBadgeTex = new Texture2D[numCourses];
         for (int i = 0; i < trackBadgeTex.Length; i++)
@@ -110,6 +110,7 @@ public partial class RaceManager
         if (trackBadgeTex.Length > 3 && trackBadgeTex[3] == null) trackBadgeTex[3] = TextureGen.CityBadge();
         if (trackBadgeTex.Length > 4 && trackBadgeTex[4] == null) trackBadgeTex[4] = TextureGen.HokkaidoBadge();
         if (trackBadgeTex.Length > 5 && trackBadgeTex[5] == null) trackBadgeTex[5] = TextureGen.OverpassBadge();
+        if (trackBadgeTex.Length > 6 && trackBadgeTex[6] == null) trackBadgeTex[6] = TextureGen.CanyonBadge();
 
         cardPopTex = LoadTexture("UI/ui_card_pop", uiDir + "ui_card_pop.png");
         btnRaceTex = LoadTexture("UI/ui_btn_race", uiDir + "ui_btn_race.png");

@@ -477,6 +477,163 @@ public static class TextureGen
     }
 
 
+
+    // タイトル画面用の峡谷分岐コースバッジ（キャニオン・スプリット：砂岩メサ・夕日・Y字分岐ロード）
+    public static Texture2D CanyonBadge()
+    {
+        const string key = "canyon_badge";
+        if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+        const int n = 128;
+        var px = new Color[n * n];
+        Color skyTop = new Color(0.96f, 0.43f, 0.20f);
+        Color skyBottom = new Color(1.0f, 0.84f, 0.47f);
+        Color sunColor = new Color(1.0f, 0.96f, 0.67f);
+        Color rockLayer1 = new Color(0.76f, 0.33f, 0.18f);
+        Color rockLayer2 = new Color(0.63f, 0.24f, 0.12f);
+        Color rockLayer3 = new Color(0.84f, 0.51f, 0.25f);
+        Color groundCol = new Color(0.82f, 0.47f, 0.25f);
+        Color roadCol = new Color(0.24f, 0.22f, 0.20f);
+        Color curbA = new Color(0.96f, 0.35f, 0.16f);
+        Color curbB = new Color(1.0f, 0.84f, 0.24f);
+        Color woodBridge = new Color(0.59f, 0.37f, 0.22f);
+        Color woodRail = new Color(0.90f, 0.67f, 0.35f);
+        Color cactusCol = new Color(0.18f, 0.45f, 0.22f);
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float dx = x - n * 0.5f + 0.5f, dy = y - n * 0.5f + 0.5f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            var c = new Color(0, 0, 0, 0);
+            if (d < 60f)
+            {
+                // 空の夕暮れグラデーション
+                float tSky = Mathf.Clamp01((y - 30f) / 75f);
+                c = Color.Lerp(skyBottom, skyTop, tSky);
+
+                // 沈む夕日 (x=64, y=70, r=16)
+                float sunDx = x - 64f, sunDy = y - 70f;
+                float sunDist = Mathf.Sqrt(sunDx * sunDx + sunDy * sunDy);
+                if (sunDist < 16f)
+                {
+                    c = Color.Lerp(sunColor, c, sunDist / 16f);
+                }
+
+                // 遠景のキャニオン岩壁（左右メサと中央尖塔メサ）
+                float mesaLeft = 68f - 0.45f * x;
+                float mesaRight = 68f - 0.45f * (127f - x);
+                float mesaH = Mathf.Max(mesaLeft, mesaRight);
+                float spireH = 75f - Mathf.Abs(x - 64f) * 2.2f;
+
+                bool isRock = false;
+                float rockY = 0f;
+                if (y < mesaH && (x < 46 || x > 81))
+                {
+                    isRock = true;
+                    rockY = y;
+                }
+                else if (y < spireH && Mathf.Abs(x - 64f) < 14f)
+                {
+                    isRock = true;
+                    rockY = y + 10f;
+                }
+
+                if (isRock)
+                {
+                    // 地層ストライプ
+                    int stripe = (int)(rockY * 0.8f) % 12;
+                    if (stripe < 4) c = rockLayer1;
+                    else if (stripe < 8) c = rockLayer2;
+                    else c = rockLayer3;
+
+                    // 中央尖塔の陰影
+                    if (Mathf.Abs(x - 64f) < 14f && x > 64f)
+                    {
+                        c = new Color(c.r * 0.75f, c.g * 0.75f, c.b * 0.75f);
+                    }
+                }
+
+                // 谷底の砂漠大地
+                if (y < 35 && !isRock)
+                {
+                    c = groundCol;
+                }
+
+                // サボテンのシルエット
+                if ((Mathf.Abs(x - 22f) < 2f && y >= 26 && y <= 38) || (Mathf.Abs(y - 32f) < 2f && x >= 18 && x <= 26))
+                    c = cactusCol;
+                if ((Mathf.Abs(x - 106f) < 2f && y >= 20 && y <= 30) || (Mathf.Abs(y - 25f) < 2f && x >= 103 && x <= 110))
+                    c = cactusCol;
+
+                // 分岐道路（Y字スプリットロード）
+                bool onRoad = false;
+                bool onCurb = false;
+                bool isBridge = false;
+
+                if (y < 24)
+                {
+                    float roadW = 8.0f + (24f - y) * 0.3f;
+                    float distRoad = Mathf.Abs(x - 64f);
+                    if (distRoad < roadW)
+                    {
+                        onRoad = true;
+                        if (distRoad > roadW - 2.0f) onCurb = true;
+                    }
+                }
+                else
+                {
+                    // 分岐区間
+                    float tSplit = (y - 24f) / 36f;
+                    if (tSplit <= 1.0f)
+                    {
+                        float xl = 64f - (y - 24f) * 0.92f;
+                        float xr = 64f + (y - 24f) * 0.92f;
+                        float wLane = 5.2f - tSplit * 1.0f;
+
+                        // 左ルート（谷底の舗装路）
+                        if (Mathf.Abs(x - xl) < wLane)
+                        {
+                            onRoad = true;
+                            if (Mathf.Abs(x - xl) > wLane - 1.5f) onCurb = true;
+                        }
+                        // 右ルート（高架木橋）
+                        if (Mathf.Abs(x - xr) < wLane)
+                        {
+                            onRoad = true;
+                            isBridge = true;
+                            if (Mathf.Abs(x - xr) > wLane - 1.5f) onCurb = true;
+                        }
+                    }
+                }
+
+                if (onRoad)
+                {
+                    if (isBridge)
+                    {
+                        c = woodBridge;
+                        if (((x + y) % 6) == 0) c = woodRail;
+                        if (onCurb) c = new Color(1.0f, 0.78f, 0.39f);
+                    }
+                    else
+                    {
+                        c = roadCol;
+                        if (onCurb) c = ((int)(y * 0.8f) % 4 < 2) ? curbA : curbB;
+                        else if (Mathf.Abs(x - 64f) < 1.0f && y < 22 && (y % 6 < 4)) c = Color.white;
+                    }
+                }
+
+                // 外枠（ポップな立体白リング＋テラコッタインナーリム）
+                if (d > 54f) c = Color.white;
+                else if (d > 52f) c = new Color(0.92f, 0.40f, 0.15f);
+                c.a = 1f;
+            }
+            px[y * n + x] = c;
+        }
+        var t = New(n, n, px, false);
+        cache[key] = t;
+        return t;
+    }
+
     public static Texture2D Checker()
     {
         if (cache.TryGetValue("checker", out var cached) && cached != null) return cached;

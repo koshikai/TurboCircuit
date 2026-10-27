@@ -690,7 +690,7 @@ public partial class RaceManager
         GUI.Label(new Rect(leftX + 8, cardY + 182, cardW - 16, 26), $"< {cTitle} >", courseTitleStyle);
 
         string diffStr = Loc.CourseDifficulty(SelectedCourse);
-        Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : SelectedCourse == 2 ? new Color(1f, 0.28f, 0.38f) : SelectedCourse == 3 ? new Color(0.62f, 0.3f, 0.95f) : SelectedCourse == 4 ? new Color(0.12f, 0.68f, 0.36f) : new Color(0.08f, 0.65f, 0.98f);
+        Color diffBg = SelectedCourse == 0 ? new Color(0.2f, 0.78f, 0.42f) : SelectedCourse == 1 ? new Color(1f, 0.65f, 0.15f) : SelectedCourse == 2 ? new Color(1f, 0.28f, 0.38f) : SelectedCourse == 3 ? new Color(0.62f, 0.3f, 0.95f) : SelectedCourse == 4 ? new Color(0.12f, 0.68f, 0.36f) : SelectedCourse == 5 ? new Color(0.08f, 0.65f, 0.98f) : new Color(0.95f, 0.42f, 0.18f);
         DrawPopPill(new Rect(leftX + (cardW - 154) * 0.5f, cardY + 212, 154, 22), diffStr, diffBg);
 
         var descStyle = St(sSmall, Loc.IsJa ? 12 : 13, TextAnchor.UpperCenter, FontStyle.Normal, true, new Color(0.26f, 0.30f, 0.42f));

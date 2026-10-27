@@ -66,6 +66,26 @@ public class DefaultDataTests
         }
     }
 
+
+    [Test]
+    public void DefaultCourses_AllHaveBgmAssetInResources()
+    {
+        for (int i = 0; i < Track.DefaultCourses.Length; i++)
+        {
+            var clip = UnityEngine.Resources.Load<UnityEngine.AudioClip>("Audio/bgm_" + i);
+            Assert.IsNotNull(clip, $"Course {i} ({Track.DefaultCourses[i].Name}) is missing Audio/bgm_{i}");
+        }
+    }
+
+    [Test]
+    public void CourseBadges_AllProceduralBadgesGenerateNonNull()
+    {
+        Assert.IsNotNull(TextureGen.CityBadge(), "CityBadge is null");
+        Assert.IsNotNull(TextureGen.HokkaidoBadge(), "HokkaidoBadge is null");
+        Assert.IsNotNull(TextureGen.OverpassBadge(), "OverpassBadge is null");
+        Assert.IsNotNull(TextureGen.CanyonBadge(), "CanyonBadge is null");
+    }
+
     static void AssertStat(string who, string stat, int value)
     {
         Assert.That(value, Is.InRange(1, 8), $"{who}: {stat}={value} is outside 1..8");
