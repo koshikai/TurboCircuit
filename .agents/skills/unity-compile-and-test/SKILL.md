@@ -33,11 +33,11 @@ pwsh -File .agents/skills/unity-compile-and-test/scripts/run-tests.ps1 -Platform
 `-runTests -testPlatform <P> -testResults Logs/tests_<P>.xml` を実行し、NUnit XML から total/passed/failed と失敗テスト名・先頭メッセージを要約する。終了コード: `0` 全成功 / `1` 失敗あり / `2` ロック / `3` 異常・0件 / `4` テスト基盤なし。
 `-runTests` では `-quit` を付けない（付けるとテストが走らない）。PlayMode は `-nographics` を付けない（スクリプトが自動で制御）。
 
-### テストが無い場合（現状 `Assets/` に asmdef もテストも無く、manifest に `com.unity.test-framework` も無い）
+### テストが無い場合（現状 `Assets/` にテストは無く、manifest に `com.unity.test-framework` も無い。asmdef は `TurboCircuit.Runtime` と `TurboCircuit.Editor` が導入済み）
 最小手順:
 1. `Packages/manifest.json` の dependencies に `"com.unity.test-framework"` を追加（バージョンは Package Manager で確認。Unity 6 同梱版が使える）。
 2. `Assets/Tests/EditMode/` を作り、Create > Testing > Test Assembly Folder で asmdef を作成（Editor のみ・`UnityEngine.TestRunner`/`UnityEditor.TestRunner` 参照・`overrideReferences` で `nunit.framework.dll`・`defineConstraints: ["UNITY_INCLUDE_TESTS"]`）。
-3. **プロジェクトのスクリプトは現在 Assembly-CSharp（asmdef 無し）なので、asmdef のテストからは参照できない。** 本体側に `Assets/Scripts/TurboCircuit.Runtime.asmdef` を追加するか、純粋ロジックのみをテスト対象にする。asmdef 追加は参照解決・Editor フォルダの扱いに影響するため大きな変更として別Issue/PRで行うこと。
+3. **本体は `Assets/Scripts/TurboCircuit.Runtime.asmdef`（`TurboCircuit.Runtime`）に入っているので、テスト asmdef の `references` に `TurboCircuit.Runtime` を追加すれば参照できる。** 型は `public` が前提（`internal` は見えない）。`Track` / `RaceManager` / `Kart` は `partial class` で結合が強く、Runtime はこれ以上細分化しない。テスト導入は別Issue/PRで行うこと。
 4. `[Test]` メソッドを書き、上記 `run-tests.ps1` で実行。
 
 ## 3. Editor メソッドのバッチ実行 `execute-method.ps1`
