@@ -94,9 +94,9 @@ public partial class RaceManager
                 if (spectateIndex < 0) spectateIndex = MyKartIndex;
                 if (!paused && !showSettings && (updater == null || !updater.ShowModal))
                 {
-                    if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow) || InputSettings.GetSinglePadDown(PadBind.LB, 0))
+                    if (GameInput.GetKeyDown(KeyCode.A) || GameInput.GetKeyDown(KeyCode.LeftArrow) || InputSettings.GetSinglePadDown(PadBind.LB, 0))
                         CycleSpectate(-1);
-                    else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow) || InputSettings.GetSinglePadDown(PadBind.RB, 0))
+                    else if (GameInput.GetKeyDown(KeyCode.D) || GameInput.GetKeyDown(KeyCode.RightArrow) || InputSettings.GetSinglePadDown(PadBind.RB, 0))
                         CycleSpectate(1);
                 }
 
@@ -143,9 +143,9 @@ public partial class RaceManager
         {
             bool padRear = InputSettings.GetPadHeld(InputSettings.PadRearView, InputSettings.PadRearViewAlt, p);
             if (p == 0)
-                lookBehind = Input.GetKey(InputSettings.KeyRearView) || Input.GetKey(KeyCode.B) || padRear;
+                lookBehind = GameInput.GetKey(InputSettings.KeyRearView) || GameInput.GetKey(KeyCode.B) || padRear;
             else if (p == 1)
-                lookBehind = Input.GetKey(KeyCode.Comma) || Input.GetKey(KeyCode.Backslash) || Input.GetKey(KeyCode.End) || padRear;
+                lookBehind = GameInput.GetKey(KeyCode.Comma) || GameInput.GetKey(KeyCode.Backslash) || GameInput.GetKey(KeyCode.End) || padRear;
         }
         isLookingBehind[p] = lookBehind;
 
