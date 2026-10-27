@@ -370,7 +370,8 @@ public partial class Kart : MonoBehaviour
             if (starTimer > 0) max *= 1.15f;
             if (slipstreamTimer > 0) max *= 1.18f;
             if (shockTimer > 0) max *= 0.72f;
-            Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
+            float currentRatio = track != null && track.Count > 0 ? (float)Index / track.Count : 0f;
+            Offroad = track != null ? track.IsOffroad(currentRatio, Lateral) : (Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth);
             if (Offroad && boostTimer <= 0 && starTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
             if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, Mathf.Max(max * 1.25f, MaxSpeed * 1.4f * topSpeedMul * AISpeedFactor()), 60f * dt);
@@ -433,18 +434,35 @@ public partial class Kart : MonoBehaviour
             // 分岐区間の外壁リミット
             limit = Mathf.Lerp(limit, Mathf.Abs(branch.LeftOffset) + branch.LaneWidth + Track.CurbWidth + 1.5f, branchBlend);
 
-            // 中央分離帯（川・内壁）の壁判定：実際に道路が二股に分かれている区間（Start〜End）でのみ有効
+            // 中央分離帯（川・内壁・手すりフェンス）の壁判定：実際に道路が二股に分かれている区間（Start〜End）でのみ有効
             if (progressRatio >= branch.Start && progressRatio <= branch.End)
             {
-                float dividerLimit = (branch.DividerWidth + 0.8f) * branchBlend;
-                if (Mathf.Abs(Lateral) < dividerLimit)
-                {
-                    float side = Lateral >= 0 ? 1f : -1f;
-                    // 分離帯から外側（左車線または右車線）へ押し戻す
-                    var pushDir = track.Rights[Index] * side;
-                    transform.position += pushDir * (dividerLimit - Mathf.Abs(Lateral));
-                    Lateral = side * dividerLimit;
+                // 左車線の内壁ガードレール（branch.LeftOffset + branch.LaneWidth + CurbWidth = -11.5m）
+                // 右車線の木製手すりフェンス（branch.RightOffset - branch.LaneWidth = +12.5m）
+                float innerWallL = branch.LeftOffset + branch.LaneWidth + Track.CurbWidth;
+                float innerFenceR = branch.RightOffset - branch.LaneWidth;
+                const float kartMargin = 1.0f;
 
+                float hitPenetration = 0f;
+                Vector3 pushDir = Vector3.zero;
+
+                if (Lateral < 0f && Lateral > innerWallL - kartMargin)
+                {
+                    hitPenetration = Lateral - (innerWallL - kartMargin);
+                    pushDir = -track.Rights[Index];
+                    transform.position += pushDir * hitPenetration;
+                    Lateral = innerWallL - kartMargin;
+                }
+                else if (Lateral >= 0f && Lateral < innerFenceR + kartMargin)
+                {
+                    hitPenetration = (innerFenceR + kartMargin) - Lateral;
+                    pushDir = track.Rights[Index];
+                    transform.position += pushDir * hitPenetration;
+                    Lateral = innerFenceR + kartMargin;
+                }
+
+                if (hitPenetration > 0f)
+                {
                     // 中央に向かう速度成分（-pushDir）に対する衝突判定
                     float impact = -Vector3.Dot(VelDir, pushDir);
                     if (impact > 0)

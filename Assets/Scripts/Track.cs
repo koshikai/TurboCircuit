@@ -592,15 +592,40 @@ public partial class Track : MonoBehaviour
         return false;
     }
 
+    // コース上（路面＋縁石）を外れてオフロード（ダート・草地・川底など）にいるかを判定
+    public bool IsOffroad(float ratio, float lateral)
+    {
+        if (IsInBranch(ratio, out BranchDef b, out float blend) && blend > 0.001f)
+        {
+            // 左車線路面＋縁石の範囲
+            float roadLLeft = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend) - CurbWidth;
+            float roadLRight = Mathf.Lerp(0f, b.LeftOffset + b.LaneWidth, blend) + CurbWidth;
+            if (lateral >= roadLLeft && lateral <= roadLRight) return false;
+
+            // 右車線路面＋縁石の範囲
+            float roadRLeft = Mathf.Lerp(0f, b.RightOffset - b.LaneWidth, blend) - CurbWidth;
+            float roadRRight = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend) + CurbWidth;
+            if (lateral >= roadRLeft && lateral <= roadRRight) return false;
+
+            return true;
+        }
+        return Mathf.Abs(lateral) > HalfWidth + CurbWidth;
+    }
+
     public Vector3 PointAt(int index, float lateral)
     {
         if (Count == 0 || Pts == null) return Vector3.zero;
         int i = Wrap(index);
         float hOffset = 0f;
         float ratio = (float)i / Count;
-        if (lateral > 0f && IsInBranch(ratio, out BranchDef b, out float blend))
+        if (IsInBranch(ratio, out BranchDef b, out float blend))
         {
-            hOffset = b.RightHeight * blend;
+            // 右車線（高架トレッスル橋）の路面・路肩領域にいる場合のみ持ち上げ高度を加算
+            float roadRLeft = Mathf.Lerp(0f, b.RightOffset - b.LaneWidth, blend) - CurbWidth;
+            if (lateral >= roadRLeft)
+            {
+                hOffset = b.RightHeight * blend;
+            }
         }
         return Pts[i] + Rights[i] * lateral + Normals[i] * hOffset;
     }
