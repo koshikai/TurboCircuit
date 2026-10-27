@@ -17,3 +17,4 @@ All audio in this folder is released under CC0 (public domain). Credit is not re
 | bgm_3 | Neon Metropolis | City Loop | wipics | https://opengameart.org/content/city-loop-0 |
 | bgm_4 | Hokkaido Campus | Awake! (Megawall-10) | cynicmusic | https://opengameart.org/content/awake-megawall-10 |
 | bgm_5 | Skyline Overpass | Pure Raceway | MintoDog | https://opengameart.org/content/pure-raceway |
+| bgm_6 | Canyon Split | Canyon Frontier Run | Stable Audio 3 / Audio Studio MCP | Generated via Stable Audio 3 (sm-sfx+same-s), remastered, normalized & loop-tailored (CC0) |

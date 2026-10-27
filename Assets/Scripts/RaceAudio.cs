@@ -12,7 +12,7 @@ public class RaceAudio : MonoBehaviour
     AudioSource engine, driftLoop, music;
     AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, star, shield, select, explosion;
     AudioClip[] bumps;
-    readonly AudioClip[] bgm = new AudioClip[6];
+    readonly AudioClip[] bgm = new AudioClip[7];
 
     float lastBumpTime = -10f;
     float lastHitTime = -10f;
@@ -87,7 +87,7 @@ public class RaceAudio : MonoBehaviour
         var driftClip = Resources.Load<AudioClip>("Audio/sfx_drift");
         driftLoop = Loop(driftClip != null ? driftClip : Make(1f, (t, d) => Noise() * 0.25f), 0f);
 
-        // 全6コースの BGM を読み込む（万一欠けていた場合のみフォールバック）
+        // 全7コースの BGM を読み込む（万一欠けていた場合のみフォールバック）
         bool missing = false;
         for (int i = 0; i < bgm.Length; i++)
         {

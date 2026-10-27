@@ -83,11 +83,10 @@ description: >-
 * [ ] `Assets/Scripts/Loc.cs`: `CourseNamesJa`, `CourseDescsJa`, `CourseDiffEn`, `CourseDiffJa`, `CourseShortDiffEn`, `CourseShortDiffJa` の**末尾に 1 要素ずつ**追加（範囲外だと `Loc.CourseName` 等は英語/先頭要素にフォールバックするだけでエラーにならないので、漏れに気づきにくい）。
 * [ ] `Assets/Scripts/RaceManager.Intro.cs`: `CourseIntroCuts[]` に `CourseIntroCut`（`camPosStart/End`, `lookTargetStart/End`, `fovStart/End`）を末尾追加。**無いと最後の要素に Clamp され別コースの空撮になる**（`UpdateIntroCamera` は `Mathf.Clamp(SelectedCourse, 0, CourseIntroCuts.Length - 1)`）。座標はワールド座標なので `Control` に合わせて決める。
 * [ ] コース選択 UI `RaceManager.UI.cs`（タイトルの左カード、`SelectedCourse` 参照箇所）:
-  * 難易度ピルの色 `diffBg` は `SelectedCourse == 0 ? ... : SelectedCourse == 4 ? ... : new Color(0.08f,0.65f,0.98f)` の三項連鎖で、**5 以降は同じ水色に落ちる**。独自色が欲しければここを編集。
-  * バッジ画像 `trackBadgeTex[SelectedCourse]`（`RaceManager.Assets.cs`）: `Resources/UI/badge_track_{i}_pop.png` → `badge_track_{i}.png` の順に探し、無ければ 3/4/5 だけ `TextureGen.CityBadge/HokkaidoBadge/OverpassBadge` にフォールバック。**CANYON SPLIT(6) はバッジなし（null）で、UI は null ならバッジを描画しないだけ**。バッジが欲しければ PNG を追加するか `TextureGen` に生成関数を足して `RaceManager.Assets.cs` のフォールバック行に追加。
+  * 難易度ピルの色 `diffBg` は各コースに応じたカラー（5=マリーナブルー、6=キャニオンテラコッタ等）を指定。独自色が欲しければここを編集。
+  * バッジ画像 `trackBadgeTex[SelectedCourse]`（`RaceManager.Assets.cs`）: `Resources/UI/badge_track_{i}_pop.png` → `badge_track_{i}.png` の順に探し、無ければ 3〜6 は `TextureGen.CityBadge/HokkaidoBadge/OverpassBadge/CanyonBadge` にフォールバック。新コースでバッジを足す際は PNG を追加するか `TextureGen` に生成関数を足して `RaceManager.Assets.cs` のフォールバック行に追加。
 * [ ] オンライン側の表示（`RaceManager.Online.cs` の `Loc.CourseName(SelectedCourse, ...)`, `Loc.CourseShortDifficulty`）は配列追加で自動対応。
-* [ ] **BGM**: `Assets/Scripts/RaceAudio.cs` の `bgm` は `new AudioClip[6]` で `Resources.Load("Audio/bgm_" + i)` を 0〜5 だけ読み、`SetCourseMusic/RestartMusic` は `Mathf.Clamp(course, 0, bgm.Length - 1)`。
-  **7 コース目(CANYON SPLIT)は専用 BGM が無く bgm_5 が再生される**（コードから確認済み）。専用曲を付けるなら `Assets/Resources/Audio/bgm_N.ogg` を追加し、`bgm` 配列長を増やし、`Assets/Resources/Audio/CREDITS.md` の Music 表にクレジットを追記する。
+* [ ] **BGM**: `Assets/Scripts/RaceAudio.cs` の `bgm` は `new AudioClip[N]`（現在 7）で `Resources.Load("Audio/bgm_" + i)` を読み、`SetCourseMusic/RestartMusic` は `Mathf.Clamp(course, 0, bgm.Length - 1)`。新コース用楽曲を追加する際は `Assets/Resources/Audio/bgm_N.ogg`（および `.meta`）を追加し、`bgm` 配列長を増やし、`Assets/Resources/Audio/CREDITS.md` の Music 表にクレジットを追記する。
 
 ### 1-5. 検証
 ```powershell

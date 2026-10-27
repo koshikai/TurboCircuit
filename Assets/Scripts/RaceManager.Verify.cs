@@ -238,6 +238,11 @@ public partial class RaceManager
                     state = State.Title;
                     ConfigureHuman(0);
                     break;
+                case "title_canyon":
+                    state = State.Title;
+                    ConfigureHuman(0);
+                    LoadCourse(6);
+                    break;
                 case "title2p":
                     state = State.Title;
                     SelectedDriver2 = 7;
