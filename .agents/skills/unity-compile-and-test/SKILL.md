@@ -33,12 +33,13 @@ pwsh -File .agents/skills/unity-compile-and-test/scripts/run-tests.ps1 -Platform
 `-runTests -testPlatform <P> -testResults Logs/tests_<P>.xml` を実行し、NUnit XML から total/passed/failed と失敗テスト名・先頭メッセージを要約する。終了コード: `0` 全成功 / `1` 失敗あり / `2` ロック / `3` 異常・0件 / `4` テスト基盤なし。
 `-runTests` では `-quit` を付けない（付けるとテストが走らない）。PlayMode は `-nographics` を付けない（スクリプトが自動で制御）。
 
-### テストが無い場合（現状 `Assets/` にテストは無く、manifest に `com.unity.test-framework` も無い。asmdef は `TurboCircuit.Runtime` と `TurboCircuit.Editor` が導入済み）
-最小手順:
-1. `Packages/manifest.json` の dependencies に `"com.unity.test-framework"` を追加（バージョンは Package Manager で確認。Unity 6 同梱版が使える）。
-2. `Assets/Tests/EditMode/` を作り、Create > Testing > Test Assembly Folder で asmdef を作成（Editor のみ・`UnityEngine.TestRunner`/`UnityEditor.TestRunner` 参照・`overrideReferences` で `nunit.framework.dll`・`defineConstraints: ["UNITY_INCLUDE_TESTS"]`）。
-3. **本体は `Assets/Scripts/TurboCircuit.Runtime.asmdef`（`TurboCircuit.Runtime`）に入っているので、テスト asmdef の `references` に `TurboCircuit.Runtime` を追加すれば参照できる。** 型は `public` が前提（`internal` は見えない）。`Track` / `RaceManager` / `Kart` は `partial class` で結合が強く、Runtime はこれ以上細分化しない。テスト導入は別Issue/PRで行うこと。
-4. `[Test]` メソッドを書き、上記 `run-tests.ps1` で実行。
+### テストの追加方法（現状: `Assets/Tests/EditMode/` に EditMode テストあり）
+テスト基盤は導入済み（`manifest.json` に `com.unity.test-framework`、`TurboCircuit.Tests.EditMode.asmdef` が `TurboCircuit.Runtime` を参照）。
+1. `Assets/Tests/EditMode/` に `*.cs` を追加（`using NUnit.Framework;`、クラス名と同名ファイル）。asmdef は既存のものを使う。
+2. 参照できるのは `public` の型・メンバーのみ。`private` / `internal` は見えない（例: `RaceManager.ComparePlaces` は `private static`）。
+3. `Loc.Set` のように `PlayerPrefs` や static 状態を変えるテストは、`[SetUp]` / `[TearDown]` で必ず元に戻す。
+4. `Track` / `Kart` の生成や物理を伴うもの（PlayMode テスト）は未導入。必要なら `Assets/Tests/PlayMode/` に別 asmdef を作る。
+5. 追加したらエディタを閉じて `run-tests.ps1` を実行し、件数と結果を確認する。
 
 ## 3. Editor メソッドのバッチ実行 `execute-method.ps1`
 
