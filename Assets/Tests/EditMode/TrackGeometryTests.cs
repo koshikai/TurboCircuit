@@ -153,6 +153,65 @@ public class TrackGeometryTests
         }
     }
 
+    [Test]
+    public void IsOffroad_OnStraightPath_RecognizesRoadAndOutside()
+    {
+        track.BuildPath(0);
+        Assert.IsFalse(track.IsOffroad(0.1f, 0f), "center line");
+        Assert.IsFalse(track.IsOffroad(0.1f, 8.5f), "inside road");
+        Assert.IsFalse(track.IsOffroad(0.1f, 9.8f), "on curb");
+        Assert.IsTrue(track.IsOffroad(0.1f, 10.5f), "outside curb");
+        Assert.IsTrue(track.IsOffroad(0.1f, -11.0f), "outside left curb");
+    }
+
+    [Test]
+    public void IsOffroad_InBranchSection_RecognizesBothLanesAndRiver()
+    {
+        int canyonCourse = 6;
+        track.BuildPath(canyonCourse);
+        var branch = Track.Courses[canyonCourse].Branches[0];
+        float mid = (branch.Start + branch.End) * 0.5f;
+
+        // 左右の各車線（アスファルト・木橋）はオンロード
+        Assert.IsFalse(track.IsOffroad(mid, branch.LeftOffset), "left branch center");
+        Assert.IsFalse(track.IsOffroad(mid, branch.LeftOffset - branch.LaneWidth * 0.5f), "left branch mid");
+        Assert.IsFalse(track.IsOffroad(mid, branch.LeftOffset + branch.LaneWidth * 0.8f), "left branch inner edge");
+
+        Assert.IsFalse(track.IsOffroad(mid, branch.RightOffset), "right branch center");
+        Assert.IsFalse(track.IsOffroad(mid, branch.RightOffset - branch.LaneWidth * 0.5f), "right branch mid");
+        Assert.IsFalse(track.IsOffroad(mid, branch.RightOffset + branch.LaneWidth * 0.8f), "right branch outer edge");
+
+        // 中央の激流リバー（左右車線の間）およびコース外側はオフロード
+        Assert.IsTrue(track.IsOffroad(mid, 0f), "river center");
+        Assert.IsTrue(track.IsOffroad(mid, 5.0f), "river right");
+        Assert.IsTrue(track.IsOffroad(mid, -5.0f), "river left");
+        Assert.IsTrue(track.IsOffroad(mid, branch.RightOffset + branch.LaneWidth + Track.CurbWidth + 2f), "beyond right curb");
+        Assert.IsTrue(track.IsOffroad(mid, branch.LeftOffset - branch.LaneWidth - Track.CurbWidth - 2f), "beyond left curb");
+    }
+
+    [Test]
+    public void PointAt_InBranchSection_ElevatesRightLaneOnly()
+    {
+        int canyonCourse = 6;
+        track.BuildPath(canyonCourse);
+        var branch = Track.Courses[canyonCourse].Branches[0];
+        float mid = (branch.Start + branch.End) * 0.5f;
+        int idx = Mathf.RoundToInt(mid * track.Count);
+
+        Vector3 leftPt = track.PointAt(idx, branch.LeftOffset);
+        Vector3 rightPt = track.PointAt(idx, branch.RightOffset);
+        Vector3 centerPt = track.PointAt(idx, 0f);
+
+        // 右車線（木橋）は RightHeight (4.5m) 上昇、左車線と中央川底は地面高度
+        float rightHDiff = rightPt.y - track.Pts[idx].y;
+        float leftHDiff = leftPt.y - track.Pts[idx].y;
+        float centerHDiff = centerPt.y - track.Pts[idx].y;
+
+        Assert.AreEqual(branch.RightHeight, rightHDiff, 0.2f, "right lane elevated");
+        Assert.AreEqual(0f, leftHDiff, 0.2f, "left lane on ground");
+        Assert.AreEqual(0f, centerHDiff, 0.2f, "center at ground");
+    }
+
     static bool IsFinite(Vector3 v) =>
         !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) ||
           float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));

@@ -235,7 +235,21 @@ public partial class Kart
                                && !(inwardLat > 2.2f && velInwardErr < -12f);
 
                 // 3) アウト側ガード：コース外縁から1.4m以上内側
-                bool outwardSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 1.4f;
+                bool outwardSafe;
+                if (track.IsInBranch(progressRatio, out BranchDef driftBDef, out float driftBBlend) && driftBBlend > 0.1f)
+                {
+                    float halfW = Track.HalfWidth * 0.5f;
+                    float baseLane = (aiBranchChoice > 0) ? halfW : -halfW;
+                    float branchTarget = (aiBranchChoice > 0) ? driftBDef.RightOffset : driftBDef.LeftOffset;
+                    float laneCenter = Mathf.Lerp(baseLane, branchTarget, driftBBlend);
+                    float distFromLaneCenter = Mathf.Abs(currentLateral - laneCenter);
+                    float laneSafeHalf = Mathf.Lerp(Track.HalfWidth * 0.5f - 1.0f, driftBDef.LaneWidth - 1.2f, driftBBlend);
+                    outwardSafe = distFromLaneCenter < laneSafeHalf;
+                }
+                else
+                {
+                    outwardSafe = Mathf.Abs(currentLateral) < Track.HalfWidth - 1.4f;
+                }
 
                 // 長いカーブ・ヘアピンでは Level 3（紫火花）、中程度のコーナーでは Level 2（オレンジ火花）まで溜める
                 int targetDriftLv = (Mathf.Abs(nearAngle) > 18f && Mathf.Abs(futureAngle) > 30f && inwardLat < 3.0f) ? 3 : 2;

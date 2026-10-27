@@ -154,7 +154,8 @@ public partial class Kart
         else airTrickSpin = Mathf.MoveTowards(Mathf.Repeat(airTrickSpin + 180f, 360f) - 180f, 0f, 900f * dt);
         track.Locate(transform.position, ref Index, out Lateral, out float localProgress);
         Progress = hasNet ? net.Progress : localProgress;
-        Offroad = Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth;
+        float progressRatio = track != null && track.Count > 0 ? (float)Index / track.Count : 0f;
+        Offroad = track != null ? track.IsOffroad(progressRatio, Lateral) : (Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth);
 
         bool skidding = !isAirborne && (drifting || (isBraking && Speed > 6f) || (spinTimer > 0 && Speed > 3f));
         if (skidTrails[0] != null)
