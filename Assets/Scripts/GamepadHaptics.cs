@@ -1,19 +1,13 @@
-using System;
-using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-// Windows XInput を直接 P/Invoke で呼び出す超軽量コントローラー振動システム
-// パッケージ追加不要で Xbox / XInput 互換コントローラーのデュアルモーター振動を完全サポート
+// ゲームパッドの状態取得とデュアルモーター振動（Input System の Gamepad ベース）。
+// 呼び出し側（Kart.Input.cs など）は XInput 互換の値で扱っているため、PadSnapshot は従来どおり
+// ボタンのビットマスク / トリガー 0〜255 / スティック ±32767 の形式で返す。
+// Xbox / XInput 互換パッドに加えて、Input System が Gamepad として認識するパッド（PlayStation / Switch 系など）も使える。
+// P1 = Gamepad.all[0]、P2 = Gamepad.all[1]（デバイスの認識順）。
 public static class GamepadHaptics
 {
-    [StructLayout(LayoutKind.Sequential)]
-    struct XInputVibration
-    {
-        public ushort wLeftMotorSpeed;  // 低周波モーター（重い衝撃・クラッシュ）
-        public ushort wRightMotorSpeed; // 高周波モーター（繊細な振動・エンジン・ドリフト）
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     public struct XInputGamepad
     {
         public ushort wButtons;
@@ -23,13 +17,6 @@ public static class GamepadHaptics
         public short sThumbLY;
         public short sThumbRX;
         public short sThumbRY;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct XInputState
-    {
-        public uint dwPacketNumber;
-        public XInputGamepad Gamepad;
     }
 
     public const ushort BtnDPadUp        = 0x0001;
@@ -47,21 +34,6 @@ public static class GamepadHaptics
     public const ushort BtnX             = 0x4000;
     public const ushort BtnY             = 0x8000;
 
-    [DllImport("xinput1_4.dll", EntryPoint = "XInputSetState")]
-    static extern int XInputSetState14(uint dwUserIndex, ref XInputVibration pVibration);
-
-    [DllImport("xinput9_1_0.dll", EntryPoint = "XInputSetState")]
-    static extern int XInputSetState91(uint dwUserIndex, ref XInputVibration pVibration);
-
-    [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState")]
-    static extern int XInputGetState14(uint dwUserIndex, out XInputState pState);
-
-    [DllImport("xinput9_1_0.dll", EntryPoint = "XInputGetState")]
-    static extern int XInputGetState91(uint dwUserIndex, out XInputState pState);
-
-    static bool isXInputAvailable = true;
-    static bool use14 = true;
-
     struct MotorState
     {
         public float leftMotor;
@@ -78,7 +50,6 @@ public static class GamepadHaptics
         public bool connected;
         public XInputGamepad current;
         public XInputGamepad prev;
-        public float nextProbeTime;
     }
 
     static readonly MotorState[] states = new MotorState[4];
@@ -89,35 +60,26 @@ public static class GamepadHaptics
     {
         if (lastPolledFrame == Time.frameCount) return;
         lastPolledFrame = Time.frameCount;
-        float now = Time.unscaledTime;
 
         for (int i = 0; i < padSnapshots.Length; i++)
         {
             padSnapshots[i].prev = padSnapshots[i].current;
-            if (!isXInputAvailable)
+            var pad = GetGamepad(i);
+            if (pad == null)
             {
                 padSnapshots[i].connected = false;
                 padSnapshots[i].current = default;
                 continue;
             }
-            if (padSnapshots[i].nextProbeTime > now + 5f)
-                padSnapshots[i].nextProbeTime = now;
-            if (!padSnapshots[i].connected && now < padSnapshots[i].nextProbeTime)
-                continue;
-
-            int res = CallGetState((uint)i, out var st);
-            if (res == 0)
-            {
-                padSnapshots[i].connected = true;
-                padSnapshots[i].current = st.Gamepad;
-            }
-            else
-            {
-                padSnapshots[i].connected = false;
-                padSnapshots[i].current = default;
-                padSnapshots[i].nextProbeTime = now + 1.2f;
-            }
+            padSnapshots[i].connected = true;
+            padSnapshots[i].current = Read(pad);
         }
+    }
+
+    // 同じフレーム内の再取得を許すためのキャッシュ破棄（テストと、デバイス構成が変わった直後に使う）。
+    public static void InvalidatePoll()
+    {
+        lastPolledFrame = -1;
     }
 
     public static PadSnapshot GetPad(int playerIndex)
@@ -127,61 +89,47 @@ public static class GamepadHaptics
         return padSnapshots[playerIndex];
     }
 
-    static int CallGetState(uint userIndex, out XInputState state)
+    static Gamepad GetGamepad(int playerIndex)
     {
-        state = default;
-        if (!isXInputAvailable) return -1;
-        try
-        {
-            if (use14) return XInputGetState14(userIndex, out state);
-            else return XInputGetState91(userIndex, out state);
-        }
-        catch (DllNotFoundException)
-        {
-            if (use14)
-            {
-                use14 = false;
-                try { return XInputGetState91(userIndex, out state); }
-                catch { isXInputAvailable = false; return -1; }
-            }
-            isXInputAvailable = false;
-            return -1;
-        }
-        catch
-        {
-            return -1;
-        }
+        var all = Gamepad.all;
+        return playerIndex >= 0 && playerIndex < all.Count ? all[playerIndex] : null;
     }
 
-    static int CallSetState(uint userIndex, ref XInputVibration vib)
+    // Gamepad の現在値を XInput 互換の形式へ変換する。
+    // スティックとトリガーは Input System のデッドゾーン処理前の生値を使う（デッドゾーンは InputSettings.StickDeadzone 側で適用するため二重にしない）。
+    public static XInputGamepad Read(Gamepad pad)
     {
-        if (!isXInputAvailable) return -1;
-        try
+        ushort buttons = 0;
+        if (pad.dpad.up.isPressed) buttons |= BtnDPadUp;
+        if (pad.dpad.down.isPressed) buttons |= BtnDPadDown;
+        if (pad.dpad.left.isPressed) buttons |= BtnDPadLeft;
+        if (pad.dpad.right.isPressed) buttons |= BtnDPadRight;
+        if (pad.startButton.isPressed) buttons |= BtnStart;
+        if (pad.selectButton.isPressed) buttons |= BtnBack;
+        if (pad.leftStickButton.isPressed) buttons |= BtnLeftThumb;
+        if (pad.rightStickButton.isPressed) buttons |= BtnRightThumb;
+        if (pad.leftShoulder.isPressed) buttons |= BtnLeftShoulder;
+        if (pad.rightShoulder.isPressed) buttons |= BtnRightShoulder;
+        if (pad.buttonSouth.isPressed) buttons |= BtnA;
+        if (pad.buttonEast.isPressed) buttons |= BtnB;
+        if (pad.buttonWest.isPressed) buttons |= BtnX;
+        if (pad.buttonNorth.isPressed) buttons |= BtnY;
+
+        return new XInputGamepad
         {
-            if (use14) return XInputSetState14(userIndex, ref vib);
-            else return XInputSetState91(userIndex, ref vib);
-        }
-        catch (DllNotFoundException)
-        {
-            if (use14)
-            {
-                use14 = false;
-                try { return XInputSetState91(userIndex, ref vib); }
-                catch { isXInputAvailable = false; return -1; }
-            }
-            isXInputAvailable = false;
-            return -1;
-        }
-        catch (EntryPointNotFoundException)
-        {
-            isXInputAvailable = false;
-            return -1;
-        }
-        catch
-        {
-            return -1;
-        }
+            wButtons = buttons,
+            bLeftTrigger = ToTrigger(pad.leftTrigger.ReadUnprocessedValue()),
+            bRightTrigger = ToTrigger(pad.rightTrigger.ReadUnprocessedValue()),
+            sThumbLX = ToThumb(pad.leftStick.x.ReadUnprocessedValue()),
+            sThumbLY = ToThumb(pad.leftStick.y.ReadUnprocessedValue()),
+            sThumbRX = ToThumb(pad.rightStick.x.ReadUnprocessedValue()),
+            sThumbRY = ToThumb(pad.rightStick.y.ReadUnprocessedValue()),
+        };
     }
+
+    static byte ToTrigger(float v) => (byte)Mathf.RoundToInt(Mathf.Clamp01(v) * 255f);
+
+    static short ToThumb(float v) => (short)Mathf.RoundToInt(Mathf.Clamp(v, -1f, 1f) * 32767f);
 
     // 衝撃パルス振動（壁衝突、被弾、ジャンプ着地、ロケットスタートなど）
     public static void Vibrate(int playerIndex, float lowFreq, float highFreq, float duration)
@@ -231,8 +179,7 @@ public static class GamepadHaptics
         for (int i = 0; i < states.Length; i++)
         {
             states[i] = new MotorState { initialized = true, lastLeft = 0, lastRight = 0 };
-            var vib = new XInputVibration();
-            CallSetState((uint)i, ref vib);
+            GetGamepad(i)?.ResetHaptics();
         }
     }
 
@@ -250,11 +197,6 @@ public static class GamepadHaptics
         states[playerIndex].lastLeft = qLeft;
         states[playerIndex].lastRight = qRight;
 
-        var vib = new XInputVibration
-        {
-            wLeftMotorSpeed = qLeft,
-            wRightMotorSpeed = qRight
-        };
-        CallSetState((uint)playerIndex, ref vib);
+        GetGamepad(playerIndex)?.SetMotorSpeeds(qLeft / 65535f, qRight / 65535f);
     }
 }

@@ -4,6 +4,7 @@
     "references": [
         "TurboCircuit.Runtime",
         "Unity.InputSystem",
+        "Unity.InputSystem.TestFramework",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

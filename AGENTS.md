@@ -58,7 +58,7 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
   * カートの基本プロパティ、接地判定、衝突処理、ステータス
 * **`Kart.Input.cs`**:
   * キーボード / ゲームパッド入力処理、キーコンフィグの適用
-  * 入力は **Input System** のみ（`ProjectSettings` の Active Input Handling は新方式のみ）。キーボード / マウス / ゲームパッド補助経路は **`GameInput`（`GameInput.GetKey` など）経由**で読み、旧 `Input.*` は使わない（新方式のみのため例外になる）。キーコンフィグは `KeyCode` のまま保存し、`KeyCodeMap` で `Key` に変換する。新しいキーを扱うときは `KeyCodeMap` の対応表と `KeyCodeMapTests` を更新すること。ゲームパッドの主経路は `GamepadHaptics` の XInput 直読み。
+  * 入力は **Input System** のみ（`ProjectSettings` の Active Input Handling は新方式のみ）。キーボード / マウス / ゲームパッド補助経路は **`GameInput`（`GameInput.GetKey` など）経由**で読み、旧 `Input.*` は使わない（新方式のみのため例外になる）。キーコンフィグは `KeyCode` のまま保存し、`KeyCodeMap` で `Key` に変換する。新しいキーを扱うときは `KeyCodeMap` の対応表と `KeyCodeMapTests` を更新すること。ゲームパッドは `GamepadHaptics`（Input System の `Gamepad` ベース。P1 = `Gamepad.all[0]`、P2 = `Gamepad.all[1]`）が XInput 互換の値（ボタンのビットマスク、トリガー 0〜255、スティック ±32767）に変換して返す。振動は `Gamepad.SetMotorSpeeds`。変換は `GamepadHapticsTests`（`InputTestFixture`）で固定している。
 * **`Kart.AI.cs`**:
   * CPU対戦相手の経路追従、ウェイポイント走破、アイテム使用判断
 * **`Kart.Visual.cs`**:
