@@ -67,6 +67,13 @@ gh pr create --title "fix(ai): ..." --body-file pr.md   # 本文はテンプレ�
 PR 本文はテンプレの項目（概要 / `Closes #` / 変更の種類 / 検証スクリーンショット / チェックリスト）を埋める。UI・モデル・コース変更は `verify_*.png` を添付。
 CI（`.github/workflows/unity-meta-check.yml`）が PR/push to main で走る: Unity バージョン固定(6000.6.5f1)、衝突マーカー、ScriptableObject 参照/ファイル名、.meta 同期、Material、IMGUI/SafeDestroy 規約、Roslyn 構文。確認は `gh pr checks`。
 
+## 4.5 マージ方針
+`main` は保護されている（必須チェック `Check .meta files & Conflict markers`、管理者にも適用、force push/削除禁止）。チェックが通るまでマージできない。
+
+- **docs のみの PR**（`*.md`、`.agents/**` だけを触る）: 作成後に `gh pr merge <番号> --auto --merge` で auto-merge を付けてよい（履歴は merge commit 形式）。付ける前に `gh pr diff <番号> --name-only` で docs 以外が混ざっていないか確認する。
+- **コード・アセット・asmdef を含む PR**: auto-merge は付けず、ユーザーが GitHub 上で手動マージする。
+- 直接マージ（`--auto` なしの `gh pr merge`）は権限判定で拒否されることがある。回避せず、ユーザーにマージを頼む。
+
 ## 5. リリース手順
 直近の `chore(release): bump version to v2.2.0 (Closes #65)`（コミット 5b1ddd9）が触ったファイル:
 1. `Assets/Editor/BuildTool.cs` — `PlayerSettings.bundleVersion = "X.Y.Z"`
