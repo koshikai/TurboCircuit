@@ -1,4 +1,3 @@
-#if ENABLE_INPUT_SYSTEM
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
@@ -148,4 +147,3 @@ public class KeyCodeMapTests
         Assert.AreEqual(expected, key);
     }
 }
-#endif

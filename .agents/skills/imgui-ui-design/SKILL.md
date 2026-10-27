@@ -88,7 +88,7 @@ IMGUI の描画側は「マウスクリック」を `DrawModernButton` の戻り
 
 `Update()` が `PollMenuNav` で `MenuNav` を作る（1フレーム1回）:
 
-- `moveX/moveY`: パッド（`InputSettings.GetMenuPadVector()`）または `Input.GetAxisRaw("Horizontal"/"Vertical")` を閾値 0.45/0.55 で -1/0/1 化。長押しリピート（初回 0.25s、以降 0.13s）。テキスト編集中は軸入力を無視。
+- `moveX/moveY`: パッド（`InputSettings.GetMenuPadVector()`）または `GameInput.GetAxisRaw("Horizontal"/"Vertical")` を閾値 0.45/0.55 で -1/0/1 化。長押しリピート（初回 0.25s、以降 0.13s）。テキスト編集中は軸入力を無視。
 - `confirm`: パッド A または Enter/KeypadEnter（テキスト編集中は Enter 無効）
 - `cancel`: パッド B または Escape
 - `tabPrev/tabNext`: パッド LB/RB

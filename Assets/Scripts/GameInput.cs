@@ -1,18 +1,13 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
-#endif
 
-// 入力の窓口。キーボード / マウス / ゲームパッド補助経路はここを経由して読む。
-// Input System が有効（ENABLE_INPUT_SYSTEM）なら新方式、無効なら旧 Input クラスを使う。
-// 旧方式へ戻すには ProjectSettings の Active Input Handling を「Input Manager (Old)」にする。
+// 入力の窓口。キーボード / マウス / ゲームパッド補助経路はここを経由して読み、Input System（Keyboard / Mouse / Gamepad）を使う。
+// 旧 Input クラス（Input Manager）は使わない（ProjectSettings の Active Input Handling は Input System Package (New)）。
 // キーコンフィグは KeyCode のまま保存されているため、API も KeyCode で受ける（保存済みの設定互換を保つ）。
 // ゲームパッドの主経路は GamepadHaptics の XInput 直読みで、ここを通らない。
 public static class GameInput
 {
-#if ENABLE_INPUT_SYSTEM
     public static bool GetKey(KeyCode code)
     {
         if (TryGetGamepadButton(code, out var button))
@@ -119,11 +114,4 @@ public static class GameInput
             default: button = default; return false;
         }
     }
-#else
-    public static bool GetKey(KeyCode code) => Input.GetKey(code);
-    public static bool GetKeyDown(KeyCode code) => Input.GetKeyDown(code);
-    public static bool GetMouseButtonDown(int button) => Input.GetMouseButtonDown(button);
-    public static float GetAxis(string axisName) => Input.GetAxis(axisName);
-    public static float GetAxisRaw(string axisName) => Input.GetAxisRaw(axisName);
-#endif
 }

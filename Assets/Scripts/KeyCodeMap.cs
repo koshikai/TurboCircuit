@@ -1,4 +1,3 @@
-#if ENABLE_INPUT_SYSTEM
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -65,4 +64,3 @@ public static class KeyCodeMap
 
     static void Add(Dictionary<KeyCode, Key> d, KeyCode code, Key key) => d[code] = key;
 }
-#endif
