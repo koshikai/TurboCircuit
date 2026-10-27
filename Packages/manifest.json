@@ -5,6 +5,7 @@
     "com.unity.render-pipelines.universal": "17.6.0",
     "com.unity.services.authentication": "3.8.0",
     "com.unity.services.relay": "1.2.0",
+    "com.unity.test-framework": "1.8.0",
     "com.unity.transport": "6.6.0",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",

@@ -134,6 +134,16 @@ pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -AutoShot
 * **生成先**: `Build/Windows/TurboCircuit_Data/shot_*.png`
 * 画像ファイルを確認し、UI要素の文字被り・レイアウト崩れ・デザインのトーン＆マナー不一致がないか必ず目視検証すること。
 
+### 5.3 ユニットテスト (EditMode)
+純粋ロジック（ネット同期のパック形式、既定データの整合性、`Loc` など）は `Assets/Tests/EditMode/`（`TurboCircuit.Tests.EditMode`）の NUnit テストで固定している。Unity エディタを閉じた状態で次を実行する。
+
+```powershell
+pwsh -File .agents/skills/unity-compile-and-test/scripts/run-tests.ps1 -Platform EditMode
+```
+
+* コース / ドライバー / マシンを追加・削除したら、`DefaultDataTests` の期待件数（`ExpectedCourses` など）も更新すること。
+* テストを追加するときは [`unity-compile-and-test`](.agents/skills/unity-compile-and-test/SKILL.md) の手順に従う。
+
 ---
 
 ## 6. コントリビューション・作業時の留意事項
