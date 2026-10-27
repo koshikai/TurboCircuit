@@ -13,7 +13,7 @@ public class AppUpdater : MonoBehaviour
     public static AppUpdater Instance { get; private set; }
 
     // 現在のアプリバージョン
-    public const string CurrentVersion = "v2.2.0";
+    public const string CurrentVersion = "v2.2.1";
 
     // GitHub リポジトリ情報
     public const string GitHubRepo = "koshikai/TurboCircuit";
