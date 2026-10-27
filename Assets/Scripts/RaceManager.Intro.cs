@@ -105,12 +105,12 @@ public partial class RaceManager
         bool modalOpen = (updater != null && updater.ShowModal) || showSettings || paused || showQuitConfirm;
 
         // スキップ入力（SPACE / ENTER / Aボタン / START / マウスクリック）
-        bool skipRequested = Input.GetKeyDown(KeyCode.Space) ||
-                             Input.GetKeyDown(KeyCode.Return) ||
-                             Input.GetKeyDown(KeyCode.KeypadEnter) ||
+        bool skipRequested = GameInput.GetKeyDown(KeyCode.Space) ||
+                             GameInput.GetKeyDown(KeyCode.Return) ||
+                             GameInput.GetKeyDown(KeyCode.KeypadEnter) ||
                              nav.confirm ||
                              nav.padStart ||
-                             (Input.GetMouseButtonDown(0) && !modalOpen);
+                             (GameInput.GetMouseButtonDown(0) && !modalOpen);
 
         if (skipRequested || introTime >= IntroTotalDuration)
         {

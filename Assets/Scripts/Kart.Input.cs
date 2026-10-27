@@ -32,8 +32,8 @@ public partial class Kart
         float padAccel = InputSettings.GetPadAnalog(InputSettings.PadAccel, InputSettings.PadAccelAlt, 0);
         float padBrake = InputSettings.GetPadAnalog(InputSettings.PadBrake, InputSettings.PadBrakeAlt, 0);
 
-        bool keyUp = Input.GetKey(InputSettings.KeyAccel) || Input.GetKey(InputSettings.KeyAccelAlt);
-        bool keyDown = Input.GetKey(InputSettings.KeyBrake) || Input.GetKey(InputSettings.KeyBrakeAlt);
+        bool keyUp = GameInput.GetKey(InputSettings.KeyAccel) || GameInput.GetKey(InputSettings.KeyAccelAlt);
+        bool keyDown = GameInput.GetKey(InputSettings.KeyBrake) || GameInput.GetKey(InputSettings.KeyBrakeAlt);
 
         if (keyUp || padAccel > 0.15f)
             inp.throttle = keyUp ? 1f : padAccel;
@@ -45,20 +45,20 @@ public partial class Kart
         float steerAxis = InputSettings.GetPadSteer(0);
 
         float keySteer = 0f;
-        if (Input.GetKey(InputSettings.KeySteerRight) || Input.GetKey(InputSettings.KeySteerRightAlt)) keySteer += 1f;
-        if (Input.GetKey(InputSettings.KeySteerLeft) || Input.GetKey(InputSettings.KeySteerLeftAlt)) keySteer -= 1f;
+        if (GameInput.GetKey(InputSettings.KeySteerRight) || GameInput.GetKey(InputSettings.KeySteerRightAlt)) keySteer += 1f;
+        if (GameInput.GetKey(InputSettings.KeySteerLeft) || GameInput.GetKey(InputSettings.KeySteerLeftAlt)) keySteer -= 1f;
 
         inp.steer = Mathf.Clamp(Mathf.Abs(keySteer) > 0.01f ? keySteer : steerAxis, -1f, 1f);
 
-        inp.drift = Input.GetKey(InputSettings.KeyDrift) || Input.GetKey(InputSettings.KeyDriftAlt)
-                 || Input.GetKey(KeyCode.RightShift)
+        inp.drift = GameInput.GetKey(InputSettings.KeyDrift) || GameInput.GetKey(InputSettings.KeyDriftAlt)
+                 || GameInput.GetKey(KeyCode.RightShift)
                  || InputSettings.GetPadHeld(InputSettings.PadDrift, InputSettings.PadDriftAlt, 0);
-        inp.driftDown = Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(InputSettings.KeyDriftAlt)
-                     || Input.GetKeyDown(KeyCode.RightShift)
+        inp.driftDown = GameInput.GetKeyDown(InputSettings.KeyDrift) || GameInput.GetKeyDown(InputSettings.KeyDriftAlt)
+                     || GameInput.GetKeyDown(KeyCode.RightShift)
                      || InputSettings.GetPadDown(InputSettings.PadDrift, InputSettings.PadDriftAlt, 0);
 
-        inp.useItem = Input.GetKeyDown(InputSettings.KeyItem) || Input.GetKeyDown(InputSettings.KeyItemAlt)
-                   || Input.GetKeyDown(KeyCode.RightControl)
+        inp.useItem = GameInput.GetKeyDown(InputSettings.KeyItem) || GameInput.GetKeyDown(InputSettings.KeyItemAlt)
+                   || GameInput.GetKeyDown(KeyCode.RightControl)
                    || InputSettings.GetPadDown(InputSettings.PadItem, InputSettings.PadItemAlt, 0);
         return inp;
     }
@@ -76,25 +76,25 @@ public partial class Kart
 
         if (p == 0)
         {
-            bool kUp = Input.GetKey(InputSettings.KeyAccel);
-            bool kDown = Input.GetKey(InputSettings.KeyBrake);
+            bool kUp = GameInput.GetKey(InputSettings.KeyAccel);
+            bool kDown = GameInput.GetKey(InputSettings.KeyBrake);
             inp.throttle = (kUp || padAccel > 0.15f) ? (kUp ? 1f : padAccel) : (kDown || padBrake > 0.15f) ? -(kDown ? 1f : padBrake) : 0f;
-            float kSteer = (Input.GetKey(InputSettings.KeySteerRight) ? 1f : 0f) - (Input.GetKey(InputSettings.KeySteerLeft) ? 1f : 0f);
+            float kSteer = (GameInput.GetKey(InputSettings.KeySteerRight) ? 1f : 0f) - (GameInput.GetKey(InputSettings.KeySteerLeft) ? 1f : 0f);
             inp.steer = Mathf.Abs(kSteer) > 0.01f ? kSteer : padSteer;
-            inp.drift = Input.GetKey(InputSettings.KeyDrift) || Input.GetKey(KeyCode.LeftShift) || padDrift;
-            inp.driftDown = Input.GetKeyDown(InputSettings.KeyDrift) || Input.GetKeyDown(KeyCode.LeftShift) || padDriftDown;
-            inp.useItem = Input.GetKeyDown(InputSettings.KeyItem) || Input.GetKeyDown(KeyCode.LeftControl) || padItem;
+            inp.drift = GameInput.GetKey(InputSettings.KeyDrift) || GameInput.GetKey(KeyCode.LeftShift) || padDrift;
+            inp.driftDown = GameInput.GetKeyDown(InputSettings.KeyDrift) || GameInput.GetKeyDown(KeyCode.LeftShift) || padDriftDown;
+            inp.useItem = GameInput.GetKeyDown(InputSettings.KeyItem) || GameInput.GetKeyDown(KeyCode.LeftControl) || padItem;
         }
         else
         {
-            bool kUp = Input.GetKey(KeyCode.UpArrow);
-            bool kDown = Input.GetKey(KeyCode.DownArrow);
+            bool kUp = GameInput.GetKey(KeyCode.UpArrow);
+            bool kDown = GameInput.GetKey(KeyCode.DownArrow);
             inp.throttle = (kUp || padAccel > 0.15f) ? (kUp ? 1f : padAccel) : (kDown || padBrake > 0.15f) ? -(kDown ? 1f : padBrake) : 0f;
-            float kSteer = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
+            float kSteer = (GameInput.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (GameInput.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
             inp.steer = Mathf.Abs(kSteer) > 0.01f ? kSteer : padSteer;
-            inp.drift = Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.Period) || padDrift;
-            inp.driftDown = Input.GetKeyDown(KeyCode.RightShift) || Input.GetKeyDown(KeyCode.Period) || padDriftDown;
-            inp.useItem = Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.Slash) || padItem;
+            inp.drift = GameInput.GetKey(KeyCode.RightShift) || GameInput.GetKey(KeyCode.Period) || padDrift;
+            inp.driftDown = GameInput.GetKeyDown(KeyCode.RightShift) || GameInput.GetKeyDown(KeyCode.Period) || padDriftDown;
+            inp.useItem = GameInput.GetKeyDown(KeyCode.RightControl) || GameInput.GetKeyDown(KeyCode.Slash) || padItem;
         }
         return inp;
     }
@@ -309,8 +309,8 @@ public static class InputSettings
         float lt = 0f, rt = 0f;
         try
         {
-            rt = Mathf.Clamp01(Input.GetAxis("RightTrigger"));
-            lt = Mathf.Clamp01(Input.GetAxis("LeftTrigger"));
+            rt = Mathf.Clamp01(GameInput.GetAxis("RightTrigger"));
+            lt = Mathf.Clamp01(GameInput.GetAxis("LeftTrigger"));
         }
         catch { }
         curUnityLT = lt > 0.35f;
@@ -363,14 +363,14 @@ public static class InputSettings
         {
             if (b == PadBind.LT)
             {
-                try { return Mathf.Clamp01(Input.GetAxis("LeftTrigger")); } catch { return 0f; }
+                try { return Mathf.Clamp01(GameInput.GetAxis("LeftTrigger")); } catch { return 0f; }
             }
             if (b == PadBind.RT)
             {
-                try { return Mathf.Clamp01(Input.GetAxis("RightTrigger")); } catch { return 0f; }
+                try { return Mathf.Clamp01(GameInput.GetAxis("RightTrigger")); } catch { return 0f; }
             }
             var kc = ToUnityKeyCode(b);
-            if (kc != KeyCode.None && Input.GetKey(kc)) return 1f;
+            if (kc != KeyCode.None && GameInput.GetKey(kc)) return 1f;
         }
         return 0f;
     }
@@ -405,7 +405,7 @@ public static class InputSettings
             if (b == PadBind.LT) return curUnityLT && !prevUnityLT;
             if (b == PadBind.RT) return curUnityRT && !prevUnityRT;
             var kc = ToUnityKeyCode(b);
-            if (kc != KeyCode.None && Input.GetKeyDown(kc)) return true;
+            if (kc != KeyCode.None && GameInput.GetKeyDown(kc)) return true;
         }
         return false;
     }
@@ -427,10 +427,10 @@ public static class InputSettings
             return 0f;
         }
         if (includeUnityAxis && playerIndex == 0
-            && !Input.GetKey(KeyCode.LeftArrow) && !Input.GetKey(KeyCode.RightArrow)
-            && !Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D))
+            && !GameInput.GetKey(KeyCode.LeftArrow) && !GameInput.GetKey(KeyCode.RightArrow)
+            && !GameInput.GetKey(KeyCode.A) && !GameInput.GetKey(KeyCode.D))
         {
-            float ax = Input.GetAxisRaw("Horizontal");
+            float ax = GameInput.GetAxisRaw("Horizontal");
             if (Mathf.Abs(ax) >= StickDeadzone) return Mathf.Clamp(ax, -1f, 1f);
         }
         return 0f;
@@ -464,7 +464,7 @@ public static class InputSettings
         GamepadHaptics.PollPads();
         UpdateUnityTriggerEdges();
         detected = PadBind.None;
-        cancelPressed = GetSinglePadDown(PadBind.Start, 0) || Input.GetKeyDown(KeyCode.Escape);
+        cancelPressed = GetSinglePadDown(PadBind.Start, 0) || GameInput.GetKeyDown(KeyCode.Escape);
         if (cancelPressed) return false;
 
         PadBind[] candidates =

@@ -1243,7 +1243,7 @@ public partial class RaceManager : MonoBehaviour
             GUIUtility.keyboardControl = 0;
         }
         bool editingText = IsEditingTextField;
-        if (editingText && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Escape)))
+        if (editingText && (GameInput.GetKeyDown(KeyCode.Return) || GameInput.GetKeyDown(KeyCode.KeypadEnter) || GameInput.GetKeyDown(KeyCode.Escape)))
         {
             GUIUtility.keyboardControl = 0;
         }
@@ -1251,8 +1251,8 @@ public partial class RaceManager : MonoBehaviour
         Vector2 padVec = InputSettings.GetMenuPadVector();
         if (!editingText && padVec == Vector2.zero)
         {
-            float ax = Input.GetAxisRaw("Horizontal");
-            float ay = Input.GetAxisRaw("Vertical");
+            float ax = GameInput.GetAxisRaw("Horizontal");
+            float ay = GameInput.GetAxisRaw("Vertical");
             if (Mathf.Abs(ax) > 0.55f || Mathf.Abs(ay) > 0.55f)
                 padVec = new Vector2(ax, ay);
         }
@@ -1286,9 +1286,9 @@ public partial class RaceManager : MonoBehaviour
         }
 
         confirm = InputSettings.GetSinglePadDown(PadBind.A, 0) || InputSettings.GetSinglePadDown(PadBind.A, 1)
-               || (!editingText && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)));
+               || (!editingText && (GameInput.GetKeyDown(KeyCode.Return) || GameInput.GetKeyDown(KeyCode.KeypadEnter)));
         cancel = InputSettings.GetSinglePadDown(PadBind.B, 0) || InputSettings.GetSinglePadDown(PadBind.B, 1)
-              || Input.GetKeyDown(KeyCode.Escape);
+              || GameInput.GetKeyDown(KeyCode.Escape);
         tabPrev = InputSettings.GetSinglePadDown(PadBind.LB, 0) || InputSettings.GetSinglePadDown(PadBind.LB, 1);
         tabNext = InputSettings.GetSinglePadDown(PadBind.RB, 0) || InputSettings.GetSinglePadDown(PadBind.RB, 1);
     }
@@ -1347,7 +1347,7 @@ public partial class RaceManager : MonoBehaviour
     // -autoshot / -titleshot / F12 などのスクリーンショット要求とテスト用ブースト
     void HandleCaptureRequests()
     {
-        if (Input.GetKeyDown(KeyCode.F12))
+        if (GameInput.GetKeyDown(KeyCode.F12))
         {
             ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
         }
@@ -1622,7 +1622,7 @@ public partial class RaceManager : MonoBehaviour
             LeaveOnline();
             return true;
         }
-        else if ((Input.GetKeyDown(KeyCode.Escape) || nav.padStart) && (state == State.Countdown || state == State.Racing))
+        else if ((GameInput.GetKeyDown(KeyCode.Escape) || nav.padStart) && (state == State.Countdown || state == State.Racing))
         {
             if (Online)
             {
@@ -1646,10 +1646,10 @@ public partial class RaceManager : MonoBehaviour
     void UpdatePausedInput(in MenuNav nav)
     {
         if (nav.moveY != 0) { pauseFocus = (pauseFocus - nav.moveY + 5) % 5; if (Audio != null) Audio.Tick(); }
-        if (Input.GetKeyDown(KeyCode.O)) { showSettings = !showSettings; settingsFocus = 0; return; }
-        if (Input.GetKeyDown(KeyCode.Q) || nav.padBack) Application.Quit();
-        if (Input.GetKeyDown(KeyCode.R) || nav.padX) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); return; }
-        if (Input.GetKeyDown(KeyCode.T) || nav.padY) { ReturnToTitle(); return; }
+        if (GameInput.GetKeyDown(KeyCode.O)) { showSettings = !showSettings; settingsFocus = 0; return; }
+        if (GameInput.GetKeyDown(KeyCode.Q) || nav.padBack) Application.Quit();
+        if (GameInput.GetKeyDown(KeyCode.R) || nav.padX) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); return; }
+        if (GameInput.GetKeyDown(KeyCode.T) || nav.padY) { ReturnToTitle(); return; }
         if (InputSettings.GetSinglePadDown(PadBind.B, 0) || InputSettings.GetSinglePadDown(PadBind.B, 1))
         {
             paused = false;
@@ -1675,8 +1675,8 @@ public partial class RaceManager : MonoBehaviour
         bool editTxt = IsEditingTextField;
         if (LobbyActive)
         {
-            if (nav.tabPrev || (!editTxt && Input.GetKeyDown(KeyCode.A))) SwitchCourse(-1);
-            else if (nav.tabNext || (!editTxt && Input.GetKeyDown(KeyCode.D))) SwitchCourse(1);
+            if (nav.tabPrev || (!editTxt && GameInput.GetKeyDown(KeyCode.A))) SwitchCourse(-1);
+            else if (nav.tabNext || (!editTxt && GameInput.GetKeyDown(KeyCode.D))) SwitchCourse(1);
             if (nav.moveY != 0) { lobbyFocus = (lobbyFocus - nav.moveY + 4) % 4; if (Audio != null) Audio.Tick(); }
             if (nav.moveX != 0)
             {
@@ -1684,10 +1684,10 @@ public partial class RaceManager : MonoBehaviour
                 else if (lobbyFocus == 1) SwitchKart(0, nav.moveX);
                 else { lobbyFocus = lobbyFocus == 2 ? 3 : 2; if (Audio != null) Audio.Tick(); }
             }
-            if (!editTxt && Input.GetKeyDown(KeyCode.W)) SwitchDriver(0, -1);
-            else if (!editTxt && Input.GetKeyDown(KeyCode.S)) SwitchDriver(0, 1);
-            else if (!editTxt && Input.GetKeyDown(KeyCode.Q)) SwitchKart(0, -1);
-            else if (!editTxt && Input.GetKeyDown(KeyCode.E)) SwitchKart(0, 1);
+            if (!editTxt && GameInput.GetKeyDown(KeyCode.W)) SwitchDriver(0, -1);
+            else if (!editTxt && GameInput.GetKeyDown(KeyCode.S)) SwitchDriver(0, 1);
+            else if (!editTxt && GameInput.GetKeyDown(KeyCode.Q)) SwitchKart(0, -1);
+            else if (!editTxt && GameInput.GetKeyDown(KeyCode.E)) SwitchKart(0, 1);
 
             if (nav.padStart) StartRaceFromTitle();
             else if (nav.confirm)
@@ -1704,23 +1704,23 @@ public partial class RaceManager : MonoBehaviour
             return;
         }
 
-        if (!editTxt && !Net.Busy && (Input.GetKeyDown(KeyCode.Escape) || nav.cancel || nav.padBack))
+        if (!editTxt && !Net.Busy && (GameInput.GetKeyDown(KeyCode.Escape) || nav.cancel || nav.padBack))
             { ShowQuitModal(); return; }
-        if (!editTxt && Input.GetKeyDown(KeyCode.P) && !Net.Busy)
+        if (!editTxt && GameInput.GetKeyDown(KeyCode.P) && !Net.Busy)
             { showSettings = !showSettings; settingsFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (!editTxt && Input.GetKeyDown(KeyCode.L) && !Net.Busy)
+        if (!editTxt && GameInput.GetKeyDown(KeyCode.L) && !Net.Busy)
             { ToggleLanguage(); return; }
-        if (!editTxt && Input.GetKeyDown(KeyCode.U) && !Net.Busy)
+        if (!editTxt && GameInput.GetKeyDown(KeyCode.U) && !Net.Busy)
             { if (updater != null) { updater.ShowModal = !updater.ShowModal; updateModalFocus = 0; if (Audio != null) Audio.Select(); } return; }
-        if (((!editTxt && Input.GetKeyDown(KeyCode.O)) || nav.padX) && !Net.Busy)
+        if (((!editTxt && GameInput.GetKeyDown(KeyCode.O)) || nav.padX) && !Net.Busy)
             { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (!editTxt && Input.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
+        if (!editTxt && GameInput.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
         {
             IsTimeAttack = !IsTimeAttack;
             if (Audio != null) Audio.Select();
             return;
         }
-        if (((!editTxt && Input.GetKeyDown(KeyCode.Tab)) || nav.padY) && !Net.Busy)
+        if (((!editTxt && GameInput.GetKeyDown(KeyCode.Tab)) || nav.padY) && !Net.Busy)
         {
             if (IsTimeAttack) IsTimeAttack = false;
             SetTwoPlayer(!TwoPlayer);
@@ -1738,9 +1738,9 @@ public partial class RaceManager : MonoBehaviour
             if (Audio != null) Audio.Tick();
         }
 
-        if (nav.tabPrev || (!editTxt && Input.GetKeyDown(KeyCode.A)))
+        if (nav.tabPrev || (!editTxt && GameInput.GetKeyDown(KeyCode.A)))
             SwitchCourse(-1);
-        else if (nav.tabNext || (!editTxt && Input.GetKeyDown(KeyCode.D)))
+        else if (nav.tabNext || (!editTxt && GameInput.GetKeyDown(KeyCode.D)))
             SwitchCourse(1);
         else if (nav.moveX != 0)
         {
@@ -1759,26 +1759,26 @@ public partial class RaceManager : MonoBehaviour
                 if (Audio != null) Audio.Tick();
             }
         }
-        else if (!editTxt && Input.GetKeyDown(KeyCode.W))
+        else if (!editTxt && GameInput.GetKeyDown(KeyCode.W))
             SwitchDriver(0, -1);
-        else if (!editTxt && Input.GetKeyDown(KeyCode.S))
+        else if (!editTxt && GameInput.GetKeyDown(KeyCode.S))
             SwitchDriver(0, 1);
-        else if (!editTxt && Input.GetKeyDown(KeyCode.Q))
+        else if (!editTxt && GameInput.GetKeyDown(KeyCode.Q))
             SwitchKart(0, -1);
-        else if (!editTxt && Input.GetKeyDown(KeyCode.E))
+        else if (!editTxt && GameInput.GetKeyDown(KeyCode.E))
             SwitchKart(0, 1);
-        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.UpArrow))
+        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.UpArrow))
             SwitchDriver(1, -1);
-        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.DownArrow))
+        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.DownArrow))
             SwitchDriver(1, 1);
-        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.LeftArrow))
+        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.LeftArrow))
             SwitchKart(1, -1);
-        else if (!editTxt && TwoPlayer && Input.GetKeyDown(KeyCode.RightArrow))
+        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.RightArrow))
             SwitchKart(1, 1);
 
         if (!titleShotRequested)
         {
-            if (nav.padStart || (!editTxt && Input.GetKeyDown(KeyCode.Space)) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))
+            if (nav.padStart || (!editTxt && GameInput.GetKeyDown(KeyCode.Space)) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))
             {
                 StartRaceFromTitle();
             }
@@ -1886,7 +1886,7 @@ public partial class RaceManager : MonoBehaviour
                     else ReturnToTitle();
                 }
             }
-            else if (nav.cancel || Input.GetKeyDown(KeyCode.T) || Input.GetKeyDown(KeyCode.Backspace) || nav.padY)
+            else if (nav.cancel || GameInput.GetKeyDown(KeyCode.T) || GameInput.GetKeyDown(KeyCode.Backspace) || nav.padY)
             {
                 if (Online) LeaveOnline();
                 else ReturnToTitle();
