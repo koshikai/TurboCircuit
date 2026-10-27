@@ -85,6 +85,15 @@ CI（`.github/workflows/unity-meta-check.yml`）が PR/push to main で走る: U
 流れ: リリース用 Issue 作成 → `chore/release-vX.Y.Z` ブランチ → 上記5ファイル更新 → `Tools/package_release.py`（uv で実行: `uv run python Tools/package_release.py`）で `TurboCircuit-win64.zip` を生成し size を反映 → PR（`Closes #番号`）→ マージ後に GitHub Release `vX.Y.Z` へ zip を添付（`gh release create` 等）。
 `*.zip` は .gitignore 済みなのでコミットされない。
 
+v2.2.1 で実際に行った順序（検証済み）:
+1. Unity を閉じて `verify.ps1 -Build` → `uv run python Tools/package_release.py`。zip は約 65MB 前後が目安（`-AutoShot` の `shot_*.png` は除外される。膨らんだら中身を確認）。
+2. `version.json` の `size` に zip の実バイト数、`notes` に英日の更新内容を書き、リリース PR を作成する。
+3. **先に GitHub Release をドラフトで作る**: `gh release create vX.Y.Z TurboCircuit-win64.zip --draft --target main --title "Turbo Circuit vX.Y.Z" --notes-file <notes>`。ドラフトの間はタグが作られない。
+4. PR をマージする（`version.json` が `main` に入ると `AppUpdater` が参照するため、zip が公開済みでないと 404 になる。マージから公開までは短く）。
+5. `gh release edit vX.Y.Z --draft=false --latest` で公開する。タグはマージ後の `main` に付く。`git ls-remote --tags origin vX.Y.Z` が `origin/main` と一致することを確認する。
+
+注意: `--notes-file` は UTF-8（BOM なし）で作る。Windows の Python で `print` すると cp932 で落ちる（`PYTHONIOENCODING=utf-8` か PowerShell の `[IO.File]::WriteAllText` を使う）。コマンドを `;` で繋ぐと失敗後も後続が走るので、リリース作成は `&&` で繋ぐこと。
+
 ## 6. Unity 特有の注意
 * `Library/ Temp/ Obj/ Build/ Builds/ Logs/ UserSettings/ MemoryCaptures/ Recordings/`、`*.csproj *.sln *.zip` 等は .gitignore 済み。コミットしない（`git status` で現れたら .gitignore を確認）。
 * アセット/フォルダの追加・移動・削除は `.meta` も必ず同じコミットに含める。移動は Unity Editor 上で行う。
