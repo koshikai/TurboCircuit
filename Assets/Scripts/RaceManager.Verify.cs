@@ -434,7 +434,10 @@ public partial class RaceManager
 
         foreach (var raw in parts)
         {
-            if (!float.TryParse(raw.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float p01))
+            string trimmed = raw.Trim();
+            bool isRight = trimmed.EndsWith("r", System.StringComparison.OrdinalIgnoreCase);
+            string numStr = isRight ? trimmed.Substring(0, trimmed.Length - 1).Trim() : trimmed;
+            if (!float.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out float p01))
                 continue;
 
             p01 = Mathf.Repeat(p01, 1f);
@@ -443,7 +446,7 @@ public partial class RaceManager
             float lat = 0f;
             if (track.IsInBranch(p01, out BranchDef br, out float blend) && blend > 0.05f)
             {
-                lat = br.LeftOffset * blend;
+                lat = (isRight ? br.RightOffset : br.LeftOffset) * blend;
             }
 
             Player.transform.position = track.PointAt(idx, lat) + Vector3.up * 0.4f;
@@ -464,7 +467,8 @@ public partial class RaceManager
             yield return null;
             yield return new WaitForEndOfFrame();
 
-            string tag = $"c{courseIdx}_p{Mathf.RoundToInt(p01 * 1000f):D3}";
+            string suffix = isRight ? "r" : "";
+            string tag = $"c{courseIdx}_p{Mathf.RoundToInt(p01 * 1000f):D3}{suffix}";
             var tex = ScreenCapture.CaptureScreenshotAsTexture();
             SaveVerifyPng(tex, $"verify_spot_{tag}.png");
             capturedTexs.Add(tex);
