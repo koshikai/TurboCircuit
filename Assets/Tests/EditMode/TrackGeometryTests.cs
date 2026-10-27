@@ -212,6 +212,95 @@ public class TrackGeometryTests
         Assert.AreEqual(0f, centerHDiff, 0.2f, "center at ground");
     }
 
+    // ───────────────────────── 装飾安全・幾何APIバリデーションテスト ─────────────────────────
+
+    [TestCaseSource(nameof(CourseIndices))]
+    public void PointAtOuterWall_IsAlwaysOffroad_OnAllCourses(int course)
+    {
+        track.BuildPath(course);
+
+        // 全コース・全区間で PointAtOuterWall(margin >= 0) の位置が道路上（オンロード）に絶対侵入しないことを保証
+        for (int i = 0; i < track.Count; i += 8)
+        {
+            float ratio = (float)i / track.Count;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float wallLat = track.GetOuterWallOffset(i, side);
+                Assert.IsTrue(track.IsOffroad(ratio, wallLat),
+                    $"course {course}: Outer wall lateral {wallLat:F1}m at idx {i} (ratio {ratio:F3}, side {side}) is on road!");
+
+                // マージンを加えた位置もオフロードであることを検証
+                float marginLat = wallLat + side * 1.5f;
+                Assert.IsTrue(track.IsOffroad(ratio, marginLat),
+                    $"course {course}: Outer wall with margin {marginLat:F1}m at idx {i} is on road!");
+            }
+        }
+    }
+
+    [TestCaseSource(nameof(CourseIndices))]
+    public void SafeBridgeSpots_DoNotCollideWithJumpRampsOrBranches_OnAllCourses(int course)
+    {
+        track.BuildPath(course);
+        var def = Track.Courses[course];
+        int[] spots = track.GetSafeBridgeSpots();
+
+        Assert.IsNotNull(spots);
+        Assert.GreaterOrEqual(spots.Length, 1, $"course {course}: no bridge spots defined");
+
+        foreach (int spotIdx in spots)
+        {
+            Assert.That(spotIdx, Is.InRange(0, track.Count - 1), $"course {course}: spot index out of range");
+            float spotDist = track.Dist[spotIdx];
+
+            // 1. ジャンプ台（前後20m以内）と衝突していないこと
+            if (track.JumpRamps != null)
+            {
+                foreach (var ramp in track.JumpRamps)
+                {
+                    float rampDist = track.Dist[ramp.index];
+                    float distDiff = Mathf.Abs(spotDist - rampDist);
+                    if (distDiff > track.Length * 0.5f) distDiff = track.Length - distDiff;
+                    Assert.Greater(distDiff, 18.0f,
+                        $"course {course}: Bridge gate at idx {spotIdx} collides with jump ramp at idx {ramp.index} (diff: {distDiff:F1}m)");
+                }
+            }
+
+            // 2. 分岐区間（開始・終了・分岐内部）の走行ライン上に大型ゲートが被っていないこと
+            if (def.Branches != null)
+            {
+                float spotRatio = (float)spotIdx / track.Count;
+                foreach (var b in def.Branches)
+                {
+                    // 分岐区間の内部（blend > 0.05）にゲートが立っていないこと
+                    bool inBranch = track.IsInBranch(spotRatio, out _, out float blend) && blend > 0.05f;
+                    Assert.IsFalse(inBranch,
+                        $"course {course}: Bridge gate at idx {spotIdx} (ratio {spotRatio:F3}) is placed inside split branch!");
+                }
+            }
+        }
+    }
+
+    [Test]
+    public void GetOuterWallOffset_InBranchSection_ExpandsBeyondLanes()
+    {
+        int canyonCourse = 6;
+        track.BuildPath(canyonCourse);
+        var branch = Track.Courses[canyonCourse].Branches[0];
+        float mid = (branch.Start + branch.End) * 0.5f;
+        int idx = Mathf.RoundToInt(mid * track.Count);
+
+        float wallLeft = track.GetOuterWallOffset(idx, -1f);
+        float wallRight = track.GetOuterWallOffset(idx, 1f);
+
+        // 左外壁は左車線の左端（branch.LeftOffset - branch.LaneWidth - CurbWidth）よりさらに外側（負の方向）
+        float leftLaneOuterEdge = branch.LeftOffset - branch.LaneWidth - Track.CurbWidth;
+        Assert.Less(wallLeft, leftLaneOuterEdge, "left outer wall must be further left than left lane edge");
+
+        // 右外壁は右車線の右端（branch.RightOffset + branch.LaneWidth + CurbWidth）よりさらに外側（正の方向）
+        float rightLaneOuterEdge = branch.RightOffset + branch.LaneWidth + Track.CurbWidth;
+        Assert.Greater(wallRight, rightLaneOuterEdge, "right outer wall must be further right than right lane edge");
+    }
+
     static bool IsFinite(Vector3 v) =>
         !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) ||
           float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));
