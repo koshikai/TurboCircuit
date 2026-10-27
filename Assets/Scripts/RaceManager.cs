@@ -461,12 +461,16 @@ public partial class RaceManager : MonoBehaviour
         {
             int rw = PlayerPrefs.GetInt("tc_res_w");
             int rh = PlayerPrefs.GetInt("tc_res_h");
-            bool fs = PlayerPrefs.GetInt("tc_fullscreen", 0) == 1;
+            bool fs = PlayerPrefs.GetInt("tc_fullscreen", 1) == 1;
             Screen.SetResolution(rw, rh, fs);
         }
         else if (PlayerPrefs.HasKey("tc_fullscreen"))
         {
             Screen.fullScreen = PlayerPrefs.GetInt("tc_fullscreen") == 1;
+        }
+        else
+        {
+            Screen.fullScreen = true;
         }
 
         Sun = new GameObject("Sun").AddComponent<Light>();

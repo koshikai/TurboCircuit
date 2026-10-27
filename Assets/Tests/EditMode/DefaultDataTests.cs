@@ -86,6 +86,12 @@ public class DefaultDataTests
         Assert.IsNotNull(TextureGen.CanyonBadge(), "CanyonBadge is null");
     }
 
+
+    [Test]
+    public void PlayerSettings_DefaultsToFullScreenWindow()
+    {
+        Assert.AreEqual(UnityEngine.FullScreenMode.FullScreenWindow, UnityEditor.PlayerSettings.fullScreenMode);
+    }
     static void AssertStat(string who, string stat, int value)
     {
         Assert.That(value, Is.InRange(1, 8), $"{who}: {stat}={value} is outside 1..8");

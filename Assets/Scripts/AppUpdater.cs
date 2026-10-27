@@ -509,29 +509,39 @@ public class AppUpdater : MonoBehaviour
 
         string EscPs(string s) => s.Replace("'", "''");
 
-        // PowerShell スクリプト（UTF-8 with BOM で保存することで日本語パス・空白・特殊文字に完全対応）
+        string logPath = Path.Combine(updateDir, "update.log");
+
+        // PowerShell スクリプト（サイレント実行用、UTF-8 with BOM で保存することで日本語パス・空白・特殊文字に完全対応）
         string ps1Content = $@"$ErrorActionPreference = 'Stop'
 $pidToWait = {currentPid}
 $zipPath = '{EscPs(zipPath)}'
 $extractDir = '{EscPs(extractDir)}'
 $targetDir = '{EscPs(targetDir)}'
 $exePath = '{EscPs(exeFullPath)}'
+$logPath = '{EscPs(logPath)}'
 
-Write-Host '====================================================================' -ForegroundColor Cyan
-Write-Host '                  TURBO CIRCUIT AUTO UPDATER                        ' -ForegroundColor Cyan
-Write-Host '====================================================================' -ForegroundColor Cyan
-Write-Host ''
-Write-Host '[1/4] Waiting for game process to safely exit...'
+function Write-Log($msg) {{
+    $line = ""[{{0:yyyy-MM-dd HH:mm:ss}}] $msg"" -f (Get-Date)
+    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+}}
+
+Write-Log 'Turbo Circuit Auto-Updater started (silent background execution).'
+Write-Log ""Waiting for game process (PID: $pidToWait) to safely exit...""
 try {{
     Wait-Process -Id $pidToWait -Timeout 15 -ErrorAction SilentlyContinue
 }} catch {{}}
 Start-Sleep -Seconds 1
 
-Write-Host '[2/4] Extracting update package...'
-if (Test-Path -LiteralPath $extractDir) {{
-    Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+Write-Log 'Extracting update package...'
+try {{
+    if (Test-Path -LiteralPath $extractDir) {{
+        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }}
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+}} catch {{
+    Write-Log ""Extraction error: $($_.Exception.Message)""
+    exit 1
 }}
-Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
 
 $src = $extractDir
 $items = @(Get-ChildItem -LiteralPath $src)
@@ -539,20 +549,27 @@ if ($items.Count -eq 1 -and $items[0].PSIsContainer) {{
     $src = $items[0].FullName
 }}
 
-Write-Host '[3/4] Applying update files to install directory...'
-Get-ChildItem -LiteralPath $src | ForEach-Object {{
-    Copy-Item -LiteralPath $_.FullName -Destination $targetDir -Recurse -Force
+Write-Log 'Applying update files to install directory...'
+try {{
+    Get-ChildItem -LiteralPath $src | ForEach-Object {{
+        Copy-Item -LiteralPath $_.FullName -Destination $targetDir -Recurse -Force
+    }}
+}} catch {{
+    Write-Log ""Copy error: $($_.Exception.Message)""
+    exit 1
 }}
 
-Write-Host '[4/4] Cleaning up temporary files & relaunching Turbo Circuit...'
+Write-Log 'Cleaning up temporary files & relaunching Turbo Circuit...'
 Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Start-Sleep -Milliseconds 600
+Write-Log ""Launching application: $exePath""
 Start-Process -FilePath $exePath -WorkingDirectory $targetDir
+Write-Log 'Auto-updater finished successfully.'
 ";
 
-        // 起動用バッチファイル（%~dp0 で自身のフォルダにある apply_update.ps1 を呼び出す）
+        // 手動実行用のバッチファイルも念のため出力
         string batContent = @"@echo off
 chcp 65001 >nul
 title Turbo Circuit - Auto Updater
@@ -566,13 +583,15 @@ exit
 
         try
         {
+            // ユーザーに黒いターミナル画面を見せないよう、PowerShell を完全非表示（サイレント）で起動
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"\"{batPath}\"\"",
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{ps1Path}\"",
                 WorkingDirectory = updateDir,
-                CreateNoWindow = false,
-                UseShellExecute = true
+                CreateNoWindow = true,
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                UseShellExecute = false
             };
             System.Diagnostics.Process.Start(psi);
 
