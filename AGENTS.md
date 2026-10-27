@@ -148,3 +148,23 @@ pwsh -File .agents/skills/build-and-verify/scripts/verify.ps1 -AutoShot
    * スキルは YAML フロントマター（`name`, `description`）を記載し、再利用可能なスクリプトがある場合は `.agents/skills/<skill-name>/scripts/` に格納すること。
 
 
+
+---
+
+## 7. スキル一覧 (`.agents/skills/`)
+
+作業内容に合うスキルの `SKILL.md` を先に読んでから着手すること。
+
+| スキル | 使う場面 |
+|---|---|
+| [`build-and-verify`](.agents/skills/build-and-verify/SKILL.md) | ビルド、スクリーンショット検証、3Dモデル4面図、コース地点確認 |
+| [`unity-compile-and-test`](.agents/skills/unity-compile-and-test/SKILL.md) | バッチモードのコンパイルエラー確認、テスト実行、`-executeMethod`、`.asset`/`.meta` の直接編集 |
+| [`add-game-content`](.agents/skills/add-game-content/SKILL.md) | コース・ドライバー・カート・アイテムの追加手順と落とし穴 |
+| [`imgui-ui-design`](.agents/skills/imgui-ui-design/SKILL.md) | IMGUI の画面・メニュー・HUD の追加/変更、入力処理、デザイン規約 |
+| [`github-workflow`](.agents/skills/github-workflow/SKILL.md) | Issue → ブランチ → PR、コミット規約、リリース手順 |
+| [`course-decor-editor`](.agents/skills/course-decor-editor/SKILL.md) | コース装飾の手動調整 |
+| [`unity-editor-tools`](.agents/skills/unity-editor-tools/SKILL.md) | エディタ拡張・ビルドツールの開発 |
+| [`unity-multiplayer-patterns`](.agents/skills/unity-multiplayer-patterns/SKILL.md) | オンライン同期まわり |
+| [`urp-graphics-optimization`](.agents/skills/urp-graphics-optimization/SKILL.md) | URP・マテリアル・プロシージャルメッシュの最適化 |
+
+Claude Code では `.claude/skills` から `.agents/skills` へのリンクを作ると直接呼び出せる（Windows では開発者モードが必要。リンク自体はコミットしない運用でもよい）。
