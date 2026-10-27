@@ -35,6 +35,8 @@ Turbo Circuit プロジェクトにおける AI エージェント（Antigravity
 
 スクリプトは `Assets/Scripts/` 配下に配置され、関心事ごとに `partial class` で機能分割されています。
 
+**アセンブリ構成 (asmdef)**: `Assets/Scripts/` は `TurboCircuit.Runtime`、`Assets/Editor/` は `TurboCircuit.Editor`（Editor 専用・Runtime を参照）に分かれている。新しい外部パッケージの型を Runtime で使うときは `TurboCircuit.Runtime.asmdef` の `references` にそのパッケージの asmdef 名を追加すること。Runtime から `UnityEditor` を参照しないこと。`Track` / `RaceManager` / `Kart` は `partial class` で強く結合しているため、Runtime をこれ以上細分化しない。
+
 ### 3.1 レース進行 & UI (`RaceManager`)
 * **`RaceManager.cs`**:
   * ゲームステート管理 (`State.Title`, `State.Countdown`, `State.Racing`, `State.Results`)
