@@ -630,6 +630,87 @@ public partial class Track : MonoBehaviour
         return Pts[i] + Rights[i] * lateral + Normals[i] * hOffset;
     }
 
+    // ───────────────────────── セマンティック幾何・安全配置API ─────────────────────────
+
+    /// <summary>
+    /// 指定地点・左右の外壁横オフセット（lateral）を取得する。
+    /// 単一区間なら ±WallOffset（±15.5m）、分岐区間なら左右それぞれの外壁の広がり（約±30m）を自動計算する。
+    /// </summary>
+    public float GetOuterWallOffset(int index, float side)
+    {
+        if (Count == 0) return (side >= 0f ? 1f : -1f) * WallOffset;
+        int i = Wrap(index);
+        float ratio = (float)i / Count;
+        if (side <= 0f)
+        {
+            float leftEdge = -HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                leftEdge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend);
+            return leftEdge - CurbWidth - 4f;
+        }
+        else
+        {
+            float rightEdge = HalfWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                rightEdge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend);
+            return rightEdge + CurbWidth + 4f;
+        }
+    }
+
+    /// <summary>
+    /// 指定地点の外壁外側の安全なワールド座標を取得する。
+    /// side: 負なら左側外壁、正なら右側外壁。margin: 外壁からさらに外側へ離す距離（正の値）。
+    /// コース形状（単一・分岐）に関わらず、道路上・走行ライン上へのオブジェクト誤侵入を確実に防止する。
+    /// </summary>
+    public Vector3 PointAtOuterWall(int index, float side, float margin = 0f)
+    {
+        float sign = side >= 0f ? 1f : -1f;
+        float baseWall = GetOuterWallOffset(index, sign);
+        float lat = baseWall + sign * Mathf.Abs(margin);
+        return PointAt(index, lat);
+    }
+
+    /// <summary>
+    /// 指定地点の走行可能車線外端（縁石端）のワールド座標を取得する。
+    /// </summary>
+    public Vector3 PointAtRoadEdge(int index, float side, float margin = 0f)
+    {
+        if (Count == 0) return Vector3.zero;
+        int i = Wrap(index);
+        float ratio = (float)i / Count;
+        float sign = side >= 0f ? 1f : -1f;
+        float edge;
+        if (sign < 0f)
+        {
+            edge = -HalfWidth - CurbWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                edge = Mathf.Lerp(-HalfWidth, b.LeftOffset - b.LaneWidth, blend) - CurbWidth;
+            edge -= Mathf.Abs(margin);
+        }
+        else
+        {
+            edge = HalfWidth + CurbWidth;
+            if (IsInBranch(ratio, out BranchDef b, out float blend))
+                edge = Mathf.Lerp(HalfWidth, b.RightOffset + b.LaneWidth, blend) + CurbWidth;
+            edge += Mathf.Abs(margin);
+        }
+        return PointAt(i, edge);
+    }
+
+    /// <summary>
+    /// 大型オーバーヘッド広告ゲートの安全な配置インデックス一覧を返す。
+    /// 分岐区間やジャンプ台との衝突を自動で回避する。
+    /// </summary>
+    public int[] GetSafeBridgeSpots()
+    {
+        var def = Courses[ActiveCourseIndex];
+        if (def.Branches != null && def.Branches.Length > 0)
+        {
+            return new[] { Count * 22 / 100, Count * 68 / 100 };
+        }
+        return new[] { Count * 33 / 100, Count * 72 / 100 };
+    }
+
     // ミニマップ用テクスチャ
     public Texture2D MakeMinimap(int size, out System.Func<Vector3, Vector2> toMap)
     {

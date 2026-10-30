@@ -1557,7 +1557,7 @@ public partial class Track
             }
             foreach (float side in new[] { -1f, 1f })
             {
-                var p = PointAt(i, side * (WallOffset + 1.2f));
+                var p = PointAtOuterWall(i, side, 1.2f);
                 Box("Pole", p + Vector3.up * 2.5f, new Vector3(0.15f, 2.5f, 0.15f), Quaternion.identity, rm.chromeMaterial, PrimitiveType.Cylinder);
                 var flag = Box("Flag", p + Vector3.up * 4.3f + Dirs[i] * 0.6f, new Vector3(0.05f, 0.8f, 1.2f), Quaternion.LookRotation(Dirs[i]), rm.kartPaintMaterial);
                 var mpb = new MaterialPropertyBlock();
@@ -1611,7 +1611,7 @@ public partial class Track
             }
             float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 12)], Vector3.up);
             float side = bend > 2f ? -1f : 1f; // カーブ外側を優先
-            var pos = PointAt(i, side * (WallOffset + 0.6f)) + Vector3.up * 1.9f;
+            var pos = PointAtOuterWall(i, side, 0.6f) + Vector3.up * 1.9f;
             var mat = bannerMats[(i / 22) % 4];
 
             var tex = mat.mainTexture;
@@ -1690,17 +1690,7 @@ public partial class Track
             }
         }
 
-        int[] bridgeSpots;
-        if (def.Branches != null && def.Branches.Length > 0)
-        {
-            // 分岐コース（CANYON SPLIT等）: 分岐区間（0.30〜0.55）やジャンプ台・分岐標識を避け、
-            // 序盤の直線アプローチと合流後の直線に配置
-            bridgeSpots = new[] { Count * 22 / 100, Count * 68 / 100 };
-        }
-        else
-        {
-            bridgeSpots = new[] { Count * 33 / 100, Count * 72 / 100 };
-        }
+        int[] bridgeSpots = GetSafeBridgeSpots();
         for (int b = 0; b < bridgeSpots.Length; b++)
         {
             int idx = bridgeSpots[b];
@@ -1744,14 +1734,7 @@ public partial class Track
             if (isCampus) createdMaterials.Add(poleMat);
             for (int i = 0; i < Count; i += Count / 8)
             {
-                float ratio = (float)i / Count;
-                float offset = WallOffset + (isCampus ? 3.0f : 4.2f);
-                if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
-                {
-                    // 分岐区間では右車線の外壁外側に正しくオフセットして走行ライン上への配置を防止
-                    offset = Mathf.Lerp(offset, br.RightOffset + br.LaneWidth + CurbWidth + 4.2f, blend);
-                }
-                var pos = PointAt(i, offset);
+                var pos = PointAtOuterWall(i, 1f, isCampus ? 3.0f : 4.2f);
                 pos.y = GetTerrainHeight(pos.x, pos.z, def);
                 var rot = Quaternion.LookRotation(-Rights[i], Vector3.up);
                 var go = Instantiate(lightPost, pos, rot, transform);
@@ -1801,7 +1784,7 @@ public partial class Track
             for (int t = 1; t <= 3; t++)
             {
                 int idx = Wrap(-t * 9);
-                var pos = PointAt(idx, WallOffset + 10f); // 壁の上の縁(+0.4m)にテントの屋根が食い込まないよう外側へ
+                var pos = PointAtOuterWall(idx, 1f, 10f); // 壁の上の縁(+0.4m)にテントの屋根が食い込まないよう外側へ
                 pos.y = GetTerrainHeight(pos.x, pos.z, def);
                 var rot = Quaternion.LookRotation(-Rights[idx], Vector3.up);
                 var anchor = new GameObject("TentAnchor").transform;
@@ -1821,7 +1804,7 @@ public partial class Track
         {
             foreach (float side in new[] { -1f, 1f })
             {
-                var pos = PointAt(0, side * (HalfWidth + 1.2f));
+                var pos = PointAtRoadEdge(0, side, 1.2f);
                 var go = Instantiate(checkersFlag, pos, Quaternion.LookRotation(Dirs[0]), transform);
                 go.transform.localScale = Vector3.one * 1.6f;
                 StripColliders(go);

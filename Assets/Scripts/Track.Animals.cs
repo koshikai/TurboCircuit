@@ -126,14 +126,7 @@ public partial class Track
                 for (int l = 1; l < 3; l++)
                 {
                     int idx = Wrap(Count * l / 3 + 30);
-                    float ratio = (float)idx / Count;
-                    float offset = -(WallOffset + 14f + l * 6f);
-                    if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
-                    {
-                        // 分岐区間では左車線の外壁外側に安全配置
-                        offset = -(Mathf.Abs(br.LeftOffset) + br.LaneWidth + CurbWidth + 8f + l * 6f);
-                    }
-                    Vector3 p = PointAt(idx, offset);
+                    Vector3 p = PointAtOuterWall(idx, -1f, 14f + l * 6f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.LookRotation(Dirs[idx], Vector3.up);
                     SpawnAnimal(prefabLion, p, rot, 2.4f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
@@ -151,16 +144,8 @@ public partial class Track
                 for (int f = 1; f < 4; f++)
                 {
                     int idx = Wrap(Count * f / 4 + 22);
-                    float ratio = (float)idx / Count;
                     float side = (f % 2 == 0) ? 1f : -1f;
-                    float offset = WallOffset + 8f + (float)rng.NextDouble() * 8f;
-                    if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
-                    {
-                        // 分岐区間では左右それぞれの外壁外側に安全配置
-                        float outer = (side > 0) ? (br.RightOffset + br.LaneWidth + CurbWidth + 6f) : (Mathf.Abs(br.LeftOffset) + br.LaneWidth + CurbWidth + 6f);
-                        offset = outer + (float)rng.NextDouble() * 8f;
-                    }
-                    Vector3 p = PointAt(idx, side * offset);
+                    Vector3 p = PointAtOuterWall(idx, side, 8f + (float)rng.NextDouble() * 8f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabFox, p, rot, 1.7f, animalMat, AnimalBehavior.BehaviorType.LookAround);
@@ -178,14 +163,7 @@ public partial class Track
                 for (int c = 1; c < 5; c++)
                 {
                     int idx = Wrap(Count * c / 5 + 18);
-                    float ratio = (float)idx / Count;
-                    float offset = WallOffset + 5f + (float)rng.NextDouble() * 6f;
-                    if (IsInBranch(ratio, out BranchDef br, out float blend) && blend > 0.05f)
-                    {
-                        // 分岐区間では右車線の外壁外側に安全配置
-                        offset = br.RightOffset + br.LaneWidth + CurbWidth + 6f + (float)rng.NextDouble() * 6f;
-                    }
-                    Vector3 p = PointAt(idx, offset);
+                    Vector3 p = PointAtOuterWall(idx, 1f, 5f + (float)rng.NextDouble() * 6f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.LookRotation(-Rights[idx], Vector3.up);
                     SpawnAnimal(prefabCrab, p, rot, 1.8f, animalMat, AnimalBehavior.BehaviorType.CrabSidestep);
