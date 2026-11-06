@@ -5,6 +5,10 @@ public partial class Kart
 {
     // ───────────────────────── AI (Tanaka Control / Optimal Racing) ─────────────────────────
     int aiBranchChoice = 0; // -1: 左ルート, 1: 右ルート, 0: 未定
+    public int AIBranchChoice { get => aiBranchChoice; set => aiBranchChoice = value; }
+    public float AILastTargetLane { get; private set; }
+    public float AILastMinSafeSpeed { get; private set; }
+    public Vector3 AILastTargetPos { get; private set; }
 
     public KartInput AIInput(float dt)
     {
@@ -57,6 +61,7 @@ public partial class Kart
                 minSafeSpeed = safeSpeed;
             }
         }
+        AILastMinSafeSpeed = minSafeSpeed;
 
         // 2. 動的レーシングライン生成 (Smooth Racing Line & Tactical Adjustments)
         // 極端な端への振りを抑え、コース中央寄りの安全なラインを滑らかにトレース
@@ -127,6 +132,8 @@ public partial class Kart
                 targetLane = Mathf.Lerp(baseLane + aiLane * 0.25f, aiLane * 0.4f, tPost);
             }
         }
+        AILastTargetLane = targetLane;
+
         // 3. 曲率適応型ルックアヘッド & 非線形 Stanley 操舵制御
         // 直近(12m先)と中距離(24m先)のコース旋回角を取得
         float nearAngle = Vector3.SignedAngle(track.Dirs[Index], track.Dirs[track.Wrap(Index + 6)], Vector3.up);
@@ -141,6 +148,7 @@ public partial class Kart
             : Mathf.Clamp(Mathf.RoundToInt(baseLook - localCurv * 140f), 6, 16);
         int targetIdx = track.Wrap(Index + look);
         Vector3 targetPos = track.PointAt(targetIdx, targetLane);
+        AILastTargetPos = targetPos;
 
         // 車体鼻先(fwd)の方位角誤差と、実際の進行方向ベクトル(VelDir)の方位角誤差
         Vector3 toTarget = (targetPos - curPos).normalized;

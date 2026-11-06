@@ -111,6 +111,26 @@ public partial class Kart : MonoBehaviour
         ResetTo(index, lateral);
     }
 
+    /// <summary>
+    /// EditMode テスト等で、モデル描画や3D音響の初期化を省いて AI や物理のテストを行うための初期化メソッド。
+    /// </summary>
+    public void InitForTest(Track track, float lateral = 0f, float aiSkill = 0.85f)
+    {
+        this.track = track;
+        Name = "TestCPU";
+        Color = Color.red;
+        IsPlayer = false;
+        this.aiSkill = aiSkill;
+        aiSeed = 42f;
+        aiLane = lateral * 0.5f;
+        if (model == null)
+        {
+            model = new GameObject("Model").transform;
+            model.SetParent(transform, false);
+        }
+        ResetTo(0, lateral);
+    }
+
     void Setup3DEngineAudio()
     {
         if (IsPlayer) return;
