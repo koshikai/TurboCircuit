@@ -597,6 +597,7 @@ public partial class RaceManager
         if (DrawModernButton(new Rect(r.x + (r.width - 200) * 0.5f, r.yMax - 46, 200, 36), Loc.T("►  CLOSE", "►  閉じる"), "[ESC / B]", new Color(0.2f, 0.85f, 0.45f), false, settingsFocus == closeFocusIdx))
         {
             CloseSettings();
+            if (Audio != null) Audio.Cancel();
         }
     }
 

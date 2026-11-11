@@ -10,7 +10,7 @@ public class RaceAudio : MonoBehaviour
     AudioSource[] pool;
     int next;
     AudioSource engine, driftLoop, music;
-    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, star, shield, select, explosion;
+    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, star, shield, select, cancel, explosion;
     AudioClip[] bumps;
     readonly AudioClip[] bgm = new AudioClip[7];
 
@@ -60,10 +60,10 @@ public class RaceAudio : MonoBehaviour
         }
 
         // Resources/Audio の実素材（リマスター版アーケードSE・物理フォーリー効果音）を読み込み、欠けている場合のみ合成音を生成
-        beep = Load("sfx_beep", () => Make(0.26f, (t, d) => (WarmTone(1046.5f, t) * 0.40f + WarmTone(2093.0f, t) * 0.15f) * Env(t, d)));
-        go = Load("sfx_go", () => Make(0.70f, (t, d) => (WarmTone(1046.5f, t) * 0.25f + WarmTone(1318.5f, t) * 0.22f + WarmTone(1568.0f, t) * 0.22f + WarmTone(2093.0f, t) * 0.20f) * Env(t, d)));
+        beep = Load("sfx_beep", () => Make(0.32f, (t, d) => (WarmTone(1046.5f, t) * 0.50f + WarmTone(2093.0f, t) * 0.22f + WarmTone(3139.5f, t) * 0.10f) * Env(t, d)));
+        go = Load("sfx_go", () => Make(0.95f, (t, d) => (WarmTone(1046.5f, t) * 0.30f + WarmTone(1318.5f, t) * 0.25f + WarmTone(1568.0f, t) * 0.25f + WarmTone(2093.0f, t) * 0.35f) * Env(t, d)));
         pickup = Load("sfx_pickup", () => Make(0.30f, (t, d) => WarmTone(Arp(t, 0.06f, 523, 659, 784, 1047), t) * 0.3f * Env(t, d)));
-        tick = Load("sfx_tick", () => Make(0.045f, (t, d) => (WarmTone(2800.0f, t) * 0.25f + Noise() * 0.10f) * Env(t, d)));
+        tick = Load("sfx_tick", () => Make(0.04f, (t, d) => (WarmTone(2200.0f, t) * 0.28f + Noise() * 0.10f) * Env(t, d)));
         gotItem = Load("sfx_gotitem", () => Make(0.40f, (t, d) => WarmTone(Arp(t, 0.07f, 784, 1047, 1319, 1568), t) * 0.32f * Env(t, d)));
         boost = Load("sfx_boost", () => Make(0.8f, (t, d) => (Noise() * 0.25f + WarmTone(Mathf.Lerp(140, 320, t / d), t) * 0.35f) * Mathf.Sin(Mathf.PI * t / d) * 0.5f));
         hit = Load("sfx_hit", () => Make(0.45f, (t, d) => (WarmTone(Mathf.Lerp(260, 95, t / d), t) * 0.35f + Noise() * 0.15f) * Env(t, d)));
@@ -75,7 +75,8 @@ public class RaceAudio : MonoBehaviour
         pop = Load("sfx_pop", () => Make(0.18f, (t, d) => (Noise() * 0.20f + WarmTone(1318.5f, t) * 0.35f + WarmTone(2637.0f, t) * 0.15f) * Env(t, d)));
         star = Load("sfx_star", () => Load("sfx_shield", () => Make(1.1f, (t, d) => WarmTone(Arp(t, 0.10f, 523, 659, 784, 1047, 1319), t) * 0.32f * Env(t, d))));
         shield = star;
-        select = Load("sfx_select", () => beep);
+        select = Load("sfx_select", () => Make(0.26f, (t, d) => WarmTone(Arp(t, 0.05f, 784, 1047), t) * 0.32f * Env(t, d)));
+        cancel = Load("sfx_cancel", () => Make(0.24f, (t, d) => WarmTone(Arp(t, 0.05f, 1047, 784), t) * 0.30f * Env(t, d)));
         explosion = Load("sfx_explosion", () => hit);
         System.Func<AudioClip> bumpFallback = () => bump != null ? bump : (bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d)));
         bumps = new[] { Load("sfx_bump_0", bumpFallback), Load("sfx_bump_1", bumpFallback), Load("sfx_bump_2", bumpFallback) };
@@ -206,7 +207,8 @@ public class RaceAudio : MonoBehaviour
         RefreshMusicVolume();
     }
 
-    public void Select() => Play(select, 0.28f, Random.Range(0.97f, 1.03f));
+    public void Select() => Play(select, 0.32f, Random.Range(0.98f, 1.02f));
+    public void Cancel() => Play(cancel, 0.30f, Random.Range(0.98f, 1.02f));
 
     public void Explode(float volumeScale = 1f)
     {
@@ -217,8 +219,8 @@ public class RaceAudio : MonoBehaviour
         if (v > 0.01f) Play(explosion, v, Random.Range(0.95f, 1.05f));
     }
 
-    public void Beep() => Play(beep, 0.38f);
-    public void Go() => Play(go, 0.44f);
+    public void Beep(int step = 0) => Play(beep, 0.44f, 1.0f + Mathf.Clamp(step, 0, 2) * 0.04f);
+    public void Go() => Play(go, 0.52f, 1.0f);
     public void Pickup() => Play(pickup, 0.35f, Random.Range(0.97f, 1.04f));
 
     public void Tick()
