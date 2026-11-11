@@ -1401,6 +1401,9 @@ public partial class Track
         bool overpass = def.SceneryTheme == 5;
         if (overpass) BuildSkylineOverpassScenery(rm, def, rng);
 
+        bool frost = def.SceneryTheme == 2;
+        if (frost) BuildFrostPeakScenery(rm, def, rng);
+
         // 自然物・木・岩の配置ループ（起伏に富んだプロシージャル地表に追従）
         for (int tries = 0; tries < 3500 && placed < 280 && !city && !campus && !overpass; tries++)
         {
