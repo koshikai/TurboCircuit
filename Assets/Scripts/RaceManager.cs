@@ -1386,7 +1386,7 @@ public partial class RaceManager : MonoBehaviour
     void CloseQuitModal()
     {
         showQuitConfirm = false;
-        if (Audio != null) Audio.Select();
+        if (Audio != null) Audio.Cancel();
     }
 
     // ゲーム終了確認モーダル表示中の入力
@@ -1428,13 +1428,13 @@ public partial class RaceManager : MonoBehaviour
         {
             if (updater.State == AppUpdater.UpdateState.Downloading) updater.CancelDownload();
             else updater.ShowModal = false;
-            if (Audio != null) Audio.Select();
+            if (Audio != null) Audio.Cancel();
             return;
         }
         if (nav.confirm)
         {
-            if (updater.State == AppUpdater.UpdateState.Downloading) updater.CancelDownload();
-            else if (updateModalFocus == 1) updater.ShowModal = false;
+            if (updater.State == AppUpdater.UpdateState.Downloading) { updater.CancelDownload(); if (Audio != null) Audio.Cancel(); return; }
+            else if (updateModalFocus == 1) { updater.ShowModal = false; if (Audio != null) Audio.Cancel(); return; }
             else if (updater.State == AppUpdater.UpdateState.UpdateAvailable) updater.StartDownload();
             else if (updater.State == AppUpdater.UpdateState.Downloaded) updater.ApplyUpdateAndRestart();
             else if (updater.State == AppUpdater.UpdateState.UpToDate || updater.State == AppUpdater.UpdateState.Error) updater.CheckForUpdates(openModalIfNew: true);
@@ -1460,7 +1460,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (cancelPad)
                 {
                     waitingPadAction = null;
-                    if (Audio != null) Audio.Tick();
+                    if (Audio != null) Audio.Cancel();
                 }
             }
             return;
@@ -1470,7 +1470,7 @@ public partial class RaceManager : MonoBehaviour
             if (InputSettings.GetSinglePadDown(PadBind.B, 0) || nav.padStart)
             {
                 waitingKeyAction = null;
-                if (Audio != null) Audio.Tick();
+                if (Audio != null) Audio.Cancel();
             }
             return;
         }
@@ -1486,7 +1486,7 @@ public partial class RaceManager : MonoBehaviour
         if (nav.cancel)
         {
             CloseSettings();
-            if (Audio != null) Audio.Select();
+            if (Audio != null) Audio.Cancel();
             return;
         }
 
@@ -1499,7 +1499,7 @@ public partial class RaceManager : MonoBehaviour
             else if (settingsFocus == 3 && (nav.confirm || nav.moveX != 0)) { Screen.fullScreen = !Screen.fullScreen; PlayerPrefs.SetInt("tc_fullscreen", Screen.fullScreen ? 1 : 0); if (Audio != null) Audio.Select(); }
             else if (settingsFocus == 4 && (nav.confirm || nav.moveX != 0)) { CycleResolution(nav.moveX < 0 ? -1 : 1); }
             else if (settingsFocus == 5 && (nav.confirm || nav.moveX != 0)) { ToggleLanguage(); }
-            else if (settingsFocus == 6 && nav.confirm) { CloseSettings(); if (Audio != null) Audio.Select(); }
+            else if (settingsFocus == 6 && nav.confirm) { CloseSettings(); if (Audio != null) Audio.Cancel(); }
         }
         else if (settingsTab == 1)
         {
@@ -1544,7 +1544,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (settingsFocus == 8)
                 {
                     CloseSettings();
-                    if (Audio != null) Audio.Select();
+                    if (Audio != null) Audio.Cancel();
                 }
             }
         }
@@ -1580,7 +1580,7 @@ public partial class RaceManager : MonoBehaviour
                 else if (settingsFocus == 3)
                 {
                     CloseSettings();
-                    if (Audio != null) Audio.Select();
+                    if (Audio != null) Audio.Cancel();
                 }
             }
         }
@@ -1807,7 +1807,7 @@ public partial class RaceManager : MonoBehaviour
         {
             lastCountdownBeep = beep;
             if (track != null) track.UpdateStartSignals(beep);
-            if (beep < 3) Audio.Beep();
+            if (beep < 3) Audio.Beep(beep);
             else
             {
                 Audio.Go();
