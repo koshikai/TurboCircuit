@@ -66,19 +66,109 @@ public partial class Track
             placed++;
         }
 
-        // 道路沿いのサイバー街路灯（等間隔に配置）
+        // 道路沿いのサイバー街路灯（安全配置API PointAtOuterWall を適用）
         var prefabLightPost = Resources.Load<GameObject>("Props/lightPostLarge");
         if (prefabLightPost != null)
         {
             for (int i = 0; i < Count; i += 7)
             {
-                float lampOffset = Pts[i].y > 2.0f ? (WallOffset - 0.1f) : (WallOffset + 2.5f);
+                float margin = Pts[i].y > 2.0f ? 0.4f : 2.5f;
                 foreach (float side in new[] { -1f, 1f })
                 {
-                    var lpPos = PointAt(i, side * lampOffset);
-                    var lpRot = Quaternion.LookRotation(side * Rights[i], Vector3.up);
+                    var lpPos = PointAtOuterWall(i, side, margin);
+                    var lpRot = Quaternion.LookRotation(-side * Rights[i], Vector3.up);
                     SpawnProp(prefabLightPost, lpPos, lpRot, Vector3.one * 1.5f, rm.standMaterial, (i % 14 == 0) ? neonCyanMat : neonPinkMat);
                 }
+            }
+        }
+
+        // ビル貫通トンネルのサイバーネオン演出（出入口ポータルゲート＆内部の流れるようなネオンリング）
+        if (def.Tunnels != null && def.Tunnels.Length > 0)
+        {
+            var darkFrameMat = new Material(rm.wallMaterial) { color = new Color(0.08f, 0.09f, 0.14f) };
+            createdMaterials.Add(darkFrameMat);
+
+            for (int tIdx = 0; tIdx < def.Tunnels.Length; tIdx++)
+            {
+                var tunnel = def.Tunnels[tIdx];
+                int startIdx = Wrap(Mathf.RoundToInt(tunnel.Start * Count));
+                int endIdx = Wrap(Mathf.RoundToInt(tunnel.End * Count));
+
+                // 1. トンネル出入口のサイバーポータルゲート
+                int[] portalSpots = { startIdx, endIdx };
+                for (int pSpot = 0; pSpot < portalSpots.Length; pSpot++)
+                {
+                    int pIdx = portalSpots[pSpot];
+                    Vector3 center = Pts[pIdx];
+                    Quaternion rot = Quaternion.LookRotation(Dirs[pIdx], Vector3.up);
+                    float spanW = (HalfWidth + 2.8f) * 2f;
+                    float portalH = 9.5f;
+
+                    // 外枠（ダークチタンフレーム）
+                    Box("CyberPortalFrameTop", center + Vector3.up * portalH, new Vector3(spanW + 1.2f, 0.8f, 1.4f), rot, darkFrameMat);
+                    Box("CyberPortalPillarL", center + Vector3.up * (portalH * 0.5f) - Rights[pIdx] * (spanW * 0.5f + 0.3f), new Vector3(0.9f, portalH, 1.4f), rot, darkFrameMat);
+                    Box("CyberPortalPillarR", center + Vector3.up * (portalH * 0.5f) + Rights[pIdx] * (spanW * 0.5f + 0.3f), new Vector3(0.9f, portalH, 1.4f), rot, darkFrameMat);
+
+                    // 内枠：眩いネオン発光フレーム
+                    Material glowMat = (tIdx % 2 == 0) ? ((pSpot == 0) ? neonCyanMat : neonPinkMat) : ((pSpot == 0) ? neonPinkMat : neonYellowMat);
+                    Box("CyberPortalGlowTop", center + Vector3.up * (portalH - 0.5f), new Vector3(spanW, 0.35f, 0.6f), rot, glowMat);
+                    Box("CyberPortalGlowL", center + Vector3.up * ((portalH - 0.5f) * 0.5f) - Rights[pIdx] * (spanW * 0.5f - 0.2f), new Vector3(0.35f, portalH - 0.5f, 0.6f), rot, glowMat);
+                    Box("CyberPortalGlowR", center + Vector3.up * ((portalH - 0.5f) * 0.5f) + Rights[pIdx] * (spanW * 0.5f - 0.2f), new Vector3(0.35f, portalH - 0.5f, 0.6f), rot, glowMat);
+
+                    // ポータル上部ネオンサイネージ
+                    Box("CyberPortalSign", center + Vector3.up * (portalH + 1.2f), new Vector3(spanW * 0.55f, 1.4f, 0.3f), rot, glowMat);
+                }
+
+                // 2. トンネル内部のサイバーネオンリング（ステップ4毎に高速通過する光のアーチ）
+                int segCount = (endIdx >= startIdx) ? (endIdx - startIdx) : (endIdx + Count - startIdx);
+                for (int s = 3; s < segCount - 2; s += 4)
+                {
+                    int ringIdx = Wrap(startIdx + s);
+                    Vector3 ringCenter = Pts[ringIdx];
+                    Quaternion ringRot = Quaternion.LookRotation(Dirs[ringIdx], Vector3.up);
+                    float ringW = (HalfWidth + 1.8f) * 2f;
+                    float ringH = 8.5f;
+
+                    Material ringMat = ((s / 4) % 3 == 0) ? neonCyanMat : (((s / 4) % 3 == 1) ? neonPinkMat : neonYellowMat);
+
+                    // 天井バーと左右リブバー
+                    Box("TunnelNeonRoof", ringCenter + Vector3.up * ringH, new Vector3(ringW, 0.22f, 0.35f), ringRot, ringMat);
+                    Box("TunnelNeonRibL", ringCenter + Vector3.up * (ringH * 0.5f) - Rights[ringIdx] * (ringW * 0.5f), new Vector3(0.22f, ringH, 0.35f), ringRot, ringMat);
+                    Box("TunnelNeonRibR", ringCenter + Vector3.up * (ringH * 0.5f) + Rights[ringIdx] * (ringW * 0.5f), new Vector3(0.22f, ringH, 0.35f), ringRot, ringMat);
+                }
+            }
+        }
+
+        // 高架ハイウェイ区間のサイバーアンダーネオン＆ガイドストリップ
+        for (int i = 0; i < Count; i += 3)
+        {
+            if (Pts[i].y > 2.5f)
+            {
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var edgePos = PointAtOuterWall(i, side, 0.15f);
+                    var stripRot = Quaternion.LookRotation(Dirs[i], Vector3.up);
+                    Material stripMat = (i % 6 == 0) ? neonCyanMat : neonPinkMat;
+                    Box("ElevatedNeonStrip", edgePos + Vector3.up * 0.45f, new Vector3(0.25f, 0.18f, Spacing * 2.8f), stripRot, stripMat);
+                }
+            }
+        }
+
+        // 高架ハイウェイ上のジャンプ台手前に「CYBER RAMP」ゲートを設置
+        if (def.Ramps != null && def.Ramps.Length > 0)
+        {
+            foreach (var ramp in def.Ramps)
+            {
+                int rIdx = Wrap(Mathf.RoundToInt(ramp.Ratio * Count) - 3);
+                Vector3 rPos = Pts[rIdx];
+                Quaternion rRot = Quaternion.LookRotation(Dirs[rIdx], Vector3.up);
+                float rSpan = (HalfWidth + 2.5f) * 2f;
+                float rH = 9.0f;
+                Box("CyberRampBeam", rPos + Vector3.up * rH, new Vector3(rSpan, 0.6f, 0.8f), rRot, rm.chromeMaterial);
+                Box("CyberRampGlow", rPos + Vector3.up * (rH - 0.35f), new Vector3(rSpan * 0.9f, 0.3f, 0.4f), rRot, neonYellowMat);
+                Box("CyberRampSign", rPos + Vector3.up * (rH + 1.1f), new Vector3(14f, 1.5f, 0.2f), rRot, neonCyanMat);
+                Box("CyberRampPillarL", rPos + Vector3.up * (rH * 0.5f) - Rights[rIdx] * (rSpan * 0.5f), new Vector3(0.6f, rH, 0.6f), rRot, rm.chromeMaterial);
+                Box("CyberRampPillarR", rPos + Vector3.up * (rH * 0.5f) + Rights[rIdx] * (rSpan * 0.5f), new Vector3(0.6f, rH, 0.6f), rRot, rm.chromeMaterial);
             }
         }
 
@@ -120,6 +210,192 @@ public partial class Track
             var p = bounds.center + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
             var b = Box("Skyline", p + Vector3.up * (h * 0.5f - 0.3f), new Vector3(w, h, w), Quaternion.identity, facade[rng.Next(facade.Length)]);
             TileFacade(b, w, h);
+        }
+    }
+
+    // フロストピーク雪山テーマ：クレバス氷柱アーチ、氷河クリスタルクラスター、山頂道標、スノー防護ネット、アルペンロッジ＆雪だるま
+    void BuildFrostPeakScenery(RaceManager rm, TrackDef def, System.Random rng)
+    {
+        var crystalMat = new Material(rm.glowMaterial) { color = new Color(0.35f, 0.88f, 1.0f, 0.82f) };
+        var woodDarkMat = MakeMat(rm.trunkMaterial, null, new Color(0.32f, 0.22f, 0.16f));
+        var woodSignMat = MakeMat(rm.trunkMaterial, null, new Color(0.55f, 0.42f, 0.28f));
+        var warmWindowMat = new Material(rm.glowMaterial) { color = new Color(1.0f, 0.85f, 0.35f, 1f) };
+        var snowMat = rm.snowMaterial ?? rm.wallMaterial;
+        var safetyNetMat = new Material(rm.wallMaterial) { color = new Color(1.0f, 0.42f, 0.08f) }; // 鮮やかなオレンジ
+        var safetyNetBlueMat = new Material(rm.wallMaterial) { color = new Color(0.12f, 0.45f, 0.95f) }; // ブルー
+        var carrotMat = new Material(rm.wallMaterial) { color = new Color(1.0f, 0.45f, 0.05f) };
+        var coalMat = new Material(rm.wallMaterial) { color = new Color(0.12f, 0.12f, 0.14f) };
+        var bucketMat = new Material(rm.standMaterial) { color = new Color(0.25f, 0.28f, 0.35f) };
+
+        createdMaterials.Add(crystalMat);
+        createdMaterials.Add(woodDarkMat);
+        createdMaterials.Add(woodSignMat);
+        createdMaterials.Add(warmWindowMat);
+        createdMaterials.Add(safetyNetMat);
+        createdMaterials.Add(safetyNetBlueMat);
+        createdMaterials.Add(carrotMat);
+        createdMaterials.Add(coalMat);
+        createdMaterials.Add(bucketMat);
+
+        var texRocks = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
+        var frostRockMat = MakeMat(rm.mountainMaterial, texRocks, new Color(0.82f, 0.90f, 0.98f));
+        var prefabRock1 = Resources.Load<GameObject>("Props/StylizedNature/Rock_1");
+        var prefabLogStack = Resources.Load<GameObject>("Props/Nature/log_stack");
+        var prefabStump = Resources.Load<GameObject>("Props/Nature/stump_old");
+
+        // 1. クレバス大ジャンプ台（Ratio 0.36）手前の「氷柱アーチ（Glacier Arch）」＆「氷河クリスタルクラスター」
+        if (def.Ramps != null && def.Ramps.Length > 0)
+        {
+            foreach (var ramp in def.Ramps)
+            {
+                int rIdx = Wrap(Mathf.RoundToInt(ramp.Ratio * Count));
+
+                // ジャンプ直前（rIdx - 3）に巨大な氷柱アーチ
+                int archIdx = Wrap(rIdx - 3);
+                Vector3 archCenter = Pts[archIdx];
+                Quaternion archRot = Quaternion.LookRotation(Dirs[archIdx], Vector3.up);
+                float archH = 11.0f;
+
+                // 左右の斜めに交差する氷柱（クリスタルシリンダー）
+                var pL = PointAtOuterWall(archIdx, -1f, 0.5f);
+                var pR = PointAtOuterWall(archIdx, 1f, 0.5f);
+                Vector3 archTopL = archCenter + Vector3.up * archH + Rights[archIdx] * 1.5f;
+                Vector3 archTopR = archCenter + Vector3.up * archH - Rights[archIdx] * 1.5f;
+
+                // 左柱（右へ傾く）
+                Vector3 dirL = (archTopL - pL).normalized;
+                float lenL = Vector3.Distance(pL, archTopL);
+                Box("GlacierArchPillarL", pL + dirL * (lenL * 0.5f), new Vector3(1.6f, lenL * 0.5f, 1.6f),
+                    Quaternion.LookRotation(dirL, Vector3.up) * Quaternion.Euler(90f, 0, 0), crystalMat, PrimitiveType.Cylinder);
+
+                // 右柱（左へ傾く）
+                Vector3 dirR = (archTopR - pR).normalized;
+                float lenR = Vector3.Distance(pR, archTopR);
+                Box("GlacierArchPillarR", pR + dirR * (lenR * 0.5f), new Vector3(1.6f, lenR * 0.5f, 1.6f),
+                    Quaternion.LookRotation(dirR, Vector3.up) * Quaternion.Euler(90f, 0, 0), crystalMat, PrimitiveType.Cylinder);
+
+                // アーチ頂上の巨大クリスタル塊
+                Box("GlacierArchCrown", archCenter + Vector3.up * (archH + 0.8f), new Vector3(4.5f, 2.8f, 3.0f),
+                    archRot * Quaternion.Euler(15f, 45f, 0), crystalMat, PrimitiveType.Cube);
+
+                // ジャンプ台手前・着地点の両脇に巨大クリスタルクラスターと氷岩群
+                for (int c = -8; c <= 10; c += 2)
+                {
+                    if (c >= -1 && c <= 2) continue; // ジャンプ踏切直前は視界確保
+                    int spot = Wrap(rIdx + c);
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        var cPos = PointAtOuterWall(spot, side, 1.5f + (float)rng.NextDouble() * 3.5f);
+                        cPos.y = GetTerrainHeight(cPos.x, cPos.z, def);
+                        float ch = 4.5f + (float)rng.NextDouble() * 6.5f;
+                        float cw = 1.2f + (float)rng.NextDouble() * 1.4f;
+                        Quaternion cRot = Quaternion.Euler((float)rng.NextDouble() * 24f - 12f, (float)rng.NextDouble() * 360f, (float)rng.NextDouble() * 24f - 12f);
+                        Box("GlacierCluster", cPos + Vector3.up * (ch * 0.5f), new Vector3(cw, ch * 0.5f, cw), cRot, crystalMat, PrimitiveType.Cylinder);
+
+                        if (rng.NextDouble() < 0.4 && prefabRock1 != null)
+                        {
+                            SpawnProp(prefabRock1, cPos + Vector3.right * 2f, Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0), Vector3.one * 3.2f, frostRockMat);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 最高峰ピーク（標高36m地点）の「SUMMIT 36M」山岳道標
+        int peakIdx = 0;
+        float maxElevation = -999f;
+        for (int i = 0; i < Count; i++)
+        {
+            if (Pts[i].y > maxElevation)
+            {
+                maxElevation = Pts[i].y;
+                peakIdx = i;
+            }
+        }
+        Vector3 peakSignPos = PointAtOuterWall(peakIdx, -1f, 3.5f);
+        peakSignPos.y = GetTerrainHeight(peakSignPos.x, peakSignPos.z, def);
+        Quaternion peakSignRot = Quaternion.LookRotation(Rights[peakIdx], Vector3.up);
+
+        // 木製の山岳標識ポスト
+        Box("SummitSignPost", peakSignPos + Vector3.up * 2.2f, new Vector3(0.35f, 2.2f, 0.35f), peakSignRot, woodDarkMat, PrimitiveType.Cylinder);
+        // 主看板ボード
+        Box("SummitSignBoard", peakSignPos + Vector3.up * 3.6f, new Vector3(3.4f, 1.2f, 0.16f), peakSignRot, woodSignMat);
+        // 看板の三角屋根（雪よけ）
+        Box("SummitSignRoof", peakSignPos + Vector3.up * 4.4f, new Vector3(3.8f, 0.25f, 0.8f), peakSignRot * Quaternion.Euler(15f, 0, 0), woodDarkMat);
+        Box("SummitSignSnow", peakSignPos + Vector3.up * 4.6f, new Vector3(3.9f, 0.18f, 0.85f), peakSignRot * Quaternion.Euler(15f, 0, 0), snowMat);
+
+        // 3. つづら折り急勾配ダウンヒル区間のスノーフェンス（雪山防護ネット）
+        // 標高が下がっていく急コーナーの外側にオレンジ/ブルーの防護ネットを設置
+        for (int i = 12; i < Count - 12; i += 3)
+        {
+            float bend = Vector3.SignedAngle(Dirs[i], Dirs[Wrap(i + 6)], Vector3.up);
+            // 急カーブかつ山岳区間（標高 > 5m）
+            if (Mathf.Abs(bend) > 8f && Pts[i].y > 5.0f)
+            {
+                float side = bend > 0 ? 1f : -1f; // カーブ外側
+                Vector3 fencePos = PointAtOuterWall(i, side, 0.6f);
+                fencePos.y = GetTerrainHeight(fencePos.x, fencePos.z, def);
+                Quaternion fenceRot = Quaternion.LookRotation(Dirs[i], Vector3.up);
+                Material netMat = (i % 6 == 0) ? safetyNetMat : safetyNetBlueMat;
+
+                // 支柱
+                Box("SnowFencePole", fencePos + Vector3.up * 1.1f, new Vector3(0.14f, 1.1f, 0.14f), Quaternion.identity, woodDarkMat, PrimitiveType.Cylinder);
+                // ネット面
+                Box("SnowFenceNet", fencePos + Vector3.up * 1.1f, new Vector3(0.06f, 1.8f, Spacing * 3.1f), fenceRot, netMat);
+                // 上部補強バー
+                Box("SnowFenceTopBar", fencePos + Vector3.up * 2.05f, new Vector3(0.12f, 0.10f, Spacing * 3.1f), fenceRot, woodDarkMat);
+            }
+        }
+
+        // 4. 山麓ベースキャンプ：アルペンロッジ＆雪だるま（Snowman）
+        // スタート/フィニッシュ直後の平坦地（インデックス 4 付近）の左側
+        Vector3 lodgePos = PointAtOuterWall(4, -1f, 16.0f);
+        lodgePos.y = GetTerrainHeight(lodgePos.x, lodgePos.z, def);
+        Quaternion lodgeRot = Quaternion.LookRotation(Rights[4], Vector3.up);
+
+        // ロッジ本体
+        float bW = 12f, bH = 5.5f, bD = 9f;
+        Box("LodgeBody", lodgePos + Vector3.up * (bH * 0.5f), new Vector3(bW, bH, bD), lodgeRot, woodDarkMat);
+        // ロッジの三角大屋根（雪化粧）
+        Box("LodgeRoofL", lodgePos + Vector3.up * (bH + 1.8f) - lodgeRot * Vector3.right * 3.2f, new Vector3(7.5f, 0.4f, bD + 1.2f), lodgeRot * Quaternion.Euler(0, 0, 32f), snowMat);
+        Box("LodgeRoofR", lodgePos + Vector3.up * (bH + 1.8f) + lodgeRot * Vector3.right * 3.2f, new Vector3(7.5f, 0.4f, bD + 1.2f), lodgeRot * Quaternion.Euler(0, 0, -32f), snowMat);
+        // 煙突
+        Box("LodgeChimney", lodgePos + Vector3.up * (bH + 3.8f) + lodgeRot * Vector3.forward * 2f, new Vector3(1.2f, 3.2f, 1.2f), lodgeRot, rm.standMaterial);
+        // 暖かな明かりの窓
+        Box("LodgeWindow1", lodgePos + Vector3.up * 2.2f + lodgeRot * Vector3.forward * (bD * 0.51f) - lodgeRot * Vector3.right * 2.8f, new Vector3(1.6f, 1.6f, 0.1f), lodgeRot, warmWindowMat);
+        Box("LodgeWindow2", lodgePos + Vector3.up * 2.2f + lodgeRot * Vector3.forward * (bD * 0.51f) + lodgeRot * Vector3.right * 2.8f, new Vector3(1.6f, 1.6f, 0.1f), lodgeRot, warmWindowMat);
+
+        if (prefabLogStack != null)
+        {
+            SpawnProp(prefabLogStack, lodgePos - lodgeRot * Vector3.right * 7.5f, lodgeRot, Vector3.one * 1.6f, woodDarkMat);
+        }
+        if (prefabStump != null)
+        {
+            SpawnProp(prefabStump, lodgePos - lodgeRot * Vector3.right * 6.0f + lodgeRot * Vector3.forward * 3f, lodgeRot, Vector3.one * 1.4f, woodDarkMat);
+        }
+
+        // かわいい雪だるま（Snowman）2体：スタート直後（ペンギン応援団の手前＆ロッジ前）
+        Vector3[] snowmanSpots = {
+            PointAtOuterWall(8, 1f, 3.8f),
+            lodgePos + lodgeRot * Vector3.forward * 6.5f
+        };
+        for (int sIdx = 0; sIdx < snowmanSpots.Length; sIdx++)
+        {
+            Vector3 smPos = snowmanSpots[sIdx];
+            smPos.y = GetTerrainHeight(smPos.x, smPos.z, def);
+            Quaternion smRot = Quaternion.LookRotation(Dirs[sIdx == 0 ? 8 : 4], Vector3.up);
+
+            // 下段（胴体）
+            Box("SnowmanBody", smPos + Vector3.up * 0.9f, Vector3.one * 1.8f, Quaternion.identity, snowMat, PrimitiveType.Sphere);
+            // 上段（頭）
+            Box("SnowmanHead", smPos + Vector3.up * 2.1f, Vector3.one * 1.2f, Quaternion.identity, snowMat, PrimitiveType.Sphere);
+            // ニンジンの鼻
+            Box("SnowmanNose", smPos + Vector3.up * 2.1f + smRot * Vector3.forward * 0.68f, new Vector3(0.14f, 0.14f, 0.45f), smRot, carrotMat);
+            // 小石の目（2つ）
+            Box("SnowmanEyeL", smPos + Vector3.up * 2.28f + smRot * Vector3.forward * 0.58f - smRot * Vector3.right * 0.22f, Vector3.one * 0.12f, Quaternion.identity, coalMat, PrimitiveType.Sphere);
+            Box("SnowmanEyeR", smPos + Vector3.up * 2.28f + smRot * Vector3.forward * 0.58f + smRot * Vector3.right * 0.22f, Vector3.one * 0.12f, Quaternion.identity, coalMat, PrimitiveType.Sphere);
+            // バケツ帽子
+            Box("SnowmanBucket", smPos + Vector3.up * 2.85f, new Vector3(0.75f, 0.3f, 0.75f), smRot * Quaternion.Euler(8f, 0, 5f), bucketMat, PrimitiveType.Cylinder);
         }
     }
 

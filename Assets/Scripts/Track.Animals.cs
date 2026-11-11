@@ -64,7 +64,7 @@ public partial class Track
                 // スタート直後の特等席
                 for (int b = 0; b < 3; b++)
                 {
-                    Vector3 p = PointAt(7 + b * 2, WallOffset + 4.2f + (float)rng.NextDouble() * 2.5f);
+                    Vector3 p = PointAtOuterWall(7 + b * 2, 1f, 3.2f + (float)rng.NextDouble() * 2.0f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     SpawnAnimal(prefabBunny, p, Quaternion.Euler(0, -70f + (float)rng.NextDouble() * 30f, 0), 1.5f, animalMat, AnimalBehavior.BehaviorType.HopBounce);
                 }
@@ -73,7 +73,7 @@ public partial class Track
                 {
                     int idx = Wrap(Count * g / 4 + 18);
                     float side = (g % 2 == 0) ? 1f : -1f;
-                    Vector3 basePos = PointAt(idx, side * (WallOffset + 5.5f + (float)rng.NextDouble() * 6f));
+                    Vector3 basePos = PointAtOuterWall(idx, side, 4.5f + (float)rng.NextDouble() * 5f);
                     for (int b = 0; b < 3; b++)
                     {
                         Vector3 p = basePos + new Vector3((float)rng.NextDouble() * 4f - 2f, 0, (float)rng.NextDouble() * 4f - 2f);
@@ -88,7 +88,7 @@ public partial class Track
             if (prefabDeer != null)
             {
                 // スタート直後の木陰
-                Vector3 p0 = PointAt(14, WallOffset + 12f);
+                Vector3 p0 = PointAtOuterWall(14, 1f, 10f);
                 p0.y = GetTerrainHeight(p0.x, p0.z, def);
                 SpawnAnimal(prefabDeer, p0, Quaternion.Euler(0, -110f, 0), 2.2f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
 
@@ -96,7 +96,7 @@ public partial class Track
                 {
                     int idx = Wrap(Count * d / 3 + 35);
                     float side = (d % 2 == 0) ? -1f : 1f;
-                    Vector3 p = PointAt(idx, side * (WallOffset + 14f + (float)rng.NextDouble() * 10f));
+                    Vector3 p = PointAtOuterWall(idx, side, 12f + (float)rng.NextDouble() * 8f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabDeer, p, rot, 2.2f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
@@ -108,7 +108,7 @@ public partial class Track
             {
                 for (int c = 0; c < 4; c++)
                 {
-                    Vector3 p = PointAt(6 + c * 2, -(WallOffset + 3.8f + (float)rng.NextDouble() * 2f));
+                    Vector3 p = PointAtOuterWall(6 + c * 2, -1f, 2.8f + (float)rng.NextDouble() * 2f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     SpawnAnimal(prefabChick, p, Quaternion.Euler(0, 80f + (float)rng.NextDouble() * 40f, 0), 1.3f, animalMat, AnimalBehavior.BehaviorType.HopBounce);
                 }
@@ -119,7 +119,7 @@ public partial class Track
             // スタート直後の岩の上に砂漠のライオン（IdleGraze）
             if (prefabLion != null)
             {
-                Vector3 pStart = PointAt(10, WallOffset + 6.5f);
+                Vector3 pStart = PointAtOuterWall(10, 1f, 5.5f);
                 pStart.y = GetTerrainHeight(pStart.x, pStart.z, def);
                 SpawnAnimal(prefabLion, pStart, Quaternion.Euler(0, -85f, 0), 2.4f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
 
@@ -137,7 +137,7 @@ public partial class Track
             if (prefabFox != null)
             {
                 // スタート直後の左側
-                Vector3 pFox = PointAt(7, -(WallOffset + 5f));
+                Vector3 pFox = PointAtOuterWall(7, -1f, 4.5f);
                 pFox.y = GetTerrainHeight(pFox.x, pFox.z, def);
                 SpawnAnimal(prefabFox, pFox, Quaternion.Euler(0, 75f, 0), 1.7f, animalMat, AnimalBehavior.BehaviorType.LookAround);
 
@@ -156,7 +156,7 @@ public partial class Track
             if (prefabCrab != null)
             {
                 // スタート直後
-                Vector3 pCrab = PointAt(12, WallOffset + 4.2f);
+                Vector3 pCrab = PointAtOuterWall(12, 1f, 3.5f);
                 pCrab.y = GetTerrainHeight(pCrab.x, pCrab.z, def);
                 SpawnAnimal(prefabCrab, pCrab, Quaternion.Euler(0, -90f, 0), 1.8f, animalMat, AnimalBehavior.BehaviorType.CrabSidestep);
 
@@ -178,7 +178,7 @@ public partial class Track
                 // スタート直後の特等席！右側フェンス際によちよち並ぶ
                 for (int p = 0; p < 4; p++)
                 {
-                    Vector3 pos = PointAt(6 + p * 2, WallOffset + 3.6f);
+                    Vector3 pos = PointAtOuterWall(6 + p * 2, 1f, 2.2f);
                     pos.y = GetTerrainHeight(pos.x, pos.z, def);
                     Quaternion rot = Quaternion.Euler(0, -90f + (p % 2 == 0 ? 15f : -15f), 0);
                     SpawnAnimal(prefabPenguin, pos, rot, 1.7f, animalMat, AnimalBehavior.BehaviorType.PenguinWaddle);
@@ -189,7 +189,7 @@ public partial class Track
                 {
                     int idx = Wrap(Count * g / 4 + 16);
                     float side = (g % 2 == 0) ? 1f : -1f;
-                    Vector3 basePos = PointAt(idx, side * (WallOffset + 4.5f + (float)rng.NextDouble() * 3f));
+                    Vector3 basePos = PointAtOuterWall(idx, side, 3.2f + (float)rng.NextDouble() * 3f);
                     for (int p = 0; p < 3; p++)
                     {
                         Vector3 pos = basePos + new Vector3((p % 2) * 2.2f - 1.1f, 0, (p / 2) * 2.2f);
@@ -204,7 +204,7 @@ public partial class Track
             if (prefabPolar != null)
             {
                 // スタート直後の左側雪丘
-                Vector3 pPolar0 = PointAt(10, -(WallOffset + 9f));
+                Vector3 pPolar0 = PointAtOuterWall(10, -1f, 7.5f);
                 pPolar0.y = GetTerrainHeight(pPolar0.x, pPolar0.z, def);
                 SpawnAnimal(prefabPolar, pPolar0, Quaternion.Euler(0, 95f, 0), 2.5f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
 
@@ -212,7 +212,7 @@ public partial class Track
                 {
                     int idx = Wrap(Count * pb / 3 + 28);
                     float side = (pb % 2 == 0) ? -1f : 1f;
-                    Vector3 p = PointAt(idx, side * (WallOffset + 16f + (float)rng.NextDouble() * 10f));
+                    Vector3 p = PointAtOuterWall(idx, side, 12f + (float)rng.NextDouble() * 8f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabPolar, p, rot, 2.5f, animalMat, AnimalBehavior.BehaviorType.IdleGraze);
@@ -225,7 +225,7 @@ public partial class Track
                 for (int f = 0; f < 3; f++)
                 {
                     int idx = Wrap(Count * f / 3 + 24);
-                    Vector3 p = PointAt(idx, WallOffset + 8f + (float)rng.NextDouble() * 6f);
+                    Vector3 p = PointAtOuterWall(idx, 1f, 6.5f + (float)rng.NextDouble() * 5f);
                     p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabFox, p, rot, 1.7f, animalMat, AnimalBehavior.BehaviorType.LookAround);
@@ -234,18 +234,19 @@ public partial class Track
         }
         else if (theme == 3) // NEON METROPOLIS: サイバー未来都市
         {
-            // サイバーキャット（LookAround）- ビルのエントランスやサイバーツリーのふもと
+            // サイバーキャット（LookAround）- ビルのエントランスやサイバーツリーのふもと（地上歩道沿い）
             if (prefabCat != null)
             {
-                Vector3 pCat0 = PointAt(8, WallOffset + 3.8f);
-                pCat0.y = -0.3f;
+                Vector3 pCat0 = PointAtOuterWall(8, 1f, 2.2f);
+                pCat0.y = GetTerrainHeight(pCat0.x, pCat0.z, def);
                 SpawnAnimal(prefabCat, pCat0, Quaternion.Euler(0, -80f, 0), 1.6f, animalMat, AnimalBehavior.BehaviorType.LookAround);
 
                 for (int c = 1; c < 4; c++)
                 {
                     int idx = Wrap(Count * c / 4 + 16);
-                    Vector3 p = PointAt(idx, WallOffset + 4.2f + (float)rng.NextDouble() * 3f);
-                    p.y = -0.3f;
+                    if (Pts[idx].y > 2.0f) idx = Wrap(idx + 18); // 高架区間は避けて地上部へ
+                    Vector3 p = PointAtOuterWall(idx, 1f, 2.5f + (float)rng.NextDouble() * 2f);
+                    p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabCat, p, rot, 1.6f, animalMat, AnimalBehavior.BehaviorType.LookAround);
                 }
@@ -254,15 +255,16 @@ public partial class Track
             // サイバードッグ（LookAround）- 歩道沿い
             if (prefabDog != null)
             {
-                Vector3 pDog0 = PointAt(12, -(WallOffset + 4.0f));
-                pDog0.y = -0.3f;
+                Vector3 pDog0 = PointAtOuterWall(12, -1f, 2.5f);
+                pDog0.y = GetTerrainHeight(pDog0.x, pDog0.z, def);
                 SpawnAnimal(prefabDog, pDog0, Quaternion.Euler(0, 85f, 0), 1.7f, animalMat, AnimalBehavior.BehaviorType.LookAround);
 
                 for (int d = 1; d < 3; d++)
                 {
                     int idx = Wrap(Count * d / 3 + 32);
-                    Vector3 p = PointAt(idx, -(WallOffset + 4.5f + (float)rng.NextDouble() * 3f));
-                    p.y = -0.3f;
+                    if (Pts[idx].y > 2.0f) idx = Wrap(idx - 16); // 高架区間は避けて地上部へ
+                    Vector3 p = PointAtOuterWall(idx, -1f, 2.8f + (float)rng.NextDouble() * 2f);
+                    p.y = GetTerrainHeight(p.x, p.z, def);
                     Quaternion rot = Quaternion.Euler(0, (float)rng.NextDouble() * 360f, 0);
                     SpawnAnimal(prefabDog, p, rot, 1.7f, animalMat, AnimalBehavior.BehaviorType.LookAround);
                 }
