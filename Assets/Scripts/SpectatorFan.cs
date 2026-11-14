@@ -470,7 +470,7 @@ public class SpectatorPalette
         };
 
         // チェッカーフラッグテクスチャ
-        var checkerTex = Resources.Load<Texture2D>("Props/Textures/checkers");
+        var checkerTex = ResourceCache.Load<Texture2D>("Props/Textures/checkers");
         p.checkerMat = MakeMat(Color.white, checkerTex);
         if (p.checkerMat.mainTexture != null)
         {

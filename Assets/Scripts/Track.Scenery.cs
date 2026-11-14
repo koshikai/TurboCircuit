@@ -67,7 +67,7 @@ public partial class Track
         }
 
         // 道路沿いのサイバー街路灯（安全配置API PointAtOuterWall を適用）
-        var prefabLightPost = Resources.Load<GameObject>("Props/lightPostLarge");
+        var prefabLightPost = ResourceCache.Load<GameObject>("Props/lightPostLarge");
         if (prefabLightPost != null)
         {
             for (int i = 0; i < Count; i += 7)
@@ -173,11 +173,11 @@ public partial class Track
         }
 
         // コースサイドのサイバー街路樹（発光ネオンカラーを纏った幻想的な樹木）
-        var prefabTree1 = Resources.Load<GameObject>("Props/StylizedNature/NormalTree_1");
-        var prefabTree2 = Resources.Load<GameObject>("Props/StylizedNature/BirchTree_1");
-        var texNormalLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Leaves");
-        var texBirchLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Leaves");
-        var texNormalBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Bark");
+        var prefabTree1 = ResourceCache.Load<GameObject>("Props/StylizedNature/NormalTree_1");
+        var prefabTree2 = ResourceCache.Load<GameObject>("Props/StylizedNature/BirchTree_1");
+        var texNormalLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Leaves");
+        var texBirchLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Leaves");
+        var texNormalBark = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Bark");
         var cyberTrunkMat = MakeMat(rm.standMaterial, texNormalBark, new Color(0.20f, 0.22f, 0.30f));
         var cyberFoliageMat1 = MakeMat(rm.leavesMaterial, texNormalLeaves, new Color(0.15f, 0.98f, 1.0f), new Color(0.05f, 0.72f, 0.90f));
         var cyberFoliageMat2 = MakeMat(rm.leavesMaterial, texBirchLeaves ?? texNormalLeaves, new Color(1.0f, 0.35f, 0.92f), new Color(0.88f, 0.14f, 0.68f));
@@ -237,11 +237,11 @@ public partial class Track
         createdMaterials.Add(coalMat);
         createdMaterials.Add(bucketMat);
 
-        var texRocks = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
+        var texRocks = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
         var frostRockMat = MakeMat(rm.mountainMaterial, texRocks, new Color(0.82f, 0.90f, 0.98f));
-        var prefabRock1 = Resources.Load<GameObject>("Props/StylizedNature/Rock_1");
-        var prefabLogStack = Resources.Load<GameObject>("Props/Nature/log_stack");
-        var prefabStump = Resources.Load<GameObject>("Props/Nature/stump_old");
+        var prefabRock1 = ResourceCache.Load<GameObject>("Props/StylizedNature/Rock_1");
+        var prefabLogStack = ResourceCache.Load<GameObject>("Props/Nature/log_stack");
+        var prefabStump = ResourceCache.Load<GameObject>("Props/Nature/stump_old");
 
         // 1. クレバス大ジャンプ台（Ratio 0.36）手前の「氷柱アーチ（Glacier Arch）」＆「氷河クリスタルクラスター」
         if (def.Ramps != null && def.Ramps.Length > 0)
@@ -403,52 +403,52 @@ public partial class Track
     void BuildCampusScenery(RaceManager rm, TrackDef def, System.Random rng)
     {
         // 1. 洗練された高品質スタイライズド 3D 自然モデル（Quaternius Stylized Nature Kit, CC0/MIT）
-        var prefabMaple1 = Resources.Load<GameObject>("Props/StylizedNature/MapleTree_1");
-        var prefabMaple2 = Resources.Load<GameObject>("Props/StylizedNature/MapleTree_2");
-        var prefabMaple3 = Resources.Load<GameObject>("Props/StylizedNature/MapleTree_3");
-        var prefabBirch1 = Resources.Load<GameObject>("Props/StylizedNature/BirchTree_1");
-        var prefabBirch2 = Resources.Load<GameObject>("Props/StylizedNature/BirchTree_2");
-        var prefabBirch3 = Resources.Load<GameObject>("Props/StylizedNature/BirchTree_3");
-        var prefabNormal1 = Resources.Load<GameObject>("Props/StylizedNature/NormalTree_1");
-        var prefabNormal2 = Resources.Load<GameObject>("Props/StylizedNature/NormalTree_2");
-        var prefabPine1 = Resources.Load<GameObject>("Props/StylizedNature/PineTree_1");
-        var prefabPine2 = Resources.Load<GameObject>("Props/StylizedNature/PineTree_2");
-        var prefabBush = Resources.Load<GameObject>("Props/StylizedNature/Bush");
-        var prefabBushFlowers = Resources.Load<GameObject>("Props/StylizedNature/Bush_Flowers");
-        var prefabBushLarge = Resources.Load<GameObject>("Props/StylizedNature/Bush_Large");
-        var prefabFlower1 = Resources.Load<GameObject>("Props/StylizedNature/Flower_1_Clump");
-        var prefabFlower2 = Resources.Load<GameObject>("Props/StylizedNature/Flower_2_Clump");
-        var prefabGrassLarge = Resources.Load<GameObject>("Props/StylizedNature/Grass_Large");
-        var prefabRock1 = Resources.Load<GameObject>("Props/StylizedNature/Rock_1");
-        var prefabRock2 = Resources.Load<GameObject>("Props/StylizedNature/Rock_2");
-        var prefabRock3 = Resources.Load<GameObject>("Props/StylizedNature/Rock_3");
+        var prefabMaple1 = ResourceCache.Load<GameObject>("Props/StylizedNature/MapleTree_1");
+        var prefabMaple2 = ResourceCache.Load<GameObject>("Props/StylizedNature/MapleTree_2");
+        var prefabMaple3 = ResourceCache.Load<GameObject>("Props/StylizedNature/MapleTree_3");
+        var prefabBirch1 = ResourceCache.Load<GameObject>("Props/StylizedNature/BirchTree_1");
+        var prefabBirch2 = ResourceCache.Load<GameObject>("Props/StylizedNature/BirchTree_2");
+        var prefabBirch3 = ResourceCache.Load<GameObject>("Props/StylizedNature/BirchTree_3");
+        var prefabNormal1 = ResourceCache.Load<GameObject>("Props/StylizedNature/NormalTree_1");
+        var prefabNormal2 = ResourceCache.Load<GameObject>("Props/StylizedNature/NormalTree_2");
+        var prefabPine1 = ResourceCache.Load<GameObject>("Props/StylizedNature/PineTree_1");
+        var prefabPine2 = ResourceCache.Load<GameObject>("Props/StylizedNature/PineTree_2");
+        var prefabBush = ResourceCache.Load<GameObject>("Props/StylizedNature/Bush");
+        var prefabBushFlowers = ResourceCache.Load<GameObject>("Props/StylizedNature/Bush_Flowers");
+        var prefabBushLarge = ResourceCache.Load<GameObject>("Props/StylizedNature/Bush_Large");
+        var prefabFlower1 = ResourceCache.Load<GameObject>("Props/StylizedNature/Flower_1_Clump");
+        var prefabFlower2 = ResourceCache.Load<GameObject>("Props/StylizedNature/Flower_2_Clump");
+        var prefabGrassLarge = ResourceCache.Load<GameObject>("Props/StylizedNature/Grass_Large");
+        var prefabRock1 = ResourceCache.Load<GameObject>("Props/StylizedNature/Rock_1");
+        var prefabRock2 = ResourceCache.Load<GameObject>("Props/StylizedNature/Rock_2");
+        var prefabRock3 = ResourceCache.Load<GameObject>("Props/StylizedNature/Rock_3");
 
         // 建築・小道具モデル
-        var prefabFence = Resources.Load<GameObject>("Props/Nature/fence_simple");
-        var prefabGate = Resources.Load<GameObject>("Props/Nature/fence_gate");
-        var prefabStatueHead = Resources.Load<GameObject>("Props/Nature/statue_head");
-        var prefabStatueColumn = Resources.Load<GameObject>("Props/Nature/statue_column");
-        var prefabStatueBlock = Resources.Load<GameObject>("Props/Nature/statue_block");
-        var prefabLilyLarge = Resources.Load<GameObject>("Props/Nature/lily_large");
-        var prefabLilySmall = Resources.Load<GameObject>("Props/Nature/lily_small");
-        var prefabBridge = Resources.Load<GameObject>("Props/Nature/bridge_wood");
-        var prefabSign = Resources.Load<GameObject>("Props/Nature/sign");
-        var prefabLogStack = Resources.Load<GameObject>("Props/Nature/log_stack");
-        var prefabStump = Resources.Load<GameObject>("Props/Nature/stump_old");
-        var prefabLampPost = Resources.Load<GameObject>("Props/lightPostLarge");
+        var prefabFence = ResourceCache.Load<GameObject>("Props/Nature/fence_simple");
+        var prefabGate = ResourceCache.Load<GameObject>("Props/Nature/fence_gate");
+        var prefabStatueHead = ResourceCache.Load<GameObject>("Props/Nature/statue_head");
+        var prefabStatueColumn = ResourceCache.Load<GameObject>("Props/Nature/statue_column");
+        var prefabStatueBlock = ResourceCache.Load<GameObject>("Props/Nature/statue_block");
+        var prefabLilyLarge = ResourceCache.Load<GameObject>("Props/Nature/lily_large");
+        var prefabLilySmall = ResourceCache.Load<GameObject>("Props/Nature/lily_small");
+        var prefabBridge = ResourceCache.Load<GameObject>("Props/Nature/bridge_wood");
+        var prefabSign = ResourceCache.Load<GameObject>("Props/Nature/sign");
+        var prefabLogStack = ResourceCache.Load<GameObject>("Props/Nature/log_stack");
+        var prefabStump = ResourceCache.Load<GameObject>("Props/Nature/stump_old");
+        var prefabLampPost = ResourceCache.Load<GameObject>("Props/lightPostLarge");
 
         // 2. 高解像度スタイライズド・テクスチャの読み込み
-        var texBirchBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Bark");
-        var texBirchLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Leaves");
-        var texMapleBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/MapleTree_Bark");
-        var texMapleLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/MapleTree_Leaves");
-        var texNormalBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Bark");
-        var texNormalLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Leaves");
-        var texPineBark = Resources.Load<Texture2D>("Props/StylizedNature/Textures/PineTree_Bark");
-        var texPineLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/PineTree_Leaves");
-        var texBushLeaves = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Bush_Leaves");
-        var texFlowers = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Flowers");
-        var texRocks = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
+        var texBirchBark = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Bark");
+        var texBirchLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/BirchTree_Leaves");
+        var texMapleBark = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/MapleTree_Bark");
+        var texMapleLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/MapleTree_Leaves");
+        var texNormalBark = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Bark");
+        var texNormalLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/NormalTree_Leaves");
+        var texPineBark = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/PineTree_Bark");
+        var texPineLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/PineTree_Leaves");
+        var texBushLeaves = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Bush_Leaves");
+        var texFlowers = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Flowers");
+        var texRocks = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
 
 
         // 専用マテリアルの初期化
@@ -1031,9 +1031,9 @@ public partial class Track
         }
 
         // 6. コース沿いのヤシの木＆シーサイドプロムナード装飾
-        var prefabPalm1 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_1");
-        var prefabPalm2 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_2");
-        var prefabPalm3 = Resources.Load<GameObject>("Props/StylizedNature/PalmTree_3");
+        var prefabPalm1 = ResourceCache.Load<GameObject>("Props/StylizedNature/PalmTree_1");
+        var prefabPalm2 = ResourceCache.Load<GameObject>("Props/StylizedNature/PalmTree_2");
+        var prefabPalm3 = ResourceCache.Load<GameObject>("Props/StylizedNature/PalmTree_3");
         for (int i = 8; i < Count; i += 16)
         {
             for (int side = -1; side <= 1; side += 2)

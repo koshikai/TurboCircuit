@@ -218,6 +218,8 @@ public partial class RaceManager
             // 状態リセット
             showQuitConfirm = false;
             showSettings = false;
+            showRecords = false;
+            cupActive = false;
             paused = false;
             netMenu = false;
             if (updater != null) updater.ShowModal = false;
@@ -375,6 +377,34 @@ public partial class RaceManager
                         k.Place = Karts.IndexOf(k) + 1;
                         k.FinishTime = 72.5f + k.Place * 1.5f;
                     }
+                    placeOrder.Clear();
+                    placeOrder.AddRange(Karts);
+                    placeOrder.Sort(ComparePlaces);
+                    state = State.Results;
+                    finishAt = Time.time - 5f;
+                    break;
+                case "records":
+                    state = State.Title;
+                    ConfigureHuman(0);
+                    showRecords = true;
+                    recordsFocus = Track.Courses.Length;
+                    break;
+                case "cup_results":
+                case "cup_standings":
+                    CurrentMode = GameMode.Cup;
+                    StartRaceFromTitle();
+                    cupStage = t == "cup_standings" ? DefaultCups[cupIndex].courses.Length - 1 : 1;
+                    bestLap[0] = 24.18f;
+                    for (int i = 0; i < Karts.Count; i++)
+                    {
+                        var k = Karts[i];
+                        k.Finished = true;
+                        k.Place = i + 1;
+                        k.FinishTime = 72.5f + k.Place * 1.5f;
+                        cupPoints[i] = (cupStage + 1) * GetCupPointsForPlace(k.Place);
+                    }
+                    cupPointsAwarded = true;
+                    if (t == "cup_standings") cupFinalRank = 1;
                     placeOrder.Clear();
                     placeOrder.AddRange(Karts);
                     placeOrder.Sort(ComparePlaces);
@@ -610,7 +640,7 @@ public partial class RaceManager
 
             foreach (var aName in list)
             {
-                var prefab = Resources.Load<GameObject>($"Animals/animal-{aName}");
+                var prefab = ResourceCache.Load<GameObject>($"Animals/animal-{aName}");
                 if (prefab == null)
                 {
                     Debug.LogWarning($"[VerifyShot] Animal prefab not found: Animals/animal-{aName}");
@@ -892,4 +922,448 @@ public partial class RaceManager
         }
         return root;
     }
+
+    System.Collections.IEnumerator CaptureSpectatorPreviews()
+    {
+        yield return new WaitForSeconds(0.6f);
+        state = State.Countdown; // UIオーバーレイを抑制
+        // スタジオ風カメラ配置
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.22f, 0.26f, 0.32f);
+
+        // プレビュー対象の親
+        var studio = new GameObject("StudioRoot");
+        studio.transform.position = new Vector3(0, 1000f, 0); // コースから離れた上空スタジオ
+        Vector3 center = studio.transform.position;
+
+        // スタジオ専用ライト
+        var studioKey = new GameObject("StudioKeyLight").AddComponent<Light>();
+        studioKey.type = LightType.Directional;
+        studioKey.transform.SetParent(studio.transform, false);
+        studioKey.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
+        studioKey.intensity = 1.35f;
+        studioKey.color = new Color(1f, 0.98f, 0.95f);
+
+        var studioFill = new GameObject("StudioFillLight").AddComponent<Light>();
+        studioFill.type = LightType.Directional;
+        studioFill.transform.SetParent(studio.transform, false);
+        studioFill.transform.rotation = Quaternion.Euler(-20f, 145f, 0f);
+        studioFill.intensity = 0.55f;
+        studioFill.color = new Color(0.75f, 0.88f, 1f);
+
+        // 床ディスク（スタジオの台座）
+        var stage = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        stage.transform.SetParent(studio.transform, false);
+        stage.transform.localPosition = new Vector3(0, -0.05f, 0);
+        stage.transform.localScale = new Vector3(4.5f, 0.05f, 4.5f);
+        var stageRend = stage.GetComponent<Renderer>();
+        stageRend.sharedMaterial = wallMaterial;
+
+        // 1. 人間サポーターキャラクター（6種類の帽子・応援スタイル）
+        var spectatorPalette = SpectatorPalette.Create(this, new List<Material>());
+        string[] hatNames = new[] { "cap", "visor", "knit", "bear_ears", "headphones", "sunglasses" };
+
+        for (int h = 0; h < 6; h++)
+        {
+            var fanObj = SpectatorFan.CreateFan(
+                studio.transform,
+                center,
+                Quaternion.identity,
+                new System.Random(h * 888 + 19),
+                this,
+                spectatorPalette
+            );
+
+            // 前面全身ショット
+            cam.transform.position = center + new Vector3(1.6f, 2.3f, 3.2f);
+            cam.transform.LookAt(center + new Vector3(0, 1.4f, 0));
+            yield return new WaitForSeconds(0.25f);
+            ScreenCapture.CaptureScreenshot($"preview_fan_{h}_{hatNames[h]}_front.png");
+            yield return new WaitForSeconds(0.15f);
+
+            // バストアップ・クローズアップ
+            cam.transform.position = center + new Vector3(0.5f, 1.9f, 2.0f);
+            cam.transform.LookAt(center + new Vector3(0, 1.6f, 0));
+            yield return new WaitForSeconds(0.2f);
+            ScreenCapture.CaptureScreenshot($"preview_fan_{h}_{hatNames[h]}_closeup.png");
+            yield return new WaitForSeconds(0.15f);
+
+            Destroy(fanObj);
+        }
+
+        // 2. 動物観客たち（全12種）
+        string animalTexPath = Application.dataPath + "/Resources/Animals/Textures/colormap.png";
+        var colormapTex = RaceManager.LoadTexture("Animals/Textures/colormap", animalTexPath);
+        var animalMat = new Material(wallMaterial);
+        if (colormapTex != null) animalMat.mainTexture = colormapTex;
+        animalMat.color = Color.white;
+        animalMat.SetColor("_BaseColor", Color.white);
+        animalMat.SetFloat("_Smoothness", 0.15f);
+
+        string[] animalNames = new[]
+        {
+            "bunny", "penguin", "polar", "deer", "fox", "lion", "cow", "cat", "dog", "crab", "chick", "parrot"
+        };
+
+        foreach (var name in animalNames)
+        {
+            var prefab = ResourceCache.Load<GameObject>($"Animals/animal-{name}");
+            if (prefab == null) continue;
+
+            var animalGo = Instantiate(prefab, studio.transform);
+            animalGo.transform.position = center + Vector3.up * 0.1f;
+            animalGo.transform.rotation = Quaternion.Euler(0, 35f, 0); // 正面斜め向き
+            animalGo.transform.localScale = Vector3.one * 1.5f;
+
+            foreach (var r in animalGo.GetComponentsInChildren<Renderer>())
+            {
+                r.sharedMaterial = animalMat;
+            }
+
+            cam.transform.position = center + new Vector3(2.5f, 2.2f, 3.2f);
+            cam.transform.LookAt(center + new Vector3(0, 0.8f, 0));
+            yield return new WaitForSeconds(0.2f);
+            ScreenCapture.CaptureScreenshot($"preview_animal_{name}.png");
+            yield return new WaitForSeconds(0.15f);
+
+            Destroy(animalGo);
+        }
+
+        Destroy(studio);
+        yield return new WaitForSeconds(0.5f);
+        Application.Quit();
+    }
+
+    System.Collections.IEnumerator AutoCaptureScreens()
+    {
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_01_title.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // カスタムキャラ＆カート組み合わせのタイトル画面確認 (例: PANDA + MACH FORMULA)
+        SelectedDriver = 5;
+        SelectedKart = 2;
+        ConfigureHuman(0);
+        yield return new WaitForSeconds(0.5f);
+        ScreenCapture.CaptureScreenshot("shot_01b_title_custom.png");
+        yield return new WaitForSeconds(0.3f);
+
+        // 2P分割時のタイトル画面確認
+        SelectedDriver2 = 7; // FOX
+        SelectedKart2 = 4;   // CYBER GT
+        SetTwoPlayer(true);
+        yield return new WaitForSeconds(0.5f);
+        ScreenCapture.CaptureScreenshot("shot_01c_title_2p.png");
+        yield return new WaitForSeconds(0.3f);
+        SetTwoPlayer(false);
+
+        showSettings = true;
+        settingsTab = 0;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_02_settings_general.png");
+        yield return new WaitForSeconds(0.4f);
+
+        settingsTab = 1;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_03_settings_keys.png");
+        yield return new WaitForSeconds(0.4f);
+
+        settingsTab = 2;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_03b_settings_updates.png");
+        yield return new WaitForSeconds(0.4f);
+        CloseSettings();
+        yield return new WaitForSeconds(0.4f);
+
+        if (updater != null) updater.SimulateUpdateAvailableForTesting();
+        yield return new WaitForSeconds(0.5f);
+        ScreenCapture.CaptureScreenshot("shot_03c_update_modal.png");
+        yield return new WaitForSeconds(0.4f);
+        if (updater != null) updater.ShowModal = false;
+        yield return new WaitForSeconds(0.4f);
+
+        StartRaceFromTitle();
+        yield return new WaitForSeconds(1.8f);
+        ScreenCapture.CaptureScreenshot("shot_04_countdown.png");
+
+        yield return new WaitForSeconds(2.8f);
+        if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Missile);
+        yield return new WaitForSeconds(0.10f);
+        ScreenCapture.CaptureScreenshot("shot_05_racing_1p.png");
+        yield return new WaitForSeconds(0.25f);
+
+        if (Player != null) Player.SetPreviewDrift(1, 1.15f, 27.8f, ItemType.Missile);
+        yield return new WaitForSeconds(0.10f);
+        ScreenCapture.CaptureScreenshot("shot_05b_drift_blue.png");
+        yield return new WaitForSeconds(0.25f);
+
+        if (Player != null) Player.SetPreviewDrift(-1, 2.85f, 28.5f, ItemType.Turbo);
+        yield return new WaitForSeconds(0.10f);
+        ScreenCapture.CaptureScreenshot("shot_05c_drift_purple.png");
+        yield return new WaitForSeconds(0.25f);
+
+        paused = true;
+        yield return new WaitForSeconds(0.4f);
+        ScreenCapture.CaptureScreenshot("shot_06_paused.png");
+        yield return new WaitForSeconds(0.4f);
+        paused = false;
+
+        // 7. リザルト画面
+        bestLap[0] = 24.18f;
+        foreach (var k in Karts) { k.Finished = true; k.Place = Karts.IndexOf(k) + 1; k.FinishTime = 72.5f + k.Place * 1.5f; }
+        placeOrder.Clear();
+        placeOrder.AddRange(Karts);
+        placeOrder.Sort(ComparePlaces);
+        state = State.Results;
+        finishAt = Time.time - 5f;
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_07_results.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 8. 2P レース中 HUD
+        SetTwoPlayer(true);
+        ResetRace();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 15.2f;
+        yield return new WaitForSeconds(0.6f);
+        if (Player != null) Player.SetPreviewSpeedAndBoost(27.2f, 0f, ItemType.Turbo);
+        if (Player2 != null) Player2.SetPreviewSpeedAndBoost(29.0f, 1.2f, ItemType.Banana);
+        ScreenCapture.CaptureScreenshot("shot_08_racing_2p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 9. タイムアタック レース中 HUD
+        SetTwoPlayer(false);
+        IsTimeAttack = true;
+        ResetRace();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 28.6f;
+        yield return new WaitForSeconds(0.6f);
+        if (Player != null) Player.SetPreviewSpeedAndBoost(30.5f, 1.4f, ItemType.Turbo);
+        ScreenCapture.CaptureScreenshot("shot_09_racing_timeattack.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 10. オンライン待機画面 (LOBBY - ROOM CODE 付き 4人)
+        state = State.Title;
+        SetTwoPlayer(false);
+        IsTimeAttack = false;
+        Net.HostDirect();
+        Net.JoinCode = "WFHPQQ";
+        playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart); playerNames[5] = "HostPlayer";
+        playerKarts[0] = PackDriverKart(1, 1); playerNames[0] = "RivalOne";
+        playerKarts[1] = PackDriverKart(6, 3); playerNames[1] = "Speedy";
+        playerKarts[2] = PackDriverKart(8, 7); playerNames[2] = "KartMaster";
+        lobbySlots.Clear();
+        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        ApplyLobbyKarts();
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_10_lobby_4p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 11. オンライン待機画面 (LOBBY - ROOM CODE 付き 8人満員)
+        playerKarts[3] = PackDriverKart(4, 5); playerNames[3] = "Racer4";
+        playerKarts[4] = PackDriverKart(9, 6); playerNames[4] = "Racer5";
+        playerKarts[6] = PackDriverKart(2, 2); playerNames[6] = "Racer6";
+        playerKarts[7] = PackDriverKart(7, 4); playerNames[7] = "Racer7";
+        lobbySlots.Clear();
+        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
+        ApplyLobbyKarts();
+        yield return new WaitForSeconds(0.8f);
+        ScreenCapture.CaptureScreenshot("shot_11_lobby_8p.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 12. 北大キャンパス コース表示（タイトル画面）
+        Net.Disconnect();
+        state = State.Title;
+        LoadCourse(4);
+        yield return new WaitForSeconds(0.6f);
+        ScreenCapture.CaptureScreenshot("shot_12_campus_title.png");
+        yield return new WaitForSeconds(0.4f);
+
+        // 13. 北大キャンパス レース中（スタート直後・メインストリート）
+        StartRaceFromTitle();
+        state = State.Racing;
+        stateTime = 5f;
+        raceTime = 12.4f;
+        yield return new WaitForSeconds(0.8f);
+        if (Player != null) Player.SetPreviewSpeedAndBoost(26.5f, 0f, ItemType.Star);
+        ScreenCapture.CaptureScreenshot("shot_13_campus_race.png");
+        yield return new WaitForSeconds(0.3f);
+
+        void TeleportPlayer(int idx, float lat = 0f, float extraYaw = 0f)
+        {
+            if (track == null || track.Count == 0) return;
+            int i = Mathf.Clamp(idx, 0, track.Count - 1);
+            Player.transform.position = track.PointAt(i, lat) + Vector3.up * 0.4f;
+            Player.Index = i;
+            Player.Progress = track.Dist[i];
+            float heading = Mathf.Atan2(track.Dirs[i].x, track.Dirs[i].z) * Mathf.Rad2Deg + extraYaw;
+            Player.Heading = heading;
+            Player.Speed = 0f;
+            camYaws[0] = heading;
+            var r = Quaternion.Euler(0, heading, 0);
+            cam.transform.position = Player.transform.position + r * new Vector3(0, 2.7f, -6.8f);
+            cam.transform.LookAt(Player.transform.position + r * new Vector3(0, 1.1f, 3.2f));
+        }
+
+        // 14. 北大キャンパス 北13条イチョウ並木（黄金のトンネル＆落ち葉絨毯）
+        if (track != null && track.Count > 0)
+        {
+            TeleportPlayer((int)(0.29f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(25.5f, 0f);
+            ScreenCapture.CaptureScreenshot("shot_14_campus_ginkgo.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 15. 北大キャンパス 第2農場モデルバーン＆放牧ホルスタイン牛＆木柵
+            TeleportPlayer((int)(0.555f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(24.0f, 0f);
+            ScreenCapture.CaptureScreenshot("shot_15_campus_barn.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 16. 北大キャンパス ポプラ並木通り（直立ポプラ列柱）
+            TeleportPlayer((int)(0.82f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(28.5f, 1.2f);
+            ScreenCapture.CaptureScreenshot("shot_16_campus_poplar.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 17. 北大キャンパス 大野池＆総合博物館（睡蓮・木橋・自然石）
+            TeleportPlayer((int)(0.22f * track.Count));
+            yield return new WaitForSeconds(0.6f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(23.5f, 0f);
+            ScreenCapture.CaptureScreenshot("shot_17_campus_pond.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 18. 北大キャンパス クラーク博士胸像＆花壇＆中央ローン
+            TeleportPlayer((int)(0.106f * track.Count), 1.8f, -28f);
+            yield return new WaitForSeconds(0.6f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(22.0f, 0f);
+            ScreenCapture.CaptureScreenshot("shot_18_campus_clark.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 19. Course 0: TURBO CIRCUIT（スタイライズド大樹・白樺・花壇・サーキット）
+            LoadCourse(0);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(28.0f, 1.2f, ItemType.Turbo);
+            ScreenCapture.CaptureScreenshot("shot_19_circuit_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // スポンサー看板・オーバーヘッドゲートの検証撮影
+            TeleportPlayer(16, 1.2f, 22f);
+            if (Player != null) Player.Speed = 0f;
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot("shot_19b_sponsor_board.png");
+            yield return new WaitForSeconds(0.3f);
+
+            TeleportPlayer(track.Count * 33 / 100 - 9, 0f, 0f);
+            if (Player != null) Player.Speed = 0f;
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot("shot_19c_bridge_banner.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 20. Course 1: SUNSET DUNES（ヤシの木・砂漠枯れ木・砂漠自然岩）
+            LoadCourse(1);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(26.8f, 0f, ItemType.Banana);
+            ScreenCapture.CaptureScreenshot("shot_20_dunes_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 21. Course 2: FROST PEAK（スノーパイン針葉樹林・雪山・氷晶）
+            LoadCourse(2);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(27.5f, 0f, ItemType.Star);
+            ScreenCapture.CaptureScreenshot("shot_21_frost_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 22. Course 3: NEON METROPOLIS（ネオン街路灯・サイバーツリー・発光看板・摩天楼）
+            LoadCourse(3);
+            yield return new WaitForSeconds(0.6f);
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 10f;
+            yield return new WaitForSeconds(0.8f);
+            if (Player != null) Player.SetPreviewSpeedAndBoost(30.2f, 1.5f, ItemType.Missile);
+            ScreenCapture.CaptureScreenshot("shot_22_neon_race.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 23. Course 5: SKYLINE OVERPASS タイトル画面（コースバッジ・情報）
+            LoadCourse(5);
+            state = State.Title;
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("shot_23_overpass_title.png");
+            yield return new WaitForSeconds(0.3f);
+
+            // 24. Course 5: 下層アンダーパス走行（頭上15mを高架橋が横断する迫力の立体交差アングル）
+            StartRaceFromTitle();
+            state = State.Racing;
+            stateTime = 5f;
+            raceTime = 12f;
+            if (track != null && track.Count > 0)
+            {
+                TeleportPlayer((int)(0.365f * track.Count)); // アンダーパス交差直前
+                yield return new WaitForSeconds(0.6f);
+                if (Player != null) Player.SetPreviewSpeedAndBoost(28.5f, 0f, ItemType.Turbo);
+                ScreenCapture.CaptureScreenshot("shot_24_overpass_underpass.png");
+                yield return new WaitForSeconds(0.3f);
+
+                // 25. Course 5: 上層斜張橋走行（主塔・ステイケーブル・下界を見下ろす立体交差ピーク）
+                TeleportPlayer((int)(0.785f * track.Count)); // 高架橋交差直前
+                yield return new WaitForSeconds(0.6f);
+                if (Player != null) Player.SetPreviewSpeedAndBoost(31.0f, 1.4f, ItemType.Missile);
+                ScreenCapture.CaptureScreenshot("shot_25_overpass_bridge.png");
+                yield return new WaitForSeconds(0.3f);
+            }
+        }
+
+        yield return new WaitForSeconds(0.5f);
+        Application.Quit();
+    }
+
+    // -autoshot / -titleshot / F12 などのスクリーンショット要求とテスト用ブースト
+    void HandleCaptureRequests()
+    {
+        if (GameInput.GetKeyDown(KeyCode.F12))
+        {
+            ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
+        }
+        if (titleShotRequested && state == State.Title && stateTime > shotDelay && !screenshotTaken)
+        {
+            screenshotTaken = true;
+            string fname = string.IsNullOrEmpty(customShotName) ? "screenshot_title.png" : customShotName;
+            ScreenCapture.CaptureScreenshot(fname);
+            Invoke(nameof(QuitAfterScreenshot), 0.4f);
+        }
+        if (testBoostRequested && state == State.Racing && Player != null && !Player.Boosting)
+            Player.Boost(5f);
+
+        if (screenshotRequested && state == State.Racing && stateTime > shotDelay && !screenshotTaken)
+        {
+            screenshotTaken = true;
+            string fname = string.IsNullOrEmpty(customShotName) ? $"screenshot_course{SelectedCourse}.png" : customShotName;
+            ScreenCapture.CaptureScreenshot(fname);
+            Invoke(nameof(QuitAfterScreenshot), 0.4f);
+        }
+        if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
+    }
+
+    void QuitAfterScreenshot() => Application.Quit();
 }

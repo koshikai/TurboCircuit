@@ -7,6 +7,97 @@ using UnityEngine.Rendering.Universal;
 // レース中 HUD：ラップ/タイム、順位、アイテム、スピードメーター、ミニマップ、集中線、ビネット
 public partial class RaceManager
 {
+    static readonly string[] CountdownStrings = { "GO!", "1", "2", "3" };
+    static readonly Dictionary<ItemType, string> ItemTypeNameCache = new Dictionary<ItemType, string>();
+
+    KeyCode hudCachedItemKey = KeyCode.None;
+    bool hudCachedItemKeyJa;
+    string hudCachedItemUseLabel;
+
+    readonly float[] hudCachedBestLap = new float[2];
+    readonly string[] hudCachedBestLapStr = new string[2];
+
+    string hudCachedSpecName;
+    int hudCachedSpecPlace = -1;
+    bool hudCachedSpecJa;
+    string hudCachedSpecStr;
+
+    readonly int[] hudCachedMissileDist = { -1, -1 };
+    readonly bool[] hudCachedMissileJa = new bool[2];
+    readonly string[] hudCachedMissileStr = new string[2];
+
+    readonly int[] hudCachedSplitCs = { int.MinValue, int.MinValue };
+    readonly string[] hudCachedSplitStr = new string[2];
+
+    string GetItemFallbackLabel(ItemType t)
+    {
+        if (!ItemTypeNameCache.TryGetValue(t, out string s))
+        {
+            s = t.ToString();
+            ItemTypeNameCache[t] = s;
+        }
+        return s;
+    }
+
+    string GetItemUseLabel(int pi)
+    {
+        if (pi == 1) return Loc.T("[R-CTRL] USE", "[R-CTRL] 使用");
+        if (InputSettings.KeyItem != hudCachedItemKey || Loc.IsJa != hudCachedItemKeyJa || hudCachedItemUseLabel == null)
+        {
+            hudCachedItemKey = InputSettings.KeyItem;
+            hudCachedItemKeyJa = Loc.IsJa;
+            string keyStr = hudCachedItemKey.ToString().ToUpperInvariant();
+            hudCachedItemUseLabel = Loc.T($"[{keyStr}] USE", $"[{keyStr}] 使用");
+        }
+        return hudCachedItemUseLabel;
+    }
+
+    string GetBestLapLabel(int pi, float best)
+    {
+        if (hudCachedBestLap[pi] != best || hudCachedBestLapStr[pi] == null)
+        {
+            hudCachedBestLap[pi] = best;
+            hudCachedBestLapStr[pi] = "BEST " + FormatTime(best);
+        }
+        return hudCachedBestLapStr[pi];
+    }
+
+    string GetSpectatingBanner(string name, int place)
+    {
+        if (hudCachedSpecName != name || hudCachedSpecPlace != place || hudCachedSpecJa != Loc.IsJa || hudCachedSpecStr == null)
+        {
+            hudCachedSpecName = name;
+            hudCachedSpecPlace = place;
+            hudCachedSpecJa = Loc.IsJa;
+            hudCachedSpecStr = Loc.T($"► SPECTATING: {name} ({Ordinal(place)}) ◄", $"► 観戦中: {name} ({Loc.PlaceText(place)}) ◄");
+        }
+        return hudCachedSpecStr;
+    }
+
+    string GetMissileWarnLabel(int pi, float mDist)
+    {
+        pi = Mathf.Clamp(pi, 0, 1);
+        int distInt = Mathf.RoundToInt(mDist);
+        if (hudCachedMissileDist[pi] != distInt || hudCachedMissileJa[pi] != Loc.IsJa || hudCachedMissileStr[pi] == null)
+        {
+            hudCachedMissileDist[pi] = distInt;
+            hudCachedMissileJa[pi] = Loc.IsJa;
+            hudCachedMissileStr[pi] = Loc.T($"! DANGER: MISSILE {distInt}m !", $"！ ミサイル接近 {distInt}m ！");
+        }
+        return hudCachedMissileStr[pi];
+    }
+
+    string GetTimeAttackSplitLabel(int pi, float delta)
+    {
+        int cs = Mathf.RoundToInt(delta * 100f);
+        if (hudCachedSplitCs[pi] != cs || hudCachedSplitStr[pi] == null)
+        {
+            hudCachedSplitCs[pi] = cs;
+            hudCachedSplitStr[pi] = $"{(cs < 0 ? "-" : "+")}{(Mathf.Abs(cs) * 0.01f):F2}s";
+        }
+        return hudCachedSplitStr[pi];
+    }
+
     // 1P は全画面、2P は左右それぞれのビューにクリップして HUD・バナー・ビネットを描く
     void DrawHuds(float w, float h, bool countdown)
     {
@@ -59,7 +150,7 @@ public partial class RaceManager
         if (t < 0) return;
         int n = 3 - Mathf.FloorToInt(t);
         float frac = t - Mathf.Floor(t);
-        string text = n > 0 ? n.ToString() : "GO!";
+        string text = n >= 1 && n <= 3 ? CountdownStrings[n] : (n > 0 ? n.ToString() : CountdownStrings[0]);
         var st = St(sBig, (int)(150 * (1.3f - frac * 0.3f)));
         var c = n > 0 ? new Color(1f, 0.85f, 0.2f) : new Color(0.3f, 1f, 0.4f);
         c.a = 1f - frac * 0.3f;
@@ -111,7 +202,7 @@ public partial class RaceManager
             var def = GetItemDef(shown);
             Texture2D icon = def?.Icon;
             Color ic = def != null ? def.AccentColor : Color.white;
-            string label = def != null ? def.LocalizedName : shown.ToString();
+            string label = def != null ? def.LocalizedName : GetItemFallbackLabel(shown);
             if (shown == ItemType.Star) ic = Color.HSVToRGB(Mathf.Repeat(Time.time, 1f), 0.6f, 1f);
 
             if (icon != null)
@@ -130,10 +221,7 @@ public partial class RaceManager
             if (pl.RouletteTimer <= 0)
             {
                 var usePill = new Rect(slot.x + 15, slot.yMax - 20, slot.width - 30, 22);
-                string useLabel = pi == 1
-                    ? Loc.T("[R-CTRL] USE", "[R-CTRL] 使用")
-                    : Loc.T($"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] USE", $"[{InputSettings.KeyItem.ToString().ToUpperInvariant()}] 使用");
-                DrawPopPill(usePill, useLabel, new Color(1.0f, 0.78f, 0.12f));
+                DrawPopPill(usePill, GetItemUseLabel(pi), new Color(1.0f, 0.78f, 0.12f));
             }
         }
         else
@@ -178,7 +266,7 @@ public partial class RaceManager
         Outlined(new Rect(tr.x + 10, tr.y + 6, tr.width - 22, 36), GetLapString(lap, totalLaps), St(sNum, compact ? 25 : 28, TextAnchor.MiddleRight), Color.white, 2);
         Outlined(new Rect(tr.x + 10, tr.y + 40, tr.width - 22, 26), FormatTime(pl.Finished ? pl.FinishTime : raceTime), St(sMono, compact ? 22 : 24, TextAnchor.MiddleRight), new Color(1f, 0.95f, 0.4f), 2);
         if (pl == HumanKart(pi) && bestLap[pi] > 0)
-            Outlined(new Rect(tr.x + 10, tr.y + 66, tr.width - 22, 20), "BEST " + FormatTime(bestLap[pi]), St(sMono, compact ? 13 : 15, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
+            Outlined(new Rect(tr.x + 10, tr.y + 66, tr.width - 22, 20), GetBestLapLabel(pi, bestLap[pi]), St(sMono, compact ? 13 : 15, TextAnchor.MiddleRight), new Color(0.5f, 0.9f, 1f), 1.5f);
 
         // ──────────────── 後方確認 / 観戦バナー ────────────────
         if (isLookingBehind[pi])
@@ -188,7 +276,7 @@ public partial class RaceManager
         else if (Spectating && pi == 0)
         {
             var sk = Karts[spectateIndex];
-            Outlined(new Rect(0, 16, w, 32), Loc.T($"► SPECTATING: {sk.Name} ({Ordinal(sk.Place)}) ◄", $"► 観戦中: {sk.Name} ({Loc.PlaceText(sk.Place)}) ◄"), St(sMid, 24), new Color(1f, 0.85f, 0.2f), 2);
+            Outlined(new Rect(0, 16, w, 32), GetSpectatingBanner(sk.Name, sk.Place), St(sMid, 24), new Color(1f, 0.85f, 0.2f), 2);
             GUI.Label(new Rect(0, 48, w, 22), Loc.T("[A] / [D]  Switch Driver", "[A] / [D]  観戦ドライバー切替"), St(sSmall, 14, TextAnchor.MiddleCenter, FontStyle.Normal, false, new Color(0.7f, 0.85f, 1f)));
         }
 
@@ -198,14 +286,16 @@ public partial class RaceManager
             float pulse = Mathf.Repeat(Time.time * 6f, 1f);
             if (pulse < 0.65f)
             {
-                var warnRect = new Rect(w / 2 - 160, h * 0.72f, 320, 42);
+                var warnRect = new Rect(w / 2 - 160, h * (compact ? 0.66f : 0.72f), 320, 42);
                 GUI.color = new Color(0.9f, 0.1f, 0.1f, 0.85f);
                 GUI.DrawTexture(warnRect, Texture2D.whiteTexture);
                 GUI.color = Color.white;
                 DrawFrame(warnRect, 3, Color.yellow);
-                Outlined(warnRect, Loc.T($"! DANGER: MISSILE {Mathf.RoundToInt(mDist)}m !", $"！ ミサイル接近 {Mathf.RoundToInt(mDist)}m ！"), St(sMid, 22, TextAnchor.MiddleCenter), Color.yellow, 3);
+                Outlined(warnRect, GetMissileWarnLabel(pi, mDist), St(sMid, 22, TextAnchor.MiddleCenter), Color.yellow, 3);
             }
         }
+
+        if (RaceRunning) DrawBattleLog(w, compact);
 
         // ──────────────── 順位表示（スラントバッジプレート） ────────────────
         if (IsTimeAttack)
@@ -213,9 +303,19 @@ public partial class RaceManager
             var pr = compact ? new Rect(w - 195, h - 90, 180, 75) : new Rect(w - 240, h - 110, 225, 95);
             if (rankPlateTex != null) GUI.DrawTexture(pr, rankPlateTex);
             Outlined(new Rect(pr.x, pr.y + 10, pr.width, 30), Loc.T("TIME ATTACK", "タイムアタック"), St(sSmall, compact ? 16 : 20, TextAnchor.MiddleCenter), new Color(0.3f, 0.9f, 1f), 2);
-            float bestC = GetBestTime(SelectedCourse);
-            string splitStr = bestC > 0 ? (raceTime < bestC ? $"-{FormatTime(bestC - raceTime)}" : $"+{FormatTime(raceTime - bestC)}") : Loc.T("RECORD RUN", "記録挑戦中");
-            Color splitCol = bestC > 0 && raceTime < bestC ? new Color(0.2f, 1f, 0.4f) : new Color(1f, 0.85f, 0.2f);
+            string splitStr;
+            Color splitCol;
+            float curTime = pl.Finished ? pl.FinishTime : raceTime;
+            if (ghostReplay != null && ghostReplay.TryGetSplitDelta(pl.RaceDistance, curTime, out float delta))
+            {
+                splitStr = GetTimeAttackSplitLabel(pi, delta);
+                splitCol = delta < 0f ? new Color(0.2f, 1f, 0.4f) : new Color(1f, 0.35f, 0.3f);
+            }
+            else
+            {
+                splitStr = Loc.T("RECORD RUN", "記録挑戦中");
+                splitCol = new Color(1f, 0.85f, 0.2f);
+            }
             Outlined(new Rect(pr.x, pr.y + 42, pr.width, 28), splitStr, St(sMono, compact ? 18 : 22, TextAnchor.MiddleCenter), splitCol, 2);
         }
         else
@@ -258,7 +358,7 @@ public partial class RaceManager
 
         // 16セグメント LED タコメーターバー
         var barArea = new Rect(sr.x + 18, sr.yMax - 18, sr.width - 36, 10);
-        float speedRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+        float speedRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / pl.EffectiveMaxSpeed);
         int segCount = 16;
         float segGap = 2f;
         float segW = (barArea.width - segGap * (segCount - 1)) / segCount;
@@ -329,7 +429,7 @@ public partial class RaceManager
     void DrawVignette(Kart pl, float w, float h)
     {
         if (vignetteTex == null) return;
-        float speed01 = pl != null ? Mathf.Clamp01(pl.Speed / Kart.MaxSpeed) : 0f;
+        float speed01 = pl != null ? Mathf.Clamp01(pl.Speed / pl.EffectiveMaxSpeed) : 0f;
         bool boost = pl != null && (pl.Boosting || pl.Slipstreaming);
         float boostBonus = boost ? 0.35f : (pl != null && pl.InDraftStream ? 0.15f : 0f);
         float alpha = Mathf.Clamp01(0.18f + speed01 * 0.25f + boostBonus);
@@ -350,7 +450,7 @@ public partial class RaceManager
     {
         var vk = ViewKart;
         if (vk == null) return;
-        float speedRatio = Mathf.Clamp01(vk.Speed / Kart.MaxSpeed);
+        float speedRatio = Mathf.Clamp01(vk.Speed / vk.EffectiveMaxSpeed);
         bool boost = vk.Boosting || vk.Slipstreaming;
         if (speedRatio < 0.38f && !boost) return;
 
@@ -515,5 +615,40 @@ public partial class RaceManager
         GUI.matrix = baseMatrix * Matrix4x4.TRS(new Vector3(a.x, a.y, 0f), Quaternion.Euler(0, 0, ang), Vector3.one);
         GUI.DrawTexture(new Rect(0, -thickness * 0.5f, len, thickness), tex);
         GUI.color = prev;
+    }
+
+    void DrawBattleLog(float w, bool compact)
+    {
+        if (battleLog.Count == 0) return;
+        float logW = compact ? 232f : 270f;
+        float rowH = compact ? 22f : 24f;
+        float gap = 4f;
+        float startX = w - logW - (compact ? 16f : 20f);
+        float startY = compact ? 120f : 126f;
+
+        var st = St(sSmall, compact ? 11 : 12, TextAnchor.MiddleRight, FontStyle.Bold);
+        for (int i = 0; i < battleLog.Count; i++)
+        {
+            var entry = battleLog[i];
+            float rem = entry.ExpireAt - Time.time;
+            if (rem <= 0f) continue;
+            float alpha = Mathf.Clamp01(rem / 0.6f);
+            float age = BattleLogDuration - rem;
+            float slideX = (1f - Mathf.Clamp01(age / 0.15f)) * 16f;
+
+            var r = new Rect(startX + slideX, startY + i * (rowH + gap), logW, rowH);
+            GUI.color = new Color(0.05f, 0.08f, 0.16f, 0.78f * alpha);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+
+            var bar = new Rect(r.x, r.y, 4f, r.height);
+            var ac = entry.Accent;
+            ac.a = alpha;
+            GUI.color = ac;
+            GUI.DrawTexture(bar, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            var textCol = new Color(1f, 1f, 1f, alpha);
+            Outlined(new Rect(r.x + 8f, r.y, r.width - 16f, r.height), Loc.IsJa ? entry.Ja : entry.En, st, textCol, 1.5f);
+        }
     }
 }

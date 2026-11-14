@@ -1,34 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
-
-[System.Serializable]
-public struct KartCharacterDef
-{
-    public string name;
-    public string driver;
-    public string trait;
-    public Color color;
-    public int speed;     // 1〜8
-    public int accel;     // 1〜8
-    public int handling;  // 1〜8
-    public int weight;    // 1〜8
-}
-
-[System.Serializable]
-public struct KartMachineDef
-{
-    public string name;
-    public string code;
-    public string trait;
-    public Color color;
-    public int speed;     // 1〜8
-    public int accel;     // 1〜8
-    public int handling;  // 1〜8
-    public int weight;    // 1〜8
-}
 
 // レース全体の進行・順位・アイテム・カメラ・UI
 public partial class RaceManager : MonoBehaviour
@@ -131,9 +103,11 @@ public partial class RaceManager : MonoBehaviour
     string waitingPadAction = null;
     int waitingKeySkipFrame = -1;
     int waitingPadSkipFrame = -1;
-    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates, 11=Language, 12=Quit
+    int titleFocus = 1; // 0=Start, 1=Drv1, 2=Krt1, 3=Drv2, 4=Krt2, 5=Course, 6=Mode, 7=1P/2P, 8=Online, 9=Options, 10=Updates, 11=Language, 12=Quit, 13=Cup, 14=Records, 15=SpeedClass
     bool showQuitConfirm;
     int quitModalFocus = 1; // 0=Quit, 1=Cancel
+    bool showRecords;
+    int recordsFocus = 0;
     int pauseFocus = 0;
     int settingsFocus = 0;
     int settingsCol = 0; // 0=Keyboard, 1=Controller
@@ -147,11 +121,65 @@ public partial class RaceManager : MonoBehaviour
     readonly Dictionary<int, string> playerNames = new Dictionary<int, string>();
     AppUpdater updater;
 
+    // ゲームモード（シングル / カップ戦 / タイムアタック）& スピードクラス
+    public enum GameMode { SingleRace = 0, Cup = 1, TimeAttack = 2 }
+    public GameMode CurrentMode { get; private set; } = GameMode.SingleRace;
+    public bool IsTimeAttack
+    {
+        get => CurrentMode == GameMode.TimeAttack;
+        private set => CurrentMode = value ? GameMode.TimeAttack : (CurrentMode == GameMode.TimeAttack ? GameMode.SingleRace : CurrentMode);
+    }
+    public bool IsCupMode => CurrentMode == GameMode.Cup;
+
+    public SpeedClass CurrentSpeedClass { get; private set; } = SpeedClass.Cc100;
+    public SpeedClass EffectiveSpeedClass => (Online || IsTimeAttack) ? SpeedClass.Cc100 : CurrentSpeedClass;
+    public float SpeedClassMultiplier => GetSpeedMultiplier(EffectiveSpeedClass);
+
+    bool cupActive;
+    int cupIndex = 0;
+    int cupStage = 0;
+    readonly int[] cupPoints = new int[8];
+    bool cupPointsAwarded;
+    bool cupNewTrophy;
+    int cupFinalRank;
+
     // タイムアタック & ゴーストカー
-    public bool IsTimeAttack { get; private set; }
     GhostReplay ghostReplay;
     readonly List<GhostFrame> currentRunGhost = new List<GhostFrame>();
     float nextGhostSampleTime;
+
+    public void CycleGameMode(int delta = 1)
+    {
+        int next = ((int)CurrentMode + delta + 3) % 3;
+        if (TwoPlayer && (GameMode)next == GameMode.TimeAttack)
+            next = (next + (delta >= 0 ? 1 : -1) + 3) % 3;
+        CurrentMode = (GameMode)next;
+        if (CurrentMode == GameMode.TimeAttack && TwoPlayer) SetTwoPlayer(false);
+        if (CurrentMode == GameMode.Cup)
+        {
+            int firstCourse = DefaultCups[cupIndex].courses[0];
+            if (SelectedCourse != firstCourse) LoadCourse(firstCourse);
+        }
+        if ((titleFocus == 13 && !IsCupMode) || (titleFocus == 15 && IsTimeAttack))
+            titleFocus = 6;
+        if (Audio != null) Audio.Select();
+    }
+
+    public void SwitchCup(int delta)
+    {
+        cupIndex = (cupIndex + delta + DefaultCups.Length) % DefaultCups.Length;
+        LoadCourse(DefaultCups[cupIndex].courses[0]);
+        if (Audio != null) Audio.Tick();
+    }
+
+    public void CycleSpeedClass(int delta = 1)
+    {
+        int next = ((int)CurrentSpeedClass + delta + 3) % 3;
+        CurrentSpeedClass = (SpeedClass)next;
+        PlayerPrefs.SetInt("tc_cc", (int)CurrentSpeedClass);
+        PlayerPrefs.Save();
+        if (Audio != null) Audio.Select();
+    }
 
     // 入力欄が空でも表示・送信には必ず有効な名前を使う
     string DisplayName => string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim();
@@ -222,6 +250,16 @@ public partial class RaceManager : MonoBehaviour
     public static float GetBestLap(int course) => PlayerPrefs.GetFloat($"tc_rec_lap_{course}", 0f);
     public static void SetBestTime(int course, float t) { PlayerPrefs.SetFloat($"tc_rec_time_{course}", t); PlayerPrefs.Save(); }
     public static void SetBestLap(int course, float t) { PlayerPrefs.SetFloat($"tc_rec_lap_{course}", t); PlayerPrefs.Save(); }
+    public static int GetCupBestRank(string cupId) => PlayerPrefs.GetInt($"tc_cup_best_{cupId}", 0);
+    public static void SetCupBestRank(string cupId, int rank)
+    {
+        int prev = GetCupBestRank(cupId);
+        if (rank > 0 && (prev <= 0 || rank < prev))
+        {
+            PlayerPrefs.SetInt($"tc_cup_best_{cupId}", rank);
+            PlayerPrefs.Save();
+        }
+    }
 
     bool netMenu;
     string joinCodeInput = "", ipInput = "127.0.0.1";
@@ -251,164 +289,6 @@ public partial class RaceManager : MonoBehaviour
     Texture2D rankPlateTex, rankPlateGold, rankPlateSilver, rankPlateBronze;
     Texture2D circleDotTex, speedoPlateTex;
     System.Func<Vector3, Vector2> toMap;
-
-    // ───────────────────────── 全10種類のドライバー（キャラクター）定義 ─────────────────────────
-    public static readonly KartCharacterDef[] DefaultKartCharacters =
-    {
-        new KartCharacterDef {
-            name = "OOBI", driver = "Alien Ace", trait = "Balanced / All-Rounder", color = new Color(0.95f, 0.25f, 0.25f),
-            speed = 5, accel = 5, handling = 5, weight = 5
-        },
-        new KartCharacterDef {
-            name = "OODI", driver = "Pink Dash", trait = "High Drift & Turbo Boost", color = new Color(0.98f, 0.38f, 0.78f),
-            speed = 4, accel = 7, handling = 6, weight = 3
-        },
-        new KartCharacterDef {
-            name = "OOLI", driver = "Aero Sonic", trait = "Maximum Top Speed", color = new Color(0.18f, 0.65f, 1.0f),
-            speed = 7, accel = 4, handling = 4, weight = 6
-        },
-        new KartCharacterDef {
-            name = "OOPI", driver = "Racer Swift", trait = "Sharp Handling & Turn", color = new Color(1.0f, 0.62f, 0.12f),
-            speed = 4, accel = 6, handling = 7, weight = 3
-        },
-        new KartCharacterDef {
-            name = "OOZI", driver = "Cool Titan", trait = "Heavy Weight & High Grip", color = new Color(0.22f, 0.88f, 0.38f),
-            speed = 6, accel = 3, handling = 4, weight = 7
-        },
-        new KartCharacterDef {
-            name = "PANDA", driver = "Bamboo Boss", trait = "Heavyweight Brawler", color = new Color(0.18f, 0.80f, 0.62f),
-            speed = 6, accel = 4, handling = 4, weight = 7
-        },
-        new KartCharacterDef {
-            name = "PENGUIN", driver = "Ice Slider", trait = "Smooth Ice Drifter", color = new Color(0.22f, 0.78f, 0.98f),
-            speed = 4, accel = 6, handling = 7, weight = 4
-        },
-        new KartCharacterDef {
-            name = "FOX", driver = "Nitro Kitsune", trait = "Agile Speedster", color = new Color(1.0f, 0.48f, 0.14f),
-            speed = 6, accel = 6, handling = 6, weight = 3
-        },
-        new KartCharacterDef {
-            name = "BUNNY", driver = "Hopper Star", trait = "Featherweight Dash", color = new Color(0.74f, 0.42f, 0.98f),
-            speed = 3, accel = 7, handling = 7, weight = 3
-        },
-        new KartCharacterDef {
-            name = "LION", driver = "Golden King", trait = "Royal Top Speed", color = new Color(1.0f, 0.76f, 0.12f),
-            speed = 7, accel = 4, handling = 4, weight = 7
-        },
-    };
-
-    // ───────────────────────── 全8種類のカートマシン（車体）定義 ─────────────────────────
-    public static readonly KartMachineDef[] DefaultKartMachines =
-    {
-        new KartMachineDef {
-            name = "STANDARD", code = "STD-01", trait = "Balanced All-Rounder", color = new Color(0.95f, 0.25f, 0.25f),
-            speed = 5, accel = 5, handling = 5, weight = 5
-        },
-        new KartMachineDef {
-            name = "PIPE BUGGY", code = "BUG-02", trait = "Light & Quick Accel", color = new Color(1.0f, 0.55f, 0.12f),
-            speed = 4, accel = 7, handling = 6, weight = 3
-        },
-        new KartMachineDef {
-            name = "MACH FORMULA", code = "GP-03", trait = "High-Speed Aero Wing", color = new Color(0.15f, 0.55f, 1.0f),
-            speed = 7, accel = 4, handling = 5, weight = 5
-        },
-        new KartMachineDef {
-            name = "MONSTER", code = "MON-04", trait = "Heavy Off-Road Tire", color = new Color(0.20f, 0.82f, 0.35f),
-            speed = 6, accel = 3, handling = 3, weight = 7
-        },
-        new KartMachineDef {
-            name = "CYBER GT", code = "CYB-05", trait = "Neon Drift Machine", color = new Color(0.88f, 0.22f, 0.95f),
-            speed = 6, accel = 6, handling = 6, weight = 4
-        },
-        new KartMachineDef {
-            name = "ROADSTER", code = "RET-06", trait = "Classic Smooth Turn", color = new Color(0.96f, 0.76f, 0.18f),
-            speed = 5, accel = 6, handling = 7, weight = 4
-        },
-        new KartMachineDef {
-            name = "MUSCLE V8", code = "MUS-07", trait = "Supercharged Power", color = new Color(0.48f, 0.25f, 0.95f),
-            speed = 7, accel = 4, handling = 3, weight = 7
-        },
-        new KartMachineDef {
-            name = "JET POD", code = "JET-08", trait = "Twin-Turbine Rocket", color = new Color(0.12f, 0.85f, 0.95f),
-            speed = 7, accel = 6, handling = 4, weight = 4
-        },
-    };
-
-    static KartCharacterDef[] runtimeKartCharacters;
-    public static KartCharacterDef[] KartCharacters
-    {
-        get
-        {
-            if (runtimeKartCharacters == null)
-            {
-                var loaded = Resources.LoadAll<KartData>("Data/Karts");
-                if (loaded != null && loaded.Length >= DefaultKartCharacters.Length)
-                {
-                    System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
-                    runtimeKartCharacters = loaded.Select(k => k.ToDef()).ToArray();
-                }
-                else
-                {
-                    runtimeKartCharacters = DefaultKartCharacters;
-                }
-            }
-            return runtimeKartCharacters;
-        }
-    }
-
-    static KartMachineDef[] runtimeKartMachines;
-    public static KartMachineDef[] KartMachines
-    {
-        get
-        {
-            if (runtimeKartMachines == null)
-            {
-                var loaded = Resources.LoadAll<KartMachineData>("Data/Machines");
-                if (loaded != null && loaded.Length >= DefaultKartMachines.Length)
-                {
-                    System.Array.Sort(loaded, (a, b) => string.CompareOrdinal(a.name, b.name));
-                    runtimeKartMachines = loaded.Select(m => m.ToDef()).ToArray();
-                }
-                else
-                {
-                    runtimeKartMachines = DefaultKartMachines;
-                }
-            }
-            return runtimeKartMachines;
-        }
-    }
-
-    public static void GetCombinedStats(int driverIdx, int kartIdx, out int speed, out int accel, out int handling, out int weight)
-    {
-        var d = KartCharacters[Mathf.Clamp(driverIdx, 0, KartCharacters.Length - 1)];
-        var m = KartMachines[Mathf.Clamp(kartIdx, 0, KartMachines.Length - 1)];
-        speed    = Mathf.Clamp(d.speed + m.speed - 5, 1, 8);
-        accel    = Mathf.Clamp(d.accel + m.accel - 5, 1, 8);
-        handling = Mathf.Clamp(d.handling + m.handling - 5, 1, 8);
-        weight   = Mathf.Clamp(d.weight + m.weight - 5, 1, 8);
-    }
-
-    public static int PackDriverKart(int driverIdx, int kartIdx)
-    {
-        int d = Mathf.Clamp(driverIdx, 0, 15) & 0x0F;
-        int k = Mathf.Clamp(kartIdx, 0, 15) & 0x0F;
-        return d | (k << 4);
-    }
-
-    public static void UnpackDriverKart(int packed, out int driverIdx, out int kartIdx)
-    {
-        driverIdx = Mathf.Clamp(packed & 0x0F, 0, KartCharacters.Length - 1);
-        kartIdx = Mathf.Clamp((packed >> 4) & 0x0F, 0, KartMachines.Length - 1);
-    }
-
-    float stickNavTimer = 0f;
-
-    static readonly string[] AiNames = { "Blaze", "Nova", "Rex", "Kiki", "Bolt", "Mochi", "Taro" };
-    static readonly Color[] AiColors =
-    {
-        new Color(0.15f, 0.4f, 1f), new Color(0.15f, 0.8f, 0.25f), new Color(1f, 0.85f, 0.1f), new Color(0.6f, 0.25f, 0.95f),
-        new Color(1f, 0.5f, 0.05f), new Color(1f, 0.45f, 0.75f), new Color(0.1f, 0.85f, 0.9f),
-    };
 
     void Awake()
     {
@@ -457,6 +337,7 @@ public partial class RaceManager : MonoBehaviour
 
         SetupPostProcessing();
         playerName = PlayerPrefs.GetString("tc_player_name", "Player");
+        CurrentSpeedClass = (SpeedClass)Mathf.Clamp(PlayerPrefs.GetInt("tc_cc", (int)SpeedClass.Cc100), 0, 2);
         if (PlayerPrefs.HasKey("tc_res_w") && PlayerPrefs.HasKey("tc_res_h"))
         {
             int rw = PlayerPrefs.GetInt("tc_res_w");
@@ -555,6 +436,15 @@ public partial class RaceManager : MonoBehaviour
         {
             screenFlashTimer = 0.35f;
             Audio.Explode(1.2f);
+            if (userSlot >= 0 && userSlot < Karts.Count)
+            {
+                var tDef = GetItemDef(ItemType.Thunder);
+                string uName = ShortKartName(Karts[userSlot]);
+                AddBattleLog(
+                    $"{uName} -> ALL [{(tDef != null ? tDef.NameEn : "THUNDER")}]",
+                    $"{uName} → 全員 [{(tDef != null ? tDef.NameJp : "サンダー")}]",
+                    tDef != null ? tDef.AccentColor : Color.yellow);
+            }
             foreach (var k in Karts)
             {
                 if (k == null || !k.gameObject.activeSelf) continue;
@@ -579,421 +469,6 @@ public partial class RaceManager : MonoBehaviour
         if (TryStartVerifyCoroutine()) return;
         if (previewSpectatorsRequested) StartCoroutine(CaptureSpectatorPreviews());
         else if (autoShotRequested) StartCoroutine(AutoCaptureScreens());
-    }
-
-    System.Collections.IEnumerator CaptureSpectatorPreviews()
-    {
-        yield return new WaitForSeconds(0.6f);
-        state = State.Countdown; // UIオーバーレイを抑制
-        // スタジオ風カメラ配置
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.22f, 0.26f, 0.32f);
-
-        // プレビュー対象の親
-        var studio = new GameObject("StudioRoot");
-        studio.transform.position = new Vector3(0, 1000f, 0); // コースから離れた上空スタジオ
-        Vector3 center = studio.transform.position;
-
-        // スタジオ専用ライト
-        var studioKey = new GameObject("StudioKeyLight").AddComponent<Light>();
-        studioKey.type = LightType.Directional;
-        studioKey.transform.SetParent(studio.transform, false);
-        studioKey.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
-        studioKey.intensity = 1.35f;
-        studioKey.color = new Color(1f, 0.98f, 0.95f);
-
-        var studioFill = new GameObject("StudioFillLight").AddComponent<Light>();
-        studioFill.type = LightType.Directional;
-        studioFill.transform.SetParent(studio.transform, false);
-        studioFill.transform.rotation = Quaternion.Euler(-20f, 145f, 0f);
-        studioFill.intensity = 0.55f;
-        studioFill.color = new Color(0.75f, 0.88f, 1f);
-
-        // 床ディスク（スタジオの台座）
-        var stage = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        stage.transform.SetParent(studio.transform, false);
-        stage.transform.localPosition = new Vector3(0, -0.05f, 0);
-        stage.transform.localScale = new Vector3(4.5f, 0.05f, 4.5f);
-        var stageRend = stage.GetComponent<Renderer>();
-        stageRend.sharedMaterial = wallMaterial;
-
-        // 1. 人間サポーターキャラクター（6種類の帽子・応援スタイル）
-        var spectatorPalette = SpectatorPalette.Create(this, new List<Material>());
-        string[] hatNames = new[] { "cap", "visor", "knit", "bear_ears", "headphones", "sunglasses" };
-
-        for (int h = 0; h < 6; h++)
-        {
-            var fanObj = SpectatorFan.CreateFan(
-                studio.transform,
-                center,
-                Quaternion.identity,
-                new System.Random(h * 888 + 19),
-                this,
-                spectatorPalette
-            );
-
-            // 前面全身ショット
-            cam.transform.position = center + new Vector3(1.6f, 2.3f, 3.2f);
-            cam.transform.LookAt(center + new Vector3(0, 1.4f, 0));
-            yield return new WaitForSeconds(0.25f);
-            ScreenCapture.CaptureScreenshot($"preview_fan_{h}_{hatNames[h]}_front.png");
-            yield return new WaitForSeconds(0.15f);
-
-            // バストアップ・クローズアップ
-            cam.transform.position = center + new Vector3(0.5f, 1.9f, 2.0f);
-            cam.transform.LookAt(center + new Vector3(0, 1.6f, 0));
-            yield return new WaitForSeconds(0.2f);
-            ScreenCapture.CaptureScreenshot($"preview_fan_{h}_{hatNames[h]}_closeup.png");
-            yield return new WaitForSeconds(0.15f);
-
-            Destroy(fanObj);
-        }
-
-        // 2. 動物観客たち（全12種）
-        string animalTexPath = Application.dataPath + "/Resources/Animals/Textures/colormap.png";
-        var colormapTex = RaceManager.LoadTexture("Animals/Textures/colormap", animalTexPath);
-        var animalMat = new Material(wallMaterial);
-        if (colormapTex != null) animalMat.mainTexture = colormapTex;
-        animalMat.color = Color.white;
-        animalMat.SetColor("_BaseColor", Color.white);
-        animalMat.SetFloat("_Smoothness", 0.15f);
-
-        string[] animalNames = new[]
-        {
-            "bunny", "penguin", "polar", "deer", "fox", "lion", "cow", "cat", "dog", "crab", "chick", "parrot"
-        };
-
-        foreach (var name in animalNames)
-        {
-            var prefab = Resources.Load<GameObject>($"Animals/animal-{name}");
-            if (prefab == null) continue;
-
-            var animalGo = Instantiate(prefab, studio.transform);
-            animalGo.transform.position = center + Vector3.up * 0.1f;
-            animalGo.transform.rotation = Quaternion.Euler(0, 35f, 0); // 正面斜め向き
-            animalGo.transform.localScale = Vector3.one * 1.5f;
-
-            foreach (var r in animalGo.GetComponentsInChildren<Renderer>())
-            {
-                r.sharedMaterial = animalMat;
-            }
-
-            cam.transform.position = center + new Vector3(2.5f, 2.2f, 3.2f);
-            cam.transform.LookAt(center + new Vector3(0, 0.8f, 0));
-            yield return new WaitForSeconds(0.2f);
-            ScreenCapture.CaptureScreenshot($"preview_animal_{name}.png");
-            yield return new WaitForSeconds(0.15f);
-
-            Destroy(animalGo);
-        }
-
-        Destroy(studio);
-        yield return new WaitForSeconds(0.5f);
-        Application.Quit();
-    }
-
-    System.Collections.IEnumerator AutoCaptureScreens()
-    {
-        yield return new WaitForSeconds(0.8f);
-        ScreenCapture.CaptureScreenshot("shot_01_title.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // カスタムキャラ＆カート組み合わせのタイトル画面確認 (例: PANDA + MACH FORMULA)
-        SelectedDriver = 5;
-        SelectedKart = 2;
-        ConfigureHuman(0);
-        yield return new WaitForSeconds(0.5f);
-        ScreenCapture.CaptureScreenshot("shot_01b_title_custom.png");
-        yield return new WaitForSeconds(0.3f);
-
-        // 2P分割時のタイトル画面確認
-        SelectedDriver2 = 7; // FOX
-        SelectedKart2 = 4;   // CYBER GT
-        SetTwoPlayer(true);
-        yield return new WaitForSeconds(0.5f);
-        ScreenCapture.CaptureScreenshot("shot_01c_title_2p.png");
-        yield return new WaitForSeconds(0.3f);
-        SetTwoPlayer(false);
-
-        showSettings = true;
-        settingsTab = 0;
-        yield return new WaitForSeconds(0.4f);
-        ScreenCapture.CaptureScreenshot("shot_02_settings_general.png");
-        yield return new WaitForSeconds(0.4f);
-
-        settingsTab = 1;
-        yield return new WaitForSeconds(0.4f);
-        ScreenCapture.CaptureScreenshot("shot_03_settings_keys.png");
-        yield return new WaitForSeconds(0.4f);
-
-        settingsTab = 2;
-        yield return new WaitForSeconds(0.4f);
-        ScreenCapture.CaptureScreenshot("shot_03b_settings_updates.png");
-        yield return new WaitForSeconds(0.4f);
-        CloseSettings();
-        yield return new WaitForSeconds(0.4f);
-
-        if (updater != null) updater.SimulateUpdateAvailableForTesting();
-        yield return new WaitForSeconds(0.5f);
-        ScreenCapture.CaptureScreenshot("shot_03c_update_modal.png");
-        yield return new WaitForSeconds(0.4f);
-        if (updater != null) updater.ShowModal = false;
-        yield return new WaitForSeconds(0.4f);
-
-        StartRaceFromTitle();
-        yield return new WaitForSeconds(1.8f);
-        ScreenCapture.CaptureScreenshot("shot_04_countdown.png");
-
-        yield return new WaitForSeconds(2.8f);
-        if (Player != null) Player.SetPreviewSpeedAndBoost(29.5f, 1.5f, ItemType.Missile);
-        yield return new WaitForSeconds(0.10f);
-        ScreenCapture.CaptureScreenshot("shot_05_racing_1p.png");
-        yield return new WaitForSeconds(0.25f);
-
-        if (Player != null) Player.SetPreviewDrift(1, 1.15f, 27.8f, ItemType.Missile);
-        yield return new WaitForSeconds(0.10f);
-        ScreenCapture.CaptureScreenshot("shot_05b_drift_blue.png");
-        yield return new WaitForSeconds(0.25f);
-
-        if (Player != null) Player.SetPreviewDrift(-1, 2.85f, 28.5f, ItemType.Turbo);
-        yield return new WaitForSeconds(0.10f);
-        ScreenCapture.CaptureScreenshot("shot_05c_drift_purple.png");
-        yield return new WaitForSeconds(0.25f);
-
-        paused = true;
-        yield return new WaitForSeconds(0.4f);
-        ScreenCapture.CaptureScreenshot("shot_06_paused.png");
-        yield return new WaitForSeconds(0.4f);
-        paused = false;
-
-        // 7. リザルト画面
-        bestLap[0] = 24.18f;
-        foreach (var k in Karts) { k.Finished = true; k.Place = Karts.IndexOf(k) + 1; k.FinishTime = 72.5f + k.Place * 1.5f; }
-        placeOrder.Clear();
-        placeOrder.AddRange(Karts);
-        placeOrder.Sort(ComparePlaces);
-        state = State.Results;
-        finishAt = Time.time - 5f;
-        yield return new WaitForSeconds(0.6f);
-        ScreenCapture.CaptureScreenshot("shot_07_results.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 8. 2P レース中 HUD
-        SetTwoPlayer(true);
-        ResetRace();
-        state = State.Racing;
-        stateTime = 5f;
-        raceTime = 15.2f;
-        yield return new WaitForSeconds(0.6f);
-        if (Player != null) Player.SetPreviewSpeedAndBoost(27.2f, 0f, ItemType.Turbo);
-        if (Player2 != null) Player2.SetPreviewSpeedAndBoost(29.0f, 1.2f, ItemType.Banana);
-        ScreenCapture.CaptureScreenshot("shot_08_racing_2p.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 9. タイムアタック レース中 HUD
-        SetTwoPlayer(false);
-        IsTimeAttack = true;
-        ResetRace();
-        state = State.Racing;
-        stateTime = 5f;
-        raceTime = 28.6f;
-        yield return new WaitForSeconds(0.6f);
-        if (Player != null) Player.SetPreviewSpeedAndBoost(30.5f, 1.4f, ItemType.Turbo);
-        ScreenCapture.CaptureScreenshot("shot_09_racing_timeattack.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 10. オンライン待機画面 (LOBBY - ROOM CODE 付き 4人)
-        state = State.Title;
-        SetTwoPlayer(false);
-        IsTimeAttack = false;
-        Net.HostDirect();
-        Net.JoinCode = "WFHPQQ";
-        playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart); playerNames[5] = "HostPlayer";
-        playerKarts[0] = PackDriverKart(1, 1); playerNames[0] = "RivalOne";
-        playerKarts[1] = PackDriverKart(6, 3); playerNames[1] = "Speedy";
-        playerKarts[2] = PackDriverKart(8, 7); playerNames[2] = "KartMaster";
-        lobbySlots.Clear();
-        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
-        ApplyLobbyKarts();
-        yield return new WaitForSeconds(0.8f);
-        ScreenCapture.CaptureScreenshot("shot_10_lobby_4p.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 11. オンライン待機画面 (LOBBY - ROOM CODE 付き 8人満員)
-        playerKarts[3] = PackDriverKart(4, 5); playerNames[3] = "Racer4";
-        playerKarts[4] = PackDriverKart(9, 6); playerNames[4] = "Racer5";
-        playerKarts[6] = PackDriverKart(2, 2); playerNames[6] = "Racer6";
-        playerKarts[7] = PackDriverKart(7, 4); playerNames[7] = "Racer7";
-        lobbySlots.Clear();
-        foreach (var s in HumanSlots) if (playerKarts.ContainsKey(s)) lobbySlots.Add(s);
-        ApplyLobbyKarts();
-        yield return new WaitForSeconds(0.8f);
-        ScreenCapture.CaptureScreenshot("shot_11_lobby_8p.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 12. 北大キャンパス コース表示（タイトル画面）
-        Net.Disconnect();
-        state = State.Title;
-        LoadCourse(4);
-        yield return new WaitForSeconds(0.6f);
-        ScreenCapture.CaptureScreenshot("shot_12_campus_title.png");
-        yield return new WaitForSeconds(0.4f);
-
-        // 13. 北大キャンパス レース中（スタート直後・メインストリート）
-        StartRaceFromTitle();
-        state = State.Racing;
-        stateTime = 5f;
-        raceTime = 12.4f;
-        yield return new WaitForSeconds(0.8f);
-        if (Player != null) Player.SetPreviewSpeedAndBoost(26.5f, 0f, ItemType.Star);
-        ScreenCapture.CaptureScreenshot("shot_13_campus_race.png");
-        yield return new WaitForSeconds(0.3f);
-
-        void TeleportPlayer(int idx, float lat = 0f, float extraYaw = 0f)
-        {
-            if (track == null || track.Count == 0) return;
-            int i = Mathf.Clamp(idx, 0, track.Count - 1);
-            Player.transform.position = track.PointAt(i, lat) + Vector3.up * 0.4f;
-            Player.Index = i;
-            Player.Progress = track.Dist[i];
-            float heading = Mathf.Atan2(track.Dirs[i].x, track.Dirs[i].z) * Mathf.Rad2Deg + extraYaw;
-            Player.Heading = heading;
-            Player.Speed = 0f;
-            camYaws[0] = heading;
-            var r = Quaternion.Euler(0, heading, 0);
-            cam.transform.position = Player.transform.position + r * new Vector3(0, 2.7f, -6.8f);
-            cam.transform.LookAt(Player.transform.position + r * new Vector3(0, 1.1f, 3.2f));
-        }
-
-        // 14. 北大キャンパス 北13条イチョウ並木（黄金のトンネル＆落ち葉絨毯）
-        if (track != null && track.Count > 0)
-        {
-            TeleportPlayer((int)(0.29f * track.Count));
-            yield return new WaitForSeconds(0.6f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(25.5f, 0f);
-            ScreenCapture.CaptureScreenshot("shot_14_campus_ginkgo.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 15. 北大キャンパス 第2農場モデルバーン＆放牧ホルスタイン牛＆木柵
-            TeleportPlayer((int)(0.555f * track.Count));
-            yield return new WaitForSeconds(0.6f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(24.0f, 0f);
-            ScreenCapture.CaptureScreenshot("shot_15_campus_barn.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 16. 北大キャンパス ポプラ並木通り（直立ポプラ列柱）
-            TeleportPlayer((int)(0.82f * track.Count));
-            yield return new WaitForSeconds(0.6f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(28.5f, 1.2f);
-            ScreenCapture.CaptureScreenshot("shot_16_campus_poplar.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 17. 北大キャンパス 大野池＆総合博物館（睡蓮・木橋・自然石）
-            TeleportPlayer((int)(0.22f * track.Count));
-            yield return new WaitForSeconds(0.6f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(23.5f, 0f);
-            ScreenCapture.CaptureScreenshot("shot_17_campus_pond.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 18. 北大キャンパス クラーク博士胸像＆花壇＆中央ローン
-            TeleportPlayer((int)(0.106f * track.Count), 1.8f, -28f);
-            yield return new WaitForSeconds(0.6f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(22.0f, 0f);
-            ScreenCapture.CaptureScreenshot("shot_18_campus_clark.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 19. Course 0: TURBO CIRCUIT（スタイライズド大樹・白樺・花壇・サーキット）
-            LoadCourse(0);
-            yield return new WaitForSeconds(0.6f);
-            StartRaceFromTitle();
-            state = State.Racing;
-            stateTime = 5f;
-            raceTime = 10f;
-            yield return new WaitForSeconds(0.8f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(28.0f, 1.2f, ItemType.Turbo);
-            ScreenCapture.CaptureScreenshot("shot_19_circuit_race.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // スポンサー看板・オーバーヘッドゲートの検証撮影
-            TeleportPlayer(16, 1.2f, 22f);
-            if (Player != null) Player.Speed = 0f;
-            yield return new WaitForSeconds(0.4f);
-            ScreenCapture.CaptureScreenshot("shot_19b_sponsor_board.png");
-            yield return new WaitForSeconds(0.3f);
-
-            TeleportPlayer(track.Count * 33 / 100 - 9, 0f, 0f);
-            if (Player != null) Player.Speed = 0f;
-            yield return new WaitForSeconds(0.4f);
-            ScreenCapture.CaptureScreenshot("shot_19c_bridge_banner.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 20. Course 1: SUNSET DUNES（ヤシの木・砂漠枯れ木・砂漠自然岩）
-            LoadCourse(1);
-            yield return new WaitForSeconds(0.6f);
-            StartRaceFromTitle();
-            state = State.Racing;
-            stateTime = 5f;
-            raceTime = 10f;
-            yield return new WaitForSeconds(0.8f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(26.8f, 0f, ItemType.Banana);
-            ScreenCapture.CaptureScreenshot("shot_20_dunes_race.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 21. Course 2: FROST PEAK（スノーパイン針葉樹林・雪山・氷晶）
-            LoadCourse(2);
-            yield return new WaitForSeconds(0.6f);
-            StartRaceFromTitle();
-            state = State.Racing;
-            stateTime = 5f;
-            raceTime = 10f;
-            yield return new WaitForSeconds(0.8f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(27.5f, 0f, ItemType.Star);
-            ScreenCapture.CaptureScreenshot("shot_21_frost_race.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 22. Course 3: NEON METROPOLIS（ネオン街路灯・サイバーツリー・発光看板・摩天楼）
-            LoadCourse(3);
-            yield return new WaitForSeconds(0.6f);
-            StartRaceFromTitle();
-            state = State.Racing;
-            stateTime = 5f;
-            raceTime = 10f;
-            yield return new WaitForSeconds(0.8f);
-            if (Player != null) Player.SetPreviewSpeedAndBoost(30.2f, 1.5f, ItemType.Missile);
-            ScreenCapture.CaptureScreenshot("shot_22_neon_race.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 23. Course 5: SKYLINE OVERPASS タイトル画面（コースバッジ・情報）
-            LoadCourse(5);
-            state = State.Title;
-            yield return new WaitForSeconds(0.6f);
-            ScreenCapture.CaptureScreenshot("shot_23_overpass_title.png");
-            yield return new WaitForSeconds(0.3f);
-
-            // 24. Course 5: 下層アンダーパス走行（頭上15mを高架橋が横断する迫力の立体交差アングル）
-            StartRaceFromTitle();
-            state = State.Racing;
-            stateTime = 5f;
-            raceTime = 12f;
-            if (track != null && track.Count > 0)
-            {
-                TeleportPlayer((int)(0.365f * track.Count)); // アンダーパス交差直前
-                yield return new WaitForSeconds(0.6f);
-                if (Player != null) Player.SetPreviewSpeedAndBoost(28.5f, 0f, ItemType.Turbo);
-                ScreenCapture.CaptureScreenshot("shot_24_overpass_underpass.png");
-                yield return new WaitForSeconds(0.3f);
-
-                // 25. Course 5: 上層斜張橋走行（主塔・ステイケーブル・下界を見下ろす立体交差ピーク）
-                TeleportPlayer((int)(0.785f * track.Count)); // 高架橋交差直前
-                yield return new WaitForSeconds(0.6f);
-                if (Player != null) Player.SetPreviewSpeedAndBoost(31.0f, 1.4f, ItemType.Missile);
-                ScreenCapture.CaptureScreenshot("shot_25_overpass_bridge.png");
-                yield return new WaitForSeconds(0.3f);
-            }
-        }
-
-        yield return new WaitForSeconds(0.5f);
-        Application.Quit();
     }
 
     void ApplyKartStats()
@@ -1072,6 +547,8 @@ public partial class RaceManager : MonoBehaviour
     void ReturnToTitle()
     {
         paused = false;
+        cupActive = false;
+        cupPointsAwarded = false;
         Time.timeScale = 1f;
         AudioListener.pause = false;
         state = State.Title;
@@ -1082,25 +559,6 @@ public partial class RaceManager : MonoBehaviour
         ShowAllKarts();
         LoadCourse(SelectedCourse);
         if (Audio != null) Audio.RestartMusic(SelectedCourse);
-    }
-
-    void RemoveBananaById(int id)
-    {
-        for (int i = bananas.Count - 1; i >= 0; i--)
-            if (bananas[i] != null && bananas[i].NetId == id)
-            {
-                Destroy(bananas[i].gameObject);
-                bananas.RemoveAt(i);
-            }
-    }
-
-    void ExplodeBombById(int id)
-    {
-        for (int i = bombs.Count - 1; i >= 0; i--)
-            if (bombs[i] != null && bombs[i].NetId == id)
-            {
-                bombs[i].Explode();
-            }
     }
 
     public void LoadCourse(int index)
@@ -1205,6 +663,7 @@ public partial class RaceManager : MonoBehaviour
         missiles.Clear();
         foreach (var b in bombs) if (b) Destroy(b.gameObject);
         bombs.Clear();
+        battleLog.Clear();
 
         for (int i = 0; i < Karts.Count; i++)
         {
@@ -1235,79 +694,6 @@ public partial class RaceManager : MonoBehaviour
 
     // ───────────────────────── Loop ─────────────────────────
 
-    void PollMenuNav(out int moveX, out int moveY, out bool confirm, out bool cancel, out bool tabPrev, out bool tabNext)
-    {
-        InputSettings.Init();
-        GamepadHaptics.PollPads();
-        moveX = 0;
-        moveY = 0;
-
-        if (!((showSettings && settingsTab == 0) || (state == State.Title && netMenu && !LobbyActive && (Net == null || !Net.Busy))) && GUIUtility.keyboardControl != 0)
-        {
-            GUIUtility.keyboardControl = 0;
-        }
-        bool editingText = IsEditingTextField;
-        if (editingText && (GameInput.GetKeyDown(KeyCode.Return) || GameInput.GetKeyDown(KeyCode.KeypadEnter) || GameInput.GetKeyDown(KeyCode.Escape)))
-        {
-            GUIUtility.keyboardControl = 0;
-        }
-
-        Vector2 padVec = InputSettings.GetMenuPadVector();
-        if (!editingText && padVec == Vector2.zero)
-        {
-            float ax = GameInput.GetAxisRaw("Horizontal");
-            float ay = GameInput.GetAxisRaw("Vertical");
-            if (Mathf.Abs(ax) > 0.55f || Mathf.Abs(ay) > 0.55f)
-                padVec = new Vector2(ax, ay);
-        }
-
-        Vector2Int dir = new Vector2Int(
-            padVec.x > 0.45f ? 1 : padVec.x < -0.45f ? -1 : 0,
-            padVec.y > 0.45f ? 1 : padVec.y < -0.45f ? -1 : 0
-        );
-
-        if (dir == Vector2Int.zero)
-        {
-            lastNavDir = Vector2Int.zero;
-            navRepeatTimer = 0f;
-        }
-        else if (dir != lastNavDir)
-        {
-            moveX = dir.x;
-            moveY = dir.y;
-            lastNavDir = dir;
-            navRepeatTimer = 0.25f;
-        }
-        else
-        {
-            navRepeatTimer -= Time.unscaledDeltaTime;
-            if (navRepeatTimer <= 0f)
-            {
-                moveX = dir.x;
-                moveY = dir.y;
-                navRepeatTimer = 0.13f;
-            }
-        }
-
-        confirm = InputSettings.GetSinglePadDown(PadBind.A, 0) || InputSettings.GetSinglePadDown(PadBind.A, 1)
-               || (!editingText && (GameInput.GetKeyDown(KeyCode.Return) || GameInput.GetKeyDown(KeyCode.KeypadEnter)));
-        cancel = InputSettings.GetSinglePadDown(PadBind.B, 0) || InputSettings.GetSinglePadDown(PadBind.B, 1)
-              || GameInput.GetKeyDown(KeyCode.Escape);
-        tabPrev = InputSettings.GetSinglePadDown(PadBind.LB, 0) || InputSettings.GetSinglePadDown(PadBind.LB, 1);
-        tabNext = InputSettings.GetSinglePadDown(PadBind.RB, 0) || InputSettings.GetSinglePadDown(PadBind.RB, 1);
-    }
-
-    static readonly int[] TitleFocusOrder1P = { 1, 2, 7, 8, 0, 6, 5, 9, 10, 11, 12 };
-    static readonly int[] TitleFocusOrder2P = { 1, 2, 3, 4, 7, 8, 0, 6, 5, 9, 10, 11, 12 };
-
-    // メニュー操作の入力スナップショット（Update の先頭で1フレームに1回だけ取得する）
-    struct MenuNav
-    {
-        public int moveX, moveY;
-        public bool confirm, cancel, tabPrev, tabNext;
-        public bool padStart, padBack, padX, padY;
-    }
-
     void Update()
     {
         HandleCaptureRequests();
@@ -1324,6 +710,7 @@ public partial class RaceManager : MonoBehaviour
         if (showQuitConfirm) { UpdateQuitModalInput(nav); return; }
         if (updater != null && updater.ShowModal) { UpdateModalInput(nav); return; }
         if (showSettings) { UpdateSettingsInput(nav); return; }
+        if (showRecords) { UpdateRecordsInput(nav); return; }
         if (UpdateOverlayInput(nav)) return;
         if (paused) { UpdatePausedInput(nav); return; }
 
@@ -1348,458 +735,6 @@ public partial class RaceManager : MonoBehaviour
         UpdateEngineAudio(dt, canDrive);
     }
 
-    // -autoshot / -titleshot / F12 などのスクリーンショット要求とテスト用ブースト
-    void HandleCaptureRequests()
-    {
-        if (GameInput.GetKeyDown(KeyCode.F12))
-        {
-            ScreenCapture.CaptureScreenshot("screenshot_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png");
-        }
-        if (titleShotRequested && state == State.Title && stateTime > shotDelay && !screenshotTaken)
-        {
-            screenshotTaken = true;
-            string fname = string.IsNullOrEmpty(customShotName) ? "screenshot_title.png" : customShotName;
-            ScreenCapture.CaptureScreenshot(fname);
-            Invoke(nameof(QuitAfterScreenshot), 0.4f);
-        }
-        if (testBoostRequested && state == State.Racing && Player != null && !Player.Boosting)
-            Player.Boost(5f);
-
-        if (screenshotRequested && state == State.Racing && stateTime > shotDelay && !screenshotTaken)
-        {
-            screenshotTaken = true;
-            string fname = string.IsNullOrEmpty(customShotName) ? $"screenshot_course{SelectedCourse}.png" : customShotName;
-            ScreenCapture.CaptureScreenshot(fname);
-            Invoke(nameof(QuitAfterScreenshot), 0.4f);
-        }
-        if ((screenshotRequested || titleShotRequested) && (stateTime + raceTime) > 60f) Application.Quit();
-    }
-
-    // ゲーム終了確認モーダル表示・非表示
-    void ShowQuitModal()
-    {
-        showQuitConfirm = true;
-        quitModalFocus = 1; // 既定は「戻る (CANCEL)」
-        if (Audio != null) Audio.Select();
-    }
-
-    void CloseQuitModal()
-    {
-        showQuitConfirm = false;
-        if (Audio != null) Audio.Cancel();
-    }
-
-    // ゲーム終了確認モーダル表示中の入力
-    void UpdateQuitModalInput(in MenuNav nav)
-    {
-        if (nav.moveX != 0)
-        {
-            quitModalFocus = 1 - quitModalFocus;
-            if (Audio != null) Audio.Tick();
-        }
-        if (nav.cancel)
-        {
-            CloseQuitModal();
-            return;
-        }
-        if (nav.confirm)
-        {
-            if (quitModalFocus == 0)
-            {
-                Application.Quit();
-            }
-            else
-            {
-                CloseQuitModal();
-            }
-            return;
-        }
-    }
-
-    // アップデート確認モーダル表示中の入力
-    void UpdateModalInput(in MenuNav nav)
-    {
-        if (nav.moveX != 0 || nav.moveY != 0)
-        {
-            updateModalFocus = 1 - updateModalFocus;
-            if (Audio != null) Audio.Tick();
-        }
-        if (nav.cancel)
-        {
-            if (updater.State == AppUpdater.UpdateState.Downloading) updater.CancelDownload();
-            else updater.ShowModal = false;
-            if (Audio != null) Audio.Cancel();
-            return;
-        }
-        if (nav.confirm)
-        {
-            if (updater.State == AppUpdater.UpdateState.Downloading) { updater.CancelDownload(); if (Audio != null) Audio.Cancel(); return; }
-            else if (updateModalFocus == 1) { updater.ShowModal = false; if (Audio != null) Audio.Cancel(); return; }
-            else if (updater.State == AppUpdater.UpdateState.UpdateAvailable) updater.StartDownload();
-            else if (updater.State == AppUpdater.UpdateState.Downloaded) updater.ApplyUpdateAndRestart();
-            else if (updater.State == AppUpdater.UpdateState.UpToDate || updater.State == AppUpdater.UpdateState.Error) updater.CheckForUpdates(openModalIfNew: true);
-            if (Audio != null) Audio.Select();
-            return;
-        }
-        return;
-    }
-
-    // 設定画面（音量/画面/キーコンフィグ/アップデート）の入力
-    void UpdateSettingsInput(in MenuNav nav)
-    {
-        if (!string.IsNullOrEmpty(waitingPadAction))
-        {
-            if (Time.frameCount > waitingPadSkipFrame)
-            {
-                if (InputSettings.TryDetectPadBindDown(out var detectedPad, out bool cancelPad))
-                {
-                    InputSettings.SetPadBinding(waitingPadAction, detectedPad);
-                    waitingPadAction = null;
-                    if (Audio != null) Audio.Select();
-                }
-                else if (cancelPad)
-                {
-                    waitingPadAction = null;
-                    if (Audio != null) Audio.Cancel();
-                }
-            }
-            return;
-        }
-        if (!string.IsNullOrEmpty(waitingKeyAction))
-        {
-            if (InputSettings.GetSinglePadDown(PadBind.B, 0) || nav.padStart)
-            {
-                waitingKeyAction = null;
-                if (Audio != null) Audio.Cancel();
-            }
-            return;
-        }
-
-        if (nav.tabPrev || nav.tabNext)
-        {
-            settingsTab = (settingsTab + (nav.tabNext ? 1 : -1) + 3) % 3;
-            settingsFocus = 0;
-            GUIUtility.keyboardControl = 0;
-            if (Audio != null) Audio.Select();
-            return;
-        }
-        if (nav.cancel)
-        {
-            CloseSettings();
-            if (Audio != null) Audio.Cancel();
-            return;
-        }
-
-        if (settingsTab == 0)
-        {
-            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 7) % 7; GUIUtility.keyboardControl = 0; if (Audio != null) Audio.Tick(); }
-            if (settingsFocus == 0 && nav.moveX != 0) { Audio.SetMasterBgm(Mathf.Clamp01(RaceAudio.MasterBgmVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
-            else if (settingsFocus == 1 && nav.moveX != 0) { Audio.SetMasterSfx(Mathf.Clamp01(RaceAudio.MasterSfxVolume + nav.moveX * 0.05f)); if (Audio != null) Audio.Tick(); }
-            else if (settingsFocus == 2 && nav.moveX != 0) { InputSettings.StickDeadzone = Mathf.Clamp(InputSettings.StickDeadzone + nav.moveX * 0.02f, 0.05f, 0.35f); InputSettings.Save(); if (Audio != null) Audio.Tick(); }
-            else if (settingsFocus == 3 && (nav.confirm || nav.moveX != 0)) { Screen.fullScreen = !Screen.fullScreen; PlayerPrefs.SetInt("tc_fullscreen", Screen.fullScreen ? 1 : 0); if (Audio != null) Audio.Select(); }
-            else if (settingsFocus == 4 && (nav.confirm || nav.moveX != 0)) { CycleResolution(nav.moveX < 0 ? -1 : 1); }
-            else if (settingsFocus == 5 && (nav.confirm || nav.moveX != 0)) { ToggleLanguage(); }
-            else if (settingsFocus == 6 && nav.confirm) { CloseSettings(); if (Audio != null) Audio.Cancel(); }
-        }
-        else if (settingsTab == 1)
-        {
-            if (nav.moveY != 0)
-            {
-                settingsFocus = (settingsFocus - nav.moveY + 9) % 9;
-                if (settingsFocus == 2 || settingsFocus == 3) settingsCol = 0;
-                if (Audio != null) Audio.Tick();
-            }
-            if (nav.moveX != 0 && settingsFocus <= 6 && settingsFocus != 2 && settingsFocus != 3)
-            {
-                settingsCol = 1 - settingsCol;
-                if (Audio != null) Audio.Tick();
-            }
-            if (nav.confirm)
-            {
-                if (settingsFocus <= 6)
-                {
-                    string[] ids = { "accel", "brake", "left", "right", "drift", "item", "rear" };
-                    string actId = ids[settingsFocus];
-                    if (settingsCol == 0 || actId == "left" || actId == "right")
-                    {
-                        waitingKeyAction = actId;
-                        waitingPadAction = null;
-                        waitingKeySkipFrame = Time.frameCount;
-                    }
-                    else
-                    {
-                        waitingPadAction = actId;
-                        waitingKeyAction = null;
-                        waitingPadSkipFrame = Time.frameCount;
-                    }
-                    if (Audio != null) Audio.Select();
-                }
-                else if (settingsFocus == 7)
-                {
-                    InputSettings.ResetDefaults();
-                    waitingKeyAction = null;
-                    waitingPadAction = null;
-                    if (Audio != null) Audio.Select();
-                }
-                else if (settingsFocus == 8)
-                {
-                    CloseSettings();
-                    if (Audio != null) Audio.Cancel();
-                }
-            }
-        }
-        else if (settingsTab == 2)
-        {
-            if (nav.moveY != 0) { settingsFocus = (settingsFocus - nav.moveY + 4) % 4; if (Audio != null) Audio.Tick(); }
-            if (nav.confirm)
-            {
-                if (settingsFocus == 0)
-                {
-                    bool isChecking = updater != null && (updater.State == AppUpdater.UpdateState.Checking || updater.State == AppUpdater.UpdateState.Downloading);
-                    if (!isChecking && updater != null) updater.CheckForUpdates(openModalIfNew: true);
-                    if (Audio != null) Audio.Select();
-                }
-                else if (settingsFocus == 1)
-                {
-                    if (updater != null && (updater.State == AppUpdater.UpdateState.UpdateAvailable || updater.State == AppUpdater.UpdateState.Downloaded))
-                    {
-                        updater.ShowModal = true;
-                        updateModalFocus = 0;
-                    }
-                    else
-                    {
-                        Application.OpenURL(AppUpdater.ReleasesPageUrl);
-                    }
-                    if (Audio != null) Audio.Select();
-                }
-                else if (settingsFocus == 2)
-                {
-                    if (updater != null) updater.SimulateUpdateAvailableForTesting();
-                    if (Audio != null) Audio.Select();
-                }
-                else if (settingsFocus == 3)
-                {
-                    CloseSettings();
-                    if (Audio != null) Audio.Cancel();
-                }
-            }
-        }
-        return;
-    }
-
-    // オンラインメニュー・接続中キャンセル・ポーズ切替。入力を消費したら true
-    bool UpdateOverlayInput(in MenuNav nav)
-    {
-        if (state == State.Title && netMenu && !LobbyActive)
-        {
-            if (Net.Busy)
-            {
-                if (nav.cancel || nav.confirm) LeaveOnline();
-                return true;
-            }
-            if (nav.cancel)
-            {
-                netMenu = false;
-                GUIUtility.keyboardControl = 0;
-                if (Audio != null) Audio.Select();
-                return true;
-            }
-            if (nav.moveY != 0)
-            {
-                netFocus = (netFocus - nav.moveY + 5) % 5;
-                GUIUtility.keyboardControl = 0;
-                if (Audio != null) Audio.Tick();
-            }
-            if (nav.confirm)
-            {
-                if (netFocus == 0) Net.HostRelay();
-                else if (netFocus == 1) Net.JoinRelay(joinCodeInput);
-                else if (netFocus == 2) Net.HostDirect();
-                else if (netFocus == 3) Net.JoinDirect(ipInput);
-                else if (netFocus == 4) { netMenu = false; GUIUtility.keyboardControl = 0; }
-                if (Audio != null) Audio.Select();
-            }
-            return true;
-        }
-        else if (nav.cancel && Net.Busy && state == State.Title)
-        {
-            LeaveOnline();
-            return true;
-        }
-        else if ((GameInput.GetKeyDown(KeyCode.Escape) || nav.padStart) && (state == State.Countdown || state == State.Racing))
-        {
-            if (Online)
-            {
-                LeaveOnline();
-            }
-            else
-            {
-                paused = !paused;
-                if (paused) pauseFocus = 0;
-                Time.timeScale = paused ? 0f : 1f;
-                AudioListener.pause = paused;
-                if (paused) GamepadHaptics.StopAll();
-                if (Audio != null) Audio.Select();
-            }
-            return true;
-        }
-        return false;
-    }
-
-    // ポーズ中の入力
-    void UpdatePausedInput(in MenuNav nav)
-    {
-        if (nav.moveY != 0) { pauseFocus = (pauseFocus - nav.moveY + 5) % 5; if (Audio != null) Audio.Tick(); }
-        if (GameInput.GetKeyDown(KeyCode.O)) { showSettings = !showSettings; settingsFocus = 0; return; }
-        if (GameInput.GetKeyDown(KeyCode.Q) || nav.padBack) Application.Quit();
-        if (GameInput.GetKeyDown(KeyCode.R) || nav.padX) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); return; }
-        if (GameInput.GetKeyDown(KeyCode.T) || nav.padY) { ReturnToTitle(); return; }
-        if (InputSettings.GetSinglePadDown(PadBind.B, 0) || InputSettings.GetSinglePadDown(PadBind.B, 1))
-        {
-            paused = false;
-            Time.timeScale = 1f;
-            AudioListener.pause = false;
-            if (Audio != null) Audio.Select();
-            return;
-        }
-        if (nav.confirm)
-        {
-            if (pauseFocus == 0) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; if (Audio != null) Audio.Select(); }
-            else if (pauseFocus == 1) { paused = false; Time.timeScale = 1f; AudioListener.pause = false; StartCountdown(); }
-            else if (pauseFocus == 2) { showSettings = true; settingsFocus = 0; if (Audio != null) Audio.Select(); }
-            else if (pauseFocus == 3) { ReturnToTitle(); }
-            else if (pauseFocus == 4) { Application.Quit(); }
-        }
-        return;
-    }
-
-    // タイトル / ロビー画面の入力
-    void UpdateTitleInput(in MenuNav nav)
-    {
-        bool editTxt = IsEditingTextField;
-        if (LobbyActive)
-        {
-            if (nav.tabPrev || (!editTxt && GameInput.GetKeyDown(KeyCode.A))) SwitchCourse(-1);
-            else if (nav.tabNext || (!editTxt && GameInput.GetKeyDown(KeyCode.D))) SwitchCourse(1);
-            if (nav.moveY != 0) { lobbyFocus = (lobbyFocus - nav.moveY + 4) % 4; if (Audio != null) Audio.Tick(); }
-            if (nav.moveX != 0)
-            {
-                if (lobbyFocus == 0) SwitchDriver(0, nav.moveX);
-                else if (lobbyFocus == 1) SwitchKart(0, nav.moveX);
-                else { lobbyFocus = lobbyFocus == 2 ? 3 : 2; if (Audio != null) Audio.Tick(); }
-            }
-            if (!editTxt && GameInput.GetKeyDown(KeyCode.W)) SwitchDriver(0, -1);
-            else if (!editTxt && GameInput.GetKeyDown(KeyCode.S)) SwitchDriver(0, 1);
-            else if (!editTxt && GameInput.GetKeyDown(KeyCode.Q)) SwitchKart(0, -1);
-            else if (!editTxt && GameInput.GetKeyDown(KeyCode.E)) SwitchKart(0, 1);
-
-            if (nav.padStart) StartRaceFromTitle();
-            else if (nav.confirm)
-            {
-                if (lobbyFocus == 3) LeaveOnline();
-                else if (lobbyFocus == 2 && !string.IsNullOrEmpty(Net.JoinCode) && !Net.IsHost)
-                {
-                    GUIUtility.systemCopyBuffer = Net.JoinCode;
-                    copyNotifyTimer = 2.0f;
-                    if (Audio != null) Audio.Select();
-                }
-                else if (Net.IsHost) StartRaceFromTitle();
-            }
-            return;
-        }
-
-        if (!editTxt && !Net.Busy && (GameInput.GetKeyDown(KeyCode.Escape) || nav.cancel || nav.padBack))
-            { ShowQuitModal(); return; }
-        if (!editTxt && GameInput.GetKeyDown(KeyCode.P) && !Net.Busy)
-            { showSettings = !showSettings; settingsFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (!editTxt && GameInput.GetKeyDown(KeyCode.L) && !Net.Busy)
-            { ToggleLanguage(); return; }
-        if (!editTxt && GameInput.GetKeyDown(KeyCode.U) && !Net.Busy)
-            { if (updater != null) { updater.ShowModal = !updater.ShowModal; updateModalFocus = 0; if (Audio != null) Audio.Select(); } return; }
-        if (((!editTxt && GameInput.GetKeyDown(KeyCode.O)) || nav.padX) && !Net.Busy)
-            { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); return; }
-        if (!editTxt && GameInput.GetKeyDown(KeyCode.M) && !Net.Busy && !TwoPlayer)
-        {
-            IsTimeAttack = !IsTimeAttack;
-            if (Audio != null) Audio.Select();
-            return;
-        }
-        if (((!editTxt && GameInput.GetKeyDown(KeyCode.Tab)) || nav.padY) && !Net.Busy)
-        {
-            if (IsTimeAttack) IsTimeAttack = false;
-            SetTwoPlayer(!TwoPlayer);
-            return;
-        }
-
-        // コントローラーのD-Pad / 左スティックによるタイトルメニュー選択移動
-        if (nav.moveY != 0)
-        {
-            var order = TwoPlayer ? TitleFocusOrder2P : TitleFocusOrder1P;
-            int curIdx = System.Array.IndexOf(order, titleFocus);
-            if (curIdx < 0) curIdx = 0;
-            int nextIdx = (curIdx - nav.moveY + order.Length) % order.Length;
-            titleFocus = order[nextIdx];
-            if (Audio != null) Audio.Tick();
-        }
-
-        if (nav.tabPrev || (!editTxt && GameInput.GetKeyDown(KeyCode.A)))
-            SwitchCourse(-1);
-        else if (nav.tabNext || (!editTxt && GameInput.GetKeyDown(KeyCode.D)))
-            SwitchCourse(1);
-        else if (nav.moveX != 0)
-        {
-            if (titleFocus == 1) SwitchDriver(0, nav.moveX);
-            else if (titleFocus == 2) SwitchKart(0, nav.moveX);
-            else if (titleFocus == 3 && TwoPlayer) SwitchDriver(1, nav.moveX);
-            else if (titleFocus == 4 && TwoPlayer) SwitchKart(1, nav.moveX);
-            else if (titleFocus == 5 || titleFocus == 0) SwitchCourse(nav.moveX);
-            else if (titleFocus == 6) { if (TwoPlayer) SetTwoPlayer(false); IsTimeAttack = !IsTimeAttack; if (Audio != null) Audio.Select(); }
-            else if (titleFocus == 7 || titleFocus == 8) { titleFocus = titleFocus == 7 ? 8 : 7; if (Audio != null) Audio.Tick(); }
-            else if (titleFocus == 9 || titleFocus == 10 || titleFocus == 11 || titleFocus == 12)
-            {
-                int[] topBar = { 11, 10, 9, 12 };
-                int ti = System.Array.IndexOf(topBar, titleFocus);
-                titleFocus = topBar[(ti + (nav.moveX > 0 ? 1 : topBar.Length - 1)) % topBar.Length];
-                if (Audio != null) Audio.Tick();
-            }
-        }
-        else if (!editTxt && GameInput.GetKeyDown(KeyCode.W))
-            SwitchDriver(0, -1);
-        else if (!editTxt && GameInput.GetKeyDown(KeyCode.S))
-            SwitchDriver(0, 1);
-        else if (!editTxt && GameInput.GetKeyDown(KeyCode.Q))
-            SwitchKart(0, -1);
-        else if (!editTxt && GameInput.GetKeyDown(KeyCode.E))
-            SwitchKart(0, 1);
-        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.UpArrow))
-            SwitchDriver(1, -1);
-        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.DownArrow))
-            SwitchDriver(1, 1);
-        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.LeftArrow))
-            SwitchKart(1, -1);
-        else if (!editTxt && TwoPlayer && GameInput.GetKeyDown(KeyCode.RightArrow))
-            SwitchKart(1, 1);
-
-        if (!titleShotRequested)
-        {
-            if (nav.padStart || (!editTxt && GameInput.GetKeyDown(KeyCode.Space)) || (screenshotRequested && stateTime > 0.6f) || (Demo && stateTime > 2.5f))
-            {
-                StartRaceFromTitle();
-            }
-            else if (nav.confirm)
-            {
-                if (titleFocus == 6) { if (TwoPlayer) SetTwoPlayer(false); IsTimeAttack = !IsTimeAttack; if (Audio != null) Audio.Select(); }
-                else if (titleFocus == 7) { if (IsTimeAttack) IsTimeAttack = false; SetTwoPlayer(!TwoPlayer); }
-                else if (titleFocus == 8 && !Net.Busy) { if (IsTimeAttack) IsTimeAttack = false; netMenu = true; netFocus = 0; if (Audio != null) Audio.Select(); }
-                else if (titleFocus == 9 && !Net.Busy) { showSettings = true; settingsFocus = 0; if (Audio != null) Audio.Select(); }
-                else if (titleFocus == 10 && !Net.Busy) { if (updater != null) { updater.ShowModal = true; updateModalFocus = 0; if (Audio != null) Audio.Select(); } }
-                else if (titleFocus == 11 && !Net.Busy) { ToggleLanguage(); }
-                else if (titleFocus == 12 && !Net.Busy) { ShowQuitModal(); }
-                else StartRaceFromTitle();
-            }
-        }
-    }
-
     void UpdateCountdown()
     {
         int beep = Mathf.FloorToInt(stateTime - 1f);
@@ -1822,6 +757,20 @@ public partial class RaceManager : MonoBehaviour
     void UpdateRacing(float dt)
     {
         raceTime += dt;
+        for (int i = battleLog.Count - 1; i >= 0; i--)
+        {
+            if (Time.time >= battleLog[i].ExpireAt) battleLog.RemoveAt(i);
+        }
+        if (Audio != null)
+        {
+            float minWarnDist = 999f;
+            if (Player != null && !Player.Finished && IsMissileApproaching(Player, out float d1))
+                minWarnDist = Mathf.Min(minWarnDist, d1);
+            if (TwoPlayer && Player2 != null && !Player2.Finished && IsMissileApproaching(Player2, out float d2))
+                minWarnDist = Mathf.Min(minWarnDist, d2);
+            if (minWarnDist < 45f)
+                Audio.MissileWarning(minWarnDist);
+        }
         if (stateTime > 2.5f && stateTime - dt <= 2.5f && track != null)
         {
             track.UpdateStartSignals(-1); // GO演出終了後に消灯
@@ -1831,7 +780,7 @@ public partial class RaceManager : MonoBehaviour
             ghostReplay.TickPlayback(raceTime);
             if (raceTime >= nextGhostSampleTime && Player != null && !Player.Finished)
             {
-                currentRunGhost.Add(new GhostFrame { t = raceTime, pos = Player.transform.position, heading = Player.Heading });
+                currentRunGhost.Add(new GhostFrame { t = raceTime, pos = Player.transform.position, heading = Player.Heading, dist = Player.RaceDistance });
                 nextGhostSampleTime = raceTime + 0.05f;
             }
         }
@@ -1847,6 +796,7 @@ public partial class RaceManager : MonoBehaviour
                 state = State.Results;
                 resultsFocus = 0;
                 finishAt = Time.time;
+                AwardCupPointsIfNeeded();
                 GamepadHaptics.StopAll();
                 if (Audio != null)
                 {
@@ -1860,6 +810,7 @@ public partial class RaceManager : MonoBehaviour
             state = State.Results;
             resultsFocus = 0;
             finishAt = Time.time;
+            AwardCupPointsIfNeeded();
             GamepadHaptics.StopAll();
             if (Audio != null)
             {
@@ -1883,7 +834,13 @@ public partial class RaceManager : MonoBehaviour
             }
             if (nav.confirm || (canRestart && nav.padStart))
             {
-                if (canRestart && (resultsFocus == 0 || nav.padStart)) StartRaceFromTitle();
+                if (canRestart && (resultsFocus == 0 || nav.padStart))
+                {
+                    if (cupActive && cupStage + 1 < DefaultCups[cupIndex].courses.Length)
+                        AdvanceCupStage();
+                    else
+                        StartRaceFromTitle();
+                }
                 else
                 {
                     if (Online) LeaveOnline();
@@ -1938,7 +895,8 @@ public partial class RaceManager : MonoBehaviour
             anyDrift = anyDrift || Player2.Drifting;
             maxDriftLv = Mathf.Max(maxDriftLv, Player2.DriftLevel);
         }
-        Audio.SetEngine(engSpeed / Kart.MaxSpeed, engThrottle, state != State.Title, anyDrift && canDrive, maxDriftLv);
+        float refMax = Player != null ? Player.EffectiveMaxSpeed : Kart.MaxSpeed;
+        Audio.SetEngine(engSpeed / refMax, engThrottle, state != State.Title, anyDrift && canDrive, maxDriftLv);
         shake = Mathf.MoveTowards(shake, 0, dt * 2.5f);
     }
 
@@ -1949,10 +907,74 @@ public partial class RaceManager : MonoBehaviour
         if (Online)
         {
             if (!Net.IsHost) return;
+            cupActive = false;
             Net.SendStart(SelectedCourse);
             StartCountdown(); // オンライン対戦時は同期ズレを防ぐため直接カウントダウンへ
             return;
         }
+        if (CurrentMode == GameMode.Cup)
+        {
+            cupActive = true;
+            cupStage = 0;
+            System.Array.Clear(cupPoints, 0, cupPoints.Length);
+            cupPointsAwarded = false;
+            cupNewTrophy = false;
+            cupFinalRank = 0;
+            int firstCourse = DefaultCups[cupIndex].courses[0];
+            if (SelectedCourse != firstCourse) LoadCourse(firstCourse);
+        }
+        else
+        {
+            cupActive = false;
+            cupPointsAwarded = false;
+        }
+        StartCourseIntro();
+    }
+
+    void AwardCupPointsIfNeeded()
+    {
+        if (!cupActive || cupPointsAwarded) return;
+        cupPointsAwarded = true;
+        for (int i = 0; i < Karts.Count && i < cupPoints.Length; i++)
+        {
+            cupPoints[i] += GetCupPointsForPlace(Karts[i].Place);
+        }
+        var cup = DefaultCups[cupIndex];
+        if (cupStage + 1 >= cup.courses.Length)
+        {
+            var indices = new List<int>(Karts.Count);
+            for (int i = 0; i < Karts.Count; i++)
+            {
+                if (Karts[i] != null && Karts[i].gameObject.activeSelf) indices.Add(i);
+            }
+            indices.Sort((a, b) =>
+            {
+                int cmp = cupPoints[b].CompareTo(cupPoints[a]);
+                return cmp != 0 ? cmp : Karts[a].Place.CompareTo(Karts[b].Place);
+            });
+            int r1 = indices.IndexOf(playerGridSlot) + 1;
+            int r2 = TwoPlayer ? indices.IndexOf(P2Slot) + 1 : 0;
+            cupFinalRank = (TwoPlayer && r2 > 0 && (r1 <= 0 || r2 < r1)) ? r2 : r1;
+            if (!Demo && cupFinalRank > 0)
+            {
+                int prev = GetCupBestRank(cup.id);
+                if (prev <= 0 || cupFinalRank < prev)
+                {
+                    cupNewTrophy = true;
+                    SetCupBestRank(cup.id, cupFinalRank);
+                }
+            }
+        }
+    }
+
+    void AdvanceCupStage()
+    {
+        if (!cupActive) return;
+        var cup = DefaultCups[cupIndex];
+        if (cupStage + 1 >= cup.courses.Length) return;
+        cupStage++;
+        cupPointsAwarded = false;
+        LoadCourse(cup.courses[cupStage]);
         StartCourseIntro();
     }
 
@@ -2044,7 +1066,7 @@ public partial class RaceManager : MonoBehaviour
                     }
                     if (k.PlayerIndex == 0 && IsTimeAttack && currentRunGhost.Count > 1)
                     {
-                        currentRunGhost.Add(new GhostFrame { t = k.FinishTime, pos = k.transform.position, heading = k.Heading });
+                        currentRunGhost.Add(new GhostFrame { t = k.FinishTime, pos = k.transform.position, heading = k.Heading, dist = k.RaceDistance });
                         var oldGhost = GhostReplay.LoadGhost(SelectedCourse);
                         if (oldGhost == null || oldGhost.frames == null || oldGhost.frames.Count < 2 || k.FinishTime < oldGhost.finishTime)
                         {
@@ -2059,6 +1081,7 @@ public partial class RaceManager : MonoBehaviour
                 state = State.Results;
                 resultsFocus = 0;
                 finishAt = Time.time;
+                AwardCupPointsIfNeeded();
                 GamepadHaptics.StopAll();
                 if (Audio != null)
                 {
@@ -2112,265 +1135,6 @@ public partial class RaceManager : MonoBehaviour
     }
 
     public void Shake(float s) => shake = Mathf.Max(shake, s);
-
-    void UpdatePlaces()
-    {
-        placeOrder.Sort((a, b) =>
-        {
-            bool ha = a.gameObject.activeSelf, hb = b.gameObject.activeSelf;
-            if (ha != hb) return ha ? -1 : 1; // 非表示（タイムアタック中のCPU）は最下位
-            return ComparePlaces(a, b);
-        });
-        for (int i = 0; i < placeOrder.Count; i++) placeOrder[i].Place = i + 1;
-    }
-
-    void KartCollisions()
-    {
-        for (int i = 0; i < Karts.Count; i++)
-        for (int j = i + 1; j < Karts.Count; j++)
-        {
-            var a = Karts[i]; var b = Karts[j];
-            if (!a.gameObject.activeSelf || !b.gameObject.activeSelf) continue;
-            if (Mathf.Abs(a.transform.position.y - b.transform.position.y) > 2.0f) continue;
-            var d = a.transform.position - b.transform.position;
-            d.y = 0;
-            float m = d.magnitude, min = Kart.Radius * 2f;
-            if (m >= min || m < 0.001f) continue;
-            var n = d / m;
-            // 重いカートほど押し返されにくい（ミニ化中は軽くなり弾かれやすい）
-            float massA = a.Mass * (a.Shocked ? 0.35f : 1.0f);
-            float massB = b.Mass * (b.Shocked ? 0.35f : 1.0f);
-            float wa = massB / (massA + massB), wb = 1f - wa;
-            a.transform.position += n * (min - m) * wa;
-            b.transform.position -= n * (min - m) * wb;
-
-            if (a.Shielded && !b.Shielded) { b.Spin(); continue; }
-            if (b.Shielded && !a.Shielded) { a.Spin(); continue; }
-            if (!a.Shocked && b.Shocked) { b.Spin(); continue; }
-            if (!b.Shocked && a.Shocked) { a.Spin(); continue; }
-
-            // 相対接近速度を計算し、擦れ続けではなく実際に衝突した瞬間のみ強さに応じたバンプ音を鳴らす
-            float relVel = Vector3.Dot(b.VelDir * b.Speed - a.VelDir * a.Speed, n);
-            // 押し合い：横方向に少し弾く
-            a.VelDir = (a.VelDir + n * 0.5f * wa).normalized;
-            b.VelDir = (b.VelDir - n * 0.5f * wb).normalized;
-            float damp = Mathf.Pow(0.985f, Time.deltaTime * 60f); // フレームレート非依存
-            a.Speed *= damp;
-            b.Speed *= damp;
-            if ((a.IsPlayer || b.IsPlayer) && relVel > 2.8f)
-                Audio.Bump(Mathf.Clamp01(relVel / 18f));
-        }
-    }
-
-    void CheckItemBoxes()
-    {
-        foreach (var box in boxes)
-        {
-            if (!box.Active) continue;
-            foreach (var k in Karts)
-            {
-                if (!k.gameObject.activeSelf) continue;
-                if (Mathf.Abs(k.transform.position.y - box.transform.position.y) > 2.2f) continue;
-                var d = k.transform.position - box.transform.position;
-                d.y = 0;
-                if (d.magnitude > 2.2f) continue;
-                box.Break();
-                if (k.IsRemote) break; // 相手側のカートのアイテムは相手が決める
-                if (k.GiveItem(RollItem(k)) && k.IsPlayer) Audio.Pickup();
-                break;
-            }
-        }
-    }
-
-    void CheckBananas()
-    {
-        for (int i = bananas.Count - 1; i >= 0; i--)
-        {
-            var b = bananas[i];
-            foreach (var k in Karts)
-            {
-                if (k.IsRemote || !k.gameObject.activeSelf) continue; // 当たり判定は持ち主側で行う
-                if (k == b.Owner && !b.Armed) continue;
-                if (Mathf.Abs(k.transform.position.y - b.transform.position.y) > 2.0f) continue;
-                var d = k.transform.position - b.transform.position;
-                d.y = 0;
-                if (d.magnitude > 1.5f) continue;
-                if (k.Shielded || k.Spin())
-                {
-                    Fx.Burst(b.transform.position, new Color(1f, 0.95f, 0.3f), 12, 5f, 0.4f);
-                    bananas.RemoveAt(i);
-                    if (Online) Net.SendBananaGone(b.NetId);
-                    Destroy(b.gameObject);
-                    break;
-                }
-            }
-        }
-    }
-
-    public bool IsMissileApproaching(Kart k, out float distance)
-    {
-        distance = 999f;
-        if (k == null || missiles.Count == 0) return false;
-        foreach (var m in missiles)
-        {
-            if (m != null && m.Target == k)
-            {
-                float d = Vector3.Distance(m.transform.position, k.transform.position);
-                if (d < 45f && d < distance)
-                {
-                    distance = d;
-                }
-            }
-        }
-        return distance < 45f;
-    }
-
-    ItemType RollItem(Kart k)
-    {
-        if (ItemDefs.Count == 0) return ItemType.Banana;
-        int activeCount = Karts.Count(x => x.gameObject.activeSelf);
-        float p = activeCount > 1 ? Mathf.Clamp01((k.Place - 1) / (float)(activeCount - 1)) : 0f;
-
-        float totalWeight = 0f;
-        for (int i = 0; i < ItemDefs.Count; i++)
-        {
-            totalWeight += ItemDefs[i].WeightFunc != null ? ItemDefs[i].WeightFunc(p) : 0.1f;
-        }
-
-        if (totalWeight <= 0f) return ItemType.Banana;
-
-        float r = Random.value * totalWeight;
-        for (int i = 0; i < ItemDefs.Count; i++)
-        {
-            float w = ItemDefs[i].WeightFunc != null ? ItemDefs[i].WeightFunc(p) : 0.1f;
-            if ((r -= w) < 0f) return ItemDefs[i].Type;
-        }
-
-        return ItemDefs[ItemDefs.Count - 1].Type;
-    }
-
-    public void UseThunder(Kart user)
-    {
-        thunderCooldown = 28f;
-        screenFlashTimer = 0.35f;
-        Audio.Explode(1.2f);
-
-        foreach (var k in Karts)
-        {
-            if (k == null || !k.gameObject.activeSelf || k == user) continue;
-            k.Shock(6.5f);
-        }
-
-        if (Online && user != null && !user.IsRemote)
-        {
-            Net.SendThunder(Karts.IndexOf(user));
-        }
-    }
-
-    public void SpawnBanana(Vector3 pos, Kart owner)
-    {
-        int ownerId = Karts.IndexOf(owner);
-        int id = ownerId * 100000 + (nextBananaId++ % 100000);
-        SpawnBananaInternal(id, pos, owner);
-        if (Online && !owner.IsRemote) Net.SendBanana(id, ownerId, pos);
-    }
-
-    void SpawnBananaInternal(int id, Vector3 pos, Kart owner)
-    {
-        var b = new GameObject("Banana").AddComponent<Banana>();
-        b.Init(pos, owner, bananaMaterial);
-        b.NetId = id;
-        bananas.Add(b);
-    }
-
-    public void SpawnMissile(Kart owner)
-    {
-        var target = Karts.FirstOrDefault(k => k.gameObject.activeSelf && k.Place == owner.Place - 1);
-        SpawnMissileInternal(owner, target);
-        if (Online && !owner.IsRemote) Net.SendMissile(Karts.IndexOf(owner), target == null ? -1 : Karts.IndexOf(target));
-    }
-
-    void SpawnMissileInternal(Kart owner, Kart target)
-    {
-        var m = new GameObject("Missile").AddComponent<Missile>();
-        m.Init(this, track, owner, target, missileMaterial);
-        missiles.Add(m);
-    }
-
-    public void RemoveMissile(Missile m) => missiles.Remove(m);
-
-    public void SpawnBomb(Vector3 pos, Vector3 vel, Kart owner)
-    {
-        int ownerId = Karts.IndexOf(owner);
-        int id = ownerId * 100000 + (nextBombId++ % 100000);
-        SpawnBombInternal(id, pos, vel, owner);
-        if (Online && !owner.IsRemote) Net.SendBomb(id, ownerId, pos, vel);
-    }
-
-    void SpawnBombInternal(int id, Vector3 pos, Vector3 vel, Kart owner)
-    {
-        var b = new GameObject("Bomb").AddComponent<Bomb>();
-        b.Init(this, track, owner, pos, vel, kartPaintMaterial);
-        b.NetId = id;
-        bombs.Add(b);
-    }
-
-    public void RemoveBomb(Bomb b) => bombs.Remove(b);
-
-    public void TriggerBombChain(Bomb source, Vector3 pos, float radius)
-    {
-        for (int i = bombs.Count - 1; i >= 0; i--)
-        {
-            var b = bombs[i];
-            if (b == null || b == source) continue;
-            if (Vector3.Distance(b.transform.position, pos) < radius)
-            {
-                b.Explode();
-            }
-        }
-    }
-
-    public bool MissileHitsBanana(Vector3 pos)
-    {
-        for (int i = 0; i < bananas.Count; i++)
-        {
-            if (bananas[i] == null) continue;
-            if ((bananas[i].transform.position + Vector3.up * 0.5f - pos).magnitude < 1.4f)
-            {
-                var b = bananas[i];
-                Fx.Burst(b.transform.position, new Color(1f, 0.95f, 0.3f), 12, 5f, 0.4f);
-                bananas.RemoveAt(i);
-                if (Online) Net.SendBananaGone(b.NetId);
-                Destroy(b.gameObject);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public bool KartBehindWithin(Kart k, float dist)
-    {
-        foreach (var o in Karts)
-        {
-            if (o == k || !o.gameObject.activeSelf) continue;
-            float d = k.RaceDistance - o.RaceDistance;
-            if (d > 0 && d < dist) return true;
-        }
-        return false;
-    }
-
-    public bool KartAheadWithin(Kart k, float dist)
-    {
-        foreach (var o in Karts)
-        {
-            if (o == k || !o.gameObject.activeSelf) continue;
-            float d = o.RaceDistance - k.RaceDistance;
-            if (d > 0 && d < dist) return true;
-        }
-        return false;
-    }
-
-    void QuitAfterScreenshot() => Application.Quit();
 
     void OnDestroy()
     {

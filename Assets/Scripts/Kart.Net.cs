@@ -169,7 +169,7 @@ public partial class Kart
         {
             if (!IsPlayer && rm != null && rm.RaceRunning)
             {
-                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
+                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / EffectiveMaxSpeed);
                 float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01);
                 engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
                 float targetVol = Mathf.Lerp(0.015f, 0.085f, spd01) * RaceAudio.MasterSfxVolume;

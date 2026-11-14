@@ -12,6 +12,7 @@ public struct KartInput
 public partial class Kart : MonoBehaviour
 {
     public const float MaxSpeed = 30f + (10f / 3.6f); // 基準最高速度: 108km/h + 10km/h = 約 118km/h (32.78m/s)
+    public float EffectiveMaxSpeed => MaxSpeed * (rm != null ? rm.SpeedClassMultiplier : 1f);
     public const float Radius = 1.15f;
 
     // キャラ性能（1〜8、5 が標準）。選択キャラのステータスを物理に反映する。
@@ -124,7 +125,9 @@ public partial class Kart : MonoBehaviour
             engine3D.dopplerLevel = 0.25f;
             engine3D.loop = true;
             engine3D.playOnAwake = false;
-            var clip = Resources.Load<AudioClip>("Audio/sfx_engine");
+            var clip = RaceAudio.Instance != null && RaceAudio.Instance.EngineClip != null
+                ? RaceAudio.Instance.EngineClip
+                : ResourceCache.Load<AudioClip>("Audio/sfx_engine");
             if (clip != null)
             {
                 engine3D.clip = clip;
@@ -366,7 +369,7 @@ public partial class Kart : MonoBehaviour
                 ReleaseDrift();
             }
 
-            float max = MaxSpeed * topSpeedMul * AISpeedFactor();
+            float max = EffectiveMaxSpeed * topSpeedMul * AISpeedFactor();
             if (starTimer > 0) max *= 1.15f;
             if (slipstreamTimer > 0) max *= 1.18f;
             if (shockTimer > 0) max *= 0.72f;
@@ -374,7 +377,7 @@ public partial class Kart : MonoBehaviour
             Offroad = track != null ? track.IsOffroad(currentRatio, Lateral) : (Mathf.Abs(Lateral) > Track.HalfWidth + Track.CurbWidth);
             if (Offroad && boostTimer <= 0 && starTimer <= 0 && slipstreamTimer <= 0) max *= 0.45f;
 
-            if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, Mathf.Max(max * 1.25f, MaxSpeed * 1.4f * topSpeedMul * AISpeedFactor()), 60f * dt);
+            if (boostTimer > 0) Speed = Mathf.MoveTowards(Speed, Mathf.Max(max * 1.25f, EffectiveMaxSpeed * 1.4f * topSpeedMul * AISpeedFactor()), 60f * dt);
             else if (slipstreamTimer > 0) Speed = Mathf.MoveTowards(Speed, max, 45f * dt);
             else if (Speed > max) Speed = Mathf.MoveTowards(Speed, max, 20f * dt);
             else if (inp.throttle > 0) Speed = Mathf.MoveTowards(Speed, max, 15f * accelMul * (1f - 0.55f * Speed / max) * dt);
@@ -398,7 +401,7 @@ public partial class Kart : MonoBehaviour
             }
             else
             {
-                turn = inp.steer * 95f * (1f - 0.3f * Mathf.Clamp01(Speed / MaxSpeed));
+                turn = inp.steer * 95f * (1f - 0.3f * Mathf.Clamp01(Speed / EffectiveMaxSpeed));
             }
             Heading += turn * turnMul * grip * dt;
         }
@@ -475,7 +478,7 @@ public partial class Kart : MonoBehaviour
                             Fx.Burst(transform.position - pushDir * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
                             if (IsPlayer)
                             {
-                                float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
+                                float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / EffectiveMaxSpeed));
                                 rm.Audio.Bump(bumpInt);
                                 rm.Shake(0.25f * bumpInt);
                                 if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
@@ -504,7 +507,7 @@ public partial class Kart : MonoBehaviour
                     Fx.Burst(transform.position + outward * 1f + Vector3.up * 0.5f, new Color(1f, 0.8f, 0.4f), 8, 5f, 0.3f);
                     if (IsPlayer)
                     {
-                        float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / MaxSpeed));
+                        float bumpInt = Mathf.Clamp01(impact * 1.25f * (Speed / EffectiveMaxSpeed));
                         rm.Audio.Bump(bumpInt);
                         rm.Shake(0.25f * bumpInt);
                         if (!Finished && !rm.Demo) GamepadHaptics.Vibrate(PlayerIndex, 0.65f * bumpInt, 0.22f, 0.18f);
@@ -681,7 +684,7 @@ public partial class Kart : MonoBehaviour
             if (engine3D == null) Setup3DEngineAudio();
             if (engine3D != null && engine3D.isPlaying)
             {
-                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / MaxSpeed);
+                float spd01 = Mathf.Clamp01(Mathf.Abs(Speed) / EffectiveMaxSpeed);
                 float throttle01 = Mathf.Max(0f, inp.throttle);
                 float targetPitch = Mathf.Lerp(0.78f, 1.25f, spd01 * 0.7f + throttle01 * 0.3f);
                 engine3D.pitch = Mathf.MoveTowards(engine3D.pitch, targetPitch, dt * 2.5f);
@@ -754,7 +757,7 @@ public partial class Kart : MonoBehaviour
         trickWindowTimer = 0.35f;
         trickDone = false;
         aiTrickDecided = false;
-        Speed = Mathf.Max(Speed, MaxSpeed * 1.15f);
+        Speed = Mathf.Max(Speed, EffectiveMaxSpeed * 1.15f);
         if (IsPlayer)
         {
             rm.Audio.Boost();

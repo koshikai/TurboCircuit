@@ -12,7 +12,7 @@ public partial class RaceManager
     void OnNetHostClientConnected(Unity.Networking.Transport.NetworkConnection conn)
     {
         if (TwoPlayer) SetTwoPlayer(false);
-        if (IsTimeAttack) IsTimeAttack = false;
+        if (CurrentMode != GameMode.SingleRace) { CurrentMode = GameMode.SingleRace; cupActive = false; }
         playerKarts[5] = PackDriverKart(SelectedDriver, SelectedKart);
         // 未割り当ての人間スロットを探す
         int nextSlot = HumanSlots.FirstOrDefault(s => !playerKarts.ContainsKey(s));
@@ -63,7 +63,7 @@ public partial class RaceManager
     void OnNetClientConnected()
     {
         if (TwoPlayer) SetTwoPlayer(false);
-        if (IsTimeAttack) IsTimeAttack = false;
+        if (CurrentMode != GameMode.SingleRace) { CurrentMode = GameMode.SingleRace; cupActive = false; }
         int packed = PackDriverKart(SelectedDriver, SelectedKart);
         if (Net.IsHost)
         {
@@ -81,7 +81,7 @@ public partial class RaceManager
     void OnNetWelcome(int assignedSlot, int course)
     {
         if (TwoPlayer) SetTwoPlayer(false);
-        if (IsTimeAttack) IsTimeAttack = false;
+        if (CurrentMode != GameMode.SingleRace) { CurrentMode = GameMode.SingleRace; cupActive = false; }
         mySlot = assignedSlot;
         Player = Karts[mySlot];
         Player.IsRemote = false;

@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// ゴースト走行データの1フレーム（時刻・座標・向き）
+// ゴースト走行データの1フレーム（時刻・座標・向き・走行距離）
 [Serializable]
 public struct GhostFrame
 {
     public float t;
     public Vector3 pos;
     public float heading;
+    public float dist;
 }
 
 // コース完走時のゴースト走行データ全体
@@ -61,12 +62,79 @@ public class GhostReplay : MonoBehaviour
         catch (Exception e) { Debug.LogWarning("[Ghost] save failed: " + e.Message); }
     }
 
+    public static void EnsureDistances(List<GhostFrame> frames, Track track)
+    {
+        if (frames == null || frames.Count < 2) return;
+        if (frames[frames.Count - 1].dist > 0.01f) return;
+        if (track == null || track.Count <= 0 || track.Length <= 0.01f) return;
+
+        float L = track.Length;
+        int idx = 0;
+        int lap = 0;
+        float prevProg = -1f;
+        float prevDist = float.NegativeInfinity;
+        for (int i = 0; i < frames.Count; i++)
+        {
+            var f = frames[i];
+            track.Locate(f.pos, ref idx, out _, out float prog);
+            if (prevProg >= 0f && prevProg > L * 0.75f && prog < L * 0.25f)
+                lap++;
+            float d = lap * L + prog;
+            if (d < prevDist) d = prevDist;
+            f.dist = d;
+            frames[i] = f;
+            prevProg = prog;
+            prevDist = d;
+        }
+    }
+
+    public static bool TryEvaluateSplitDelta(IReadOnlyList<GhostFrame> frames, float currentDistance, float currentTime, out float delta)
+    {
+        delta = 0f;
+        if (frames == null || frames.Count < 2) return false;
+        if (currentDistance <= frames[0].dist)
+        {
+            delta = currentTime - frames[0].t;
+            return true;
+        }
+        int last = frames.Count - 1;
+        if (currentDistance >= frames[last].dist)
+        {
+            delta = currentTime - frames[last].t;
+            return true;
+        }
+
+        int lo = 0, hi = last;
+        while (lo + 1 < hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (frames[mid].dist <= currentDistance) lo = mid;
+            else hi = mid;
+        }
+        float span = frames[hi].dist - frames[lo].dist;
+        float u = span > 0.0001f ? Mathf.Clamp01((currentDistance - frames[lo].dist) / span) : 0f;
+        float refTime = Mathf.Lerp(frames[lo].t, frames[hi].t, u);
+        delta = currentTime - refTime;
+        return true;
+    }
+
+    public bool TryGetSplitDelta(float currentDistance, float currentTime, out float delta)
+    {
+        if (!HasGhost)
+        {
+            delta = 0f;
+            return false;
+        }
+        return TryEvaluateSplitDelta(playbackData.frames, currentDistance, currentTime, out delta);
+    }
+
     // タイムアタック開始時にゴーストカーを生成して準備
     public void InitPlayback(int course, Material ghostMat, Track track)
     {
         ClearPlayback();
         playbackData = LoadGhost(course);
         if (!HasGhost) return;
+        EnsureDistances(playbackData.frames, track);
 
         ghostObj = new GameObject("GhostKart");
         ghostTransform = ghostObj.transform;

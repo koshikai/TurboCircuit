@@ -19,7 +19,7 @@ public partial class Kart
         // 1. 曲率プロファイル予測と許容限界速度の計算 (MPC / Receding Horizon Prediction)
         // 速度に応じた先読みステップ数 (約14〜38ステップ = 28〜76m 先までスキャン)
         int scanSteps = Mathf.Clamp(14 + Mathf.RoundToInt(v * 0.6f), 14, 38);
-        float minSafeSpeed = MaxSpeed * AISpeedFactor();
+        float minSafeSpeed = EffectiveMaxSpeed * AISpeedFactor();
         float distAccum = 0f;
         float apexCurvature = 0f;
         float apexBend = 0f;
@@ -576,10 +576,28 @@ public partial class Kart
         return Mathf.Clamp(lane, -maxSafeLane, maxSafeLane);
     }
 
+    public static void GetAiClassParams(SpeedClass cc, out float skillOffset, out float rbMin, out float rbMax, out float clampMin, out float clampMax)
+    {
+        switch (cc)
+        {
+            case SpeedClass.Cc50:
+                skillOffset = -0.06f; rbMin = -0.08f; rbMax = 0.04f; clampMin = 0.82f; clampMax = 0.98f;
+                break;
+            case SpeedClass.Cc150:
+                skillOffset = 0.03f; rbMin = -0.04f; rbMax = 0.10f; clampMin = 0.94f; clampMax = 1.08f;
+                break;
+            default:
+                skillOffset = 0.00f; rbMin = -0.06f; rbMax = 0.08f; clampMin = 0.90f; clampMax = 1.05f;
+                break;
+        }
+    }
+
     float AISpeedFactor()
     {
         if (IsPlayer && !Finished && !rm.Demo) return 1f;
-        float f = aiSkill;
+        SpeedClass cc = rm != null ? rm.EffectiveSpeedClass : SpeedClass.Cc100;
+        GetAiClassParams(cc, out float offset, out float rbMin, out float rbMax, out float cMin, out float cMax);
+        float f = aiSkill + offset;
         if (rm != null)
         {
             // 1P / 2P の人間プレイヤーのうち、最も距離が近いプレイヤーを基準にラバーバンド補正を行う
@@ -601,9 +619,9 @@ public partial class Kart
             if (refHuman != null)
             {
                 float diff = refHuman.RaceDistance - RaceDistance;
-                f += Mathf.Clamp(diff / 220f, -0.06f, 0.08f);
+                f += Mathf.Clamp(diff / 220f, rbMin, rbMax);
             }
         }
-        return Mathf.Clamp(f, 0.90f, 1.05f);
+        return Mathf.Clamp(f, cMin, cMax);
     }
 }

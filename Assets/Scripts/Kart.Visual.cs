@@ -226,7 +226,7 @@ public partial class Kart
         int driverIdx = ModelVariant >= 0 ? ModelVariant : IsPlayer ? (rm != null ? rm.SelectedDriver : 0) : ((slotFallback + 1) % 10);
         int kartIdx = KartVariant >= 0 ? KartVariant : IsPlayer ? (rm != null ? rm.SelectedKart : 0) : ((slotFallback + 2) % 8);
 
-        var baseKartPrefab = Resources.Load<GameObject>("Karts/kart-oobi");
+        var baseKartPrefab = ResourceCache.Load<GameObject>("Karts/kart-oobi");
         if (baseKartPrefab == null) return false;
 
         float liftY = (kartIdx == 3) ? 0.10f : 0f; // MONSTER のみハイリフト車高
@@ -263,8 +263,8 @@ public partial class Kart
         BuildCustomKartParts(kartIdx, liftY, out Vector3[] wheelPos, out bool useRacingWheel, out float frontWheelScale, out float rearWheelScale);
 
         var wheelPrefab = useRacingWheel
-            ? (Resources.Load<GameObject>("Karts/wheel-racing") ?? Resources.Load<GameObject>("Karts/wheel-default"))
-            : (Resources.Load<GameObject>("Karts/wheel-default") ?? Resources.Load<GameObject>("Karts/wheel-racing"));
+            ? (ResourceCache.Load<GameObject>("Karts/wheel-racing") ?? ResourceCache.Load<GameObject>("Karts/wheel-default"))
+            : (ResourceCache.Load<GameObject>("Karts/wheel-default") ?? ResourceCache.Load<GameObject>("Karts/wheel-racing"));
 
         for (int i = 0; i < 4; i++)
         {
@@ -500,7 +500,7 @@ public partial class Kart
         if (driverIdx >= 0 && driverIdx < KenneyKarts.Length)
         {
             // 0〜4: Kenney キャラクター (OOBI, OODI, OOLI, OOPI, OOZI)
-            var charKartPrefab = Resources.Load<GameObject>("Karts/" + KenneyKarts[driverIdx]);
+            var charKartPrefab = ResourceCache.Load<GameObject>("Karts/" + KenneyKarts[driverIdx]);
             if (charKartPrefab != null)
             {
                 var tempGo = Instantiate(charKartPrefab);
@@ -531,7 +531,7 @@ public partial class Kart
             // 5〜9: 動物レーサー (PANDA, PENGUIN, FOX, BUNNY, LION)
             int animIdx = Mathf.Clamp(driverIdx - KenneyKarts.Length, 0, AnimalDrivers.Length - 1);
             string animName = AnimalDrivers[animIdx];
-            var animPrefab = Resources.Load<GameObject>("Animals/animal-" + animName);
+            var animPrefab = ResourceCache.Load<GameObject>("Animals/animal-" + animName);
             if (animPrefab != null)
             {
                 var animGo = Instantiate(animPrefab, driverHead);
@@ -603,7 +603,7 @@ public partial class Kart
         else spinAngle = Mathf.MoveTowards(Mathf.Repeat(spinAngle + 180f, 360f) - 180f, 0, 900f * dt);
 
         steerVis = Mathf.Lerp(steerVis, steer, 1f - Mathf.Exp(-12f * dt));
-        float roll = -steerVis * 4f * Mathf.Clamp01(Speed / MaxSpeed) - (drifting ? driftDir * 5f : 0f);
+        float roll = -steerVis * 4f * Mathf.Clamp01(Speed / EffectiveMaxSpeed) - (drifting ? driftDir * 5f : 0f);
         float targetPitch = isAirborne
             ? Mathf.Clamp(-verticalVel * 1.6f, -20f, 20f)
             : ((boostTimer > 0 || slipstreamTimer > 0) ? -3.4f : (isBraking && Speed > 4f ? 2.4f : 0f));

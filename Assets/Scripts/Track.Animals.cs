@@ -20,18 +20,18 @@ public partial class Track
         animalMat.SetFloat("_Smoothness", 0.15f);
         createdMaterials.Add(animalMat);
 
-        var prefabBunny = Resources.Load<GameObject>("Animals/animal-bunny");
-        var prefabDeer = Resources.Load<GameObject>("Animals/animal-deer");
-        var prefabPenguin = Resources.Load<GameObject>("Animals/animal-penguin");
-        var prefabPolar = Resources.Load<GameObject>("Animals/animal-polar");
-        var prefabFox = Resources.Load<GameObject>("Animals/animal-fox");
-        var prefabLion = Resources.Load<GameObject>("Animals/animal-lion");
-        var prefabCrab = Resources.Load<GameObject>("Animals/animal-crab");
-        var prefabCat = Resources.Load<GameObject>("Animals/animal-cat");
-        var prefabDog = Resources.Load<GameObject>("Animals/animal-dog");
-        var prefabCow = Resources.Load<GameObject>("Animals/animal-cow");
-        var prefabBird = Resources.Load<GameObject>("Animals/animal-parrot");
-        var prefabChick = Resources.Load<GameObject>("Animals/animal-chick");
+        var prefabBunny = ResourceCache.Load<GameObject>("Animals/animal-bunny");
+        var prefabDeer = ResourceCache.Load<GameObject>("Animals/animal-deer");
+        var prefabPenguin = ResourceCache.Load<GameObject>("Animals/animal-penguin");
+        var prefabPolar = ResourceCache.Load<GameObject>("Animals/animal-polar");
+        var prefabFox = ResourceCache.Load<GameObject>("Animals/animal-fox");
+        var prefabLion = ResourceCache.Load<GameObject>("Animals/animal-lion");
+        var prefabCrab = ResourceCache.Load<GameObject>("Animals/animal-crab");
+        var prefabCat = ResourceCache.Load<GameObject>("Animals/animal-cat");
+        var prefabDog = ResourceCache.Load<GameObject>("Animals/animal-dog");
+        var prefabCow = ResourceCache.Load<GameObject>("Animals/animal-cow");
+        var prefabBird = ResourceCache.Load<GameObject>("Animals/animal-parrot");
+        var prefabChick = ResourceCache.Load<GameObject>("Animals/animal-chick");
 
         var rng = new System.Random(def.SceneryTheme * 777 + 42);
         int theme = def.SceneryTheme;

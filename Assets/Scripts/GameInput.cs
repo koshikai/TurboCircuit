@@ -5,7 +5,7 @@ using UnityEngine.InputSystem.LowLevel;
 // 入力の窓口。キーボード / マウス / ゲームパッド補助経路はここを経由して読み、Input System（Keyboard / Mouse / Gamepad）を使う。
 // 旧 Input クラス（Input Manager）は使わない（ProjectSettings の Active Input Handling は Input System Package (New)）。
 // キーコンフィグは KeyCode のまま保存されているため、API も KeyCode で受ける（保存済みの設定互換を保つ）。
-// ゲームパッドの主経路は GamepadHaptics の XInput 直読みで、ここを通らない。
+// ゲームパッドの主経路は GamepadHaptics（Input System の Gamepad ベース）で、ここを通らない。
 public static class GameInput
 {
     public static bool GetKey(KeyCode code)

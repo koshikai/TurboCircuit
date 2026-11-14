@@ -27,7 +27,7 @@ public partial class Track
     void ApplyDecorOverrides(int startChild)
     {
         DecorSpawned.Clear();
-        var data = Resources.Load<CourseDecorData>(CourseDecorData.ResourcePath(ActiveCourseIndex));
+        var data = ResourceCache.Load<CourseDecorData>(CourseDecorData.ResourcePath(ActiveCourseIndex));
         if (!BakeMode && data == null) return;
 
         var overrides = new Dictionary<string, DecorEntry>();

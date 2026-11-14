@@ -254,4 +254,23 @@ public static class Loc
         if (IsJa) return $"{n}位";
         return (n >= 1 && n <= 8) ? OrdinalsEn[n] : (n + "TH");
     }
+
+    public static string CupName(CupDef cup) => IsJa ? cup.nameJa : cup.nameEn;
+    public static string CupDesc(CupDef cup) => IsJa ? cup.descJa : cup.descEn;
+
+    public static string SpeedClassLabel(SpeedClass cc) => cc switch
+    {
+        SpeedClass.Cc50 => T("★  50cc  (EASY)", "★  50cc  (やさしい)"),
+        SpeedClass.Cc100 => T("★  100cc  (NORMAL)", "★  100cc  (ふつう)"),
+        SpeedClass.Cc150 => T("★  150cc  (HARD)", "★  150cc  (はやい)"),
+        _ => T("★  100cc  (NORMAL)", "★  100cc  (ふつう)")
+    };
+
+    public static string SpeedClassShort(SpeedClass cc) => cc switch
+    {
+        SpeedClass.Cc50 => "50cc",
+        SpeedClass.Cc100 => "100cc",
+        SpeedClass.Cc150 => "150cc",
+        _ => "100cc"
+    };
 }

@@ -114,8 +114,8 @@ public partial class Track
         var snowUvs = new List<Vector2>();
         var snowTris = new List<int>();
 
-        var texRocks = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
-        var texDesert = Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks_Red_Desert") ?? Resources.Load<Texture2D>("Props/StylizedNature/Textures/Rocks_Desert") ?? texRocks;
+        var texRocks = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Rocks");
+        var texDesert = ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Rocks_Red_Desert") ?? ResourceCache.Load<Texture2D>("Props/StylizedNature/Textures/Rocks_Desert") ?? texRocks;
 
         Material mainMtnMat;
         if (theme == 0) // Circuit: アルプス調の青藍色連峰＋岩肌テクスチャ

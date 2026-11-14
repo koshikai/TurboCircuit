@@ -164,7 +164,7 @@ public partial class RaceManager
         else if (state == State.Racing)
         {
             // 加速・ブーストによるダイナミックなカメラの引き込み（Gフォース感）
-            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / pl.EffectiveMaxSpeed);
             float gPull = (pl.Boosting || pl.Slipstreaming ? 1.5f : spd01 * 0.9f);
             dist += gPull;
             height -= gPull * 0.12f;
@@ -183,7 +183,7 @@ public partial class RaceManager
         float targetRoll = 0f;
         if (state == State.Racing && !lookBehind)
         {
-            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+            float spd01 = Mathf.Clamp01(Mathf.Abs(pl.Speed) / pl.EffectiveMaxSpeed);
             targetRoll = -pl.SteerVisual * 1.6f * spd01 - (pl.Drifting ? pl.DriftDirection * 2.2f : 0f);
         }
         camRolls[p] = Mathf.Lerp(camRolls[p], targetRoll, 1f - Mathf.Exp(-8f * dt));
@@ -194,7 +194,7 @@ public partial class RaceManager
 
         // ダイナミック FOV ブースト：最高速・ブースト・スリップストリーム・トリック連動
         float baseFov = TwoPlayer ? 68f : 60f;
-        float spdRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / Kart.MaxSpeed);
+        float spdRatio = Mathf.Clamp01(Mathf.Abs(pl.Speed) / pl.EffectiveMaxSpeed);
         float boostFov = (pl.Boosting ? 14f : 0f) + (pl.Slipstreaming ? 11f : 0f) + (pl.InDraftStream ? 3.5f : 0f);
         if (pl.IsAirborne) boostFov += pl.TrickSuccess ? 16f : 11f;
         if (lookBehind) boostFov += 8f;

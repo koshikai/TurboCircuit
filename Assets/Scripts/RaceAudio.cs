@@ -7,10 +7,14 @@ public class RaceAudio : MonoBehaviour
     const int Rate = 44100;
     const float MusicGain = 0.6f; // BGM 全体の音量倍率（効果音より控えめにする）
 
+    public static RaceAudio Instance { get; private set; }
+    public AudioClip MissileClip => missile;
+    public AudioClip EngineClip => engineClip;
+
     AudioSource[] pool;
     int next;
     AudioSource engine, driftLoop, music;
-    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, drop, lap, finalLap, finish, pop, star, shield, select, cancel, explosion;
+    AudioClip beep, go, pickup, tick, gotItem, boost, hit, bump, missile, missileWarning, drop, lap, finalLap, finish, pop, star, shield, select, cancel, explosion, engineClip;
     AudioClip[] bumps;
     readonly AudioClip[] bgm = new AudioClip[7];
 
@@ -18,10 +22,11 @@ public class RaceAudio : MonoBehaviour
     float lastHitTime = -10f;
     float lastExplodeTime = -10f;
     float lastTickTime = -10f;
+    float lastMissileWarningTime = -10f;
 
     static AudioClip Load(string name, System.Func<AudioClip> fallback)
     {
-        var clip = Resources.Load<AudioClip>("Audio/" + name);
+        var clip = ResourceCache.Load<AudioClip>("Audio/" + name);
         return clip != null ? clip : fallback();
     }
 
@@ -49,6 +54,7 @@ public class RaceAudio : MonoBehaviour
 
     void Awake()
     {
+        Instance = this;
         MasterBgmVolume = PlayerPrefs.GetFloat("Audio_BgmVolume", 0.7f);
         MasterSfxVolume = PlayerPrefs.GetFloat("Audio_SfxVolume", 1.0f);
 
@@ -80,19 +86,26 @@ public class RaceAudio : MonoBehaviour
         explosion = Load("sfx_explosion", () => hit);
         System.Func<AudioClip> bumpFallback = () => bump != null ? bump : (bump = Make(0.18f, (t, d) => (WarmTone(145, t) * 0.45f + Noise() * 0.12f) * Env(t, d)));
         bumps = new[] { Load("sfx_bump_0", bumpFallback), Load("sfx_bump_1", bumpFallback), Load("sfx_bump_2", bumpFallback) };
+        missileWarning = Load("sfx_warning", () => Make(0.18f, (t, d) =>
+        {
+            float f = t < 0.08f ? 1318.5f : 1760.0f;
+            return (WarmTone(f, t) * 0.40f + Mathf.Sin(2f * Mathf.PI * f * t) * 0.15f) * Env(t, d);
+        }));
 
-        var engineClip = Resources.Load<AudioClip>("Audio/sfx_engine");
+        engineClip = ResourceCache.Load<AudioClip>("Audio/sfx_engine");
         useRealEngine = engineClip != null;
         engine = Loop(engineClip != null ? engineClip : MakeEngine(), 0f);
+        ResourceCache.Register("Audio/sfx_missile", missile);
+        ResourceCache.PreloadRaceAssets();
 
-        var driftClip = Resources.Load<AudioClip>("Audio/sfx_drift");
+        var driftClip = ResourceCache.Load<AudioClip>("Audio/sfx_drift");
         driftLoop = Loop(driftClip != null ? driftClip : Make(1f, (t, d) => Noise() * 0.25f), 0f);
 
         // 全7コースの BGM を読み込む（万一欠けていた場合のみフォールバック）
         bool missing = false;
         for (int i = 0; i < bgm.Length; i++)
         {
-            bgm[i] = Resources.Load<AudioClip>("Audio/bgm_" + i);
+            bgm[i] = ResourceCache.Load<AudioClip>("Audio/bgm_" + i);
             if (bgm[i] == null) missing = true;
         }
         if (missing)
@@ -252,6 +265,17 @@ public class RaceAudio : MonoBehaviour
     }
 
     public void Missile() => Play(missile, 0.34f, Random.Range(0.96f, 1.05f));
+
+    public void MissileWarning(float distance = 30f)
+    {
+        float t01 = Mathf.Clamp01(distance / 45f);
+        float cooldown = Mathf.Lerp(0.22f, 0.52f, t01);
+        float now = Time.unscaledTime;
+        if (now - lastMissileWarningTime < cooldown) return;
+        lastMissileWarningTime = now;
+        float pitch = Mathf.Lerp(1.12f, 0.96f, t01);
+        Play(missileWarning, 0.34f, pitch);
+    }
     public void Drop() => Play(drop, 0.32f, Random.Range(0.95f, 1.05f));
     public void Lap() => Play(lap, 0.40f);
     public void FinalLap() => Play(finalLap, 0.44f);

@@ -13,125 +13,31 @@ public class ItemBox : MonoBehaviour
     Transform cube;
 
     Renderer[] faceRends;
-    Transform[] questionLabels;
     static Mesh s_qHookMesh;
+    static Mesh s_unitCubeMesh;
+    static Mesh s_staticBoxMesh;
+    static Material s_staticBaseMat;
+    static Material[] s_staticBoxMats;
 
-    public void Init(Vector3 pos, Material mat, Font font)
+    static Mesh ExtractPrimitiveMesh(PrimitiveType type)
     {
-        basePos = pos + Vector3.up * 1.1f;
-        transform.position = basePos;
-        phase = Random.value * 10f;
+        var tmp = GameObject.CreatePrimitive(type);
+        var mesh = tmp.GetComponent<MeshFilter>().sharedMesh;
+        if (Application.isPlaying) Destroy(tmp);
+        else DestroyImmediate(tmp);
+        return mesh;
+    }
 
-        var root = new GameObject("BoxRoot").transform;
-        root.SetParent(transform, false);
-        root.localScale = Vector3.one * 1.15f;
-        cube = root;
+    static Mesh CombineGroup(System.Collections.Generic.List<CombineInstance> list)
+    {
+        var m = new Mesh();
+        m.CombineMeshes(list.ToArray(), true, true);
+        return m;
+    }
 
-        mpb = new MaterialPropertyBlock();
-
-        // 1. 内部コアブロック（隙間から見える引き締まったダークネイビー芯）
-        var core = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Destroy(core.GetComponent<Collider>());
-        core.transform.SetParent(root, false);
-        core.transform.localScale = Vector3.one * 0.84f;
-        var coreRend = core.GetComponent<Renderer>();
-        coreRend.sharedMaterial = mat;
-        var coreMpb = new MaterialPropertyBlock();
-        Color darkCore = new Color(0.10f, 0.14f, 0.26f, 1f);
-        coreMpb.SetColor("_Color", darkCore);
-        coreMpb.SetColor("_BaseColor", darkCore);
-        coreMpb.SetColor("_EmissionColor", Color.black);
-        coreRend.SetPropertyBlock(coreMpb);
-
-        // 2. 6面のレインボーキャンディパネル（各面が異なる虹色に輝き、どの角度からもカラフルに見える）
-        Vector3[] faceNormals =
-        {
-            Vector3.forward, Vector3.back,
-            Vector3.right,   Vector3.left,
-            Vector3.up,      Vector3.down
-        };
-        faceRends = new Renderer[6];
-        for (int i = 0; i < 6; i++)
-        {
-            var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(panel.GetComponent<Collider>());
-            panel.name = "RainbowFace_" + i;
-            panel.transform.SetParent(root, false);
-            panel.transform.localPosition = faceNormals[i] * 0.425f;
-            panel.transform.localRotation = Quaternion.LookRotation(faceNormals[i]);
-            panel.transform.localScale = new Vector3(0.76f, 0.76f, 0.04f);
-            faceRends[i] = panel.GetComponent<Renderer>();
-            faceRends[i].sharedMaterial = mat;
-        }
-
-        // 3. 12本のゴールドエッジフレーム＆8箇所のコーナーバンパー球（突起飛び出しゼロのクリーンなトイフレーム）
-        var frameMpb = new MaterialPropertyBlock();
-        Color frameGold = new Color(1.00f, 0.82f, 0.14f, 1f);
-        frameMpb.SetColor("_Color", frameGold);
-        frameMpb.SetColor("_BaseColor", frameGold);
-        frameMpb.SetColor("_EmissionColor", new Color(0.12f, 0.08f, 0.01f));
-
-        float edgeOffset = 0.43f;
-        float barRadius = 0.095f;
-        float barHalfLen = 0.43f;
-
-        // X軸方向の4辺、Y軸方向の4辺、Z軸方向の4辺
-        foreach (float s1 in new[] { -1f, 1f })
-        foreach (float s2 in new[] { -1f, 1f })
-        {
-            // Y軸平行エッジ
-            var barY = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(barY.GetComponent<Collider>());
-            barY.transform.SetParent(root, false);
-            barY.transform.localPosition = new Vector3(s1 * edgeOffset, 0f, s2 * edgeOffset);
-            barY.transform.localScale = new Vector3(barRadius, barHalfLen, barRadius);
-            var ry = barY.GetComponent<Renderer>();
-            ry.sharedMaterial = mat;
-            ry.SetPropertyBlock(frameMpb);
-
-            // X軸平行エッジ
-            var barX = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(barX.GetComponent<Collider>());
-            barX.transform.SetParent(root, false);
-            barX.transform.localPosition = new Vector3(0f, s1 * edgeOffset, s2 * edgeOffset);
-            barX.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            barX.transform.localScale = new Vector3(barRadius, barHalfLen, barRadius);
-            var rx = barX.GetComponent<Renderer>();
-            rx.sharedMaterial = mat;
-            rx.SetPropertyBlock(frameMpb);
-
-            // Z軸平行エッジ
-            var barZ = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(barZ.GetComponent<Collider>());
-            barZ.transform.SetParent(root, false);
-            barZ.transform.localPosition = new Vector3(s1 * edgeOffset, s2 * edgeOffset, 0f);
-            barZ.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            barZ.transform.localScale = new Vector3(barRadius, barHalfLen, barRadius);
-            var rz = barZ.GetComponent<Renderer>();
-            rz.sharedMaterial = mat;
-            rz.SetPropertyBlock(frameMpb);
-        }
-
-        // 8箇所の角にポップなゴールドコーナーキャップ
-        foreach (float sx in new[] { -1f, 1f })
-        foreach (float sy in new[] { -1f, 1f })
-        foreach (float sz in new[] { -1f, 1f })
-        {
-            var cap = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(cap.GetComponent<Collider>());
-            cap.transform.SetParent(root, false);
-            cap.transform.localPosition = new Vector3(sx * edgeOffset, sy * edgeOffset, sz * edgeOffset);
-            cap.transform.localScale = Vector3.one * 0.175f;
-            var rr = cap.GetComponent<Renderer>();
-            rr.sharedMaterial = mat;
-            rr.SetPropertyBlock(frameMpb);
-        }
-
-        // 4. 4つの側面すべてに3Dメッシュの立体「?」エンブレム（白＋濃紺ドロップシャドウ）を配置
-        // （TextMesh の GUI/Text シェーダーは ZTest Always で裏面が透けて見えるため、Litマテリアルの3Dメッシュで描画）
-        var labelsRoot = new GameObject("QuestionLabels").transform;
-        labelsRoot.SetParent(root, false);
-        label = labelsRoot;
+    static void EnsureBoxMeshes()
+    {
+        if (s_staticBoxMesh != null && s_unitCubeMesh != null && s_qHookMesh != null) return;
 
         if (s_qHookMesh == null)
         {
@@ -166,65 +72,183 @@ public class ItemBox : MonoBehaviour
                 true, true
             );
         }
-        Mesh qHookMesh = s_qHookMesh;
 
-        var whiteMpb = new MaterialPropertyBlock();
-        whiteMpb.SetColor("_Color", Color.white);
-        whiteMpb.SetColor("_BaseColor", Color.white);
-        whiteMpb.SetColor("_EmissionColor", new Color(0.22f, 0.22f, 0.22f));
+        if (s_unitCubeMesh == null) s_unitCubeMesh = ExtractPrimitiveMesh(PrimitiveType.Cube);
+        var cylMesh = ExtractPrimitiveMesh(PrimitiveType.Cylinder);
+        var sphereMesh = ExtractPrimitiveMesh(PrimitiveType.Sphere);
 
-        var shadowMpb = new MaterialPropertyBlock();
-        Color navyShadow = new Color(0.06f, 0.09f, 0.20f, 1f);
-        shadowMpb.SetColor("_Color", navyShadow);
-        shadowMpb.SetColor("_BaseColor", navyShadow);
-        shadowMpb.SetColor("_EmissionColor", Color.black);
+        var sub0Core = new System.Collections.Generic.List<CombineInstance>(1);
+        var sub1Gold = new System.Collections.Generic.List<CombineInstance>(20);
+        var sub2Shadow = new System.Collections.Generic.List<CombineInstance>(8);
+        var sub3White = new System.Collections.Generic.List<CombineInstance>(8);
 
+        // 1. 内部コアブロック（隙間から見える引き締まったダークネイビー芯）
+        sub0Core.Add(new CombineInstance
+        {
+            mesh = s_unitCubeMesh,
+            transform = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * 0.84f)
+        });
+
+        // 3. 12本のゴールドエッジフレーム＆8箇所のコーナーバンパー球
+        float edgeOffset = 0.43f;
+        float barRadius = 0.095f;
+        float barHalfLen = 0.43f;
+        Vector3 barScale = new Vector3(barRadius, barHalfLen, barRadius);
+        Quaternion rotX = Quaternion.Euler(0f, 0f, 90f);
+        Quaternion rotZ = Quaternion.Euler(90f, 0f, 0f);
+        float[] signs = { -1f, 1f };
+
+        for (int a = 0; a < 2; a++)
+        for (int b = 0; b < 2; b++)
+        {
+            float s1 = signs[a];
+            float s2 = signs[b];
+            sub1Gold.Add(new CombineInstance
+            {
+                mesh = cylMesh,
+                transform = Matrix4x4.TRS(new Vector3(s1 * edgeOffset, 0f, s2 * edgeOffset), Quaternion.identity, barScale)
+            });
+            sub1Gold.Add(new CombineInstance
+            {
+                mesh = cylMesh,
+                transform = Matrix4x4.TRS(new Vector3(0f, s1 * edgeOffset, s2 * edgeOffset), rotX, barScale)
+            });
+            sub1Gold.Add(new CombineInstance
+            {
+                mesh = cylMesh,
+                transform = Matrix4x4.TRS(new Vector3(s1 * edgeOffset, s2 * edgeOffset, 0f), rotZ, barScale)
+            });
+        }
+
+        Vector3 capScale = Vector3.one * 0.175f;
+        for (int ix = 0; ix < 2; ix++)
+        for (int iy = 0; iy < 2; iy++)
+        for (int iz = 0; iz < 2; iz++)
+        {
+            sub1Gold.Add(new CombineInstance
+            {
+                mesh = sphereMesh,
+                transform = Matrix4x4.TRS(new Vector3(signs[ix] * edgeOffset, signs[iy] * edgeOffset, signs[iz] * edgeOffset), Quaternion.identity, capScale)
+            });
+        }
+
+        // 4. 4つの側面すべてに3Dメッシュの立体「?」エンブレム（白＋濃紺ドロップシャドウ）を配置
         float[] faceYaws = { 0f, 90f, 180f, 270f };
         for (int i = 0; i < 4; i++)
         {
-            var faceAnchor = new GameObject("QFace_" + i).transform;
-            faceAnchor.SetParent(labelsRoot, false);
-            faceAnchor.localRotation = Quaternion.Euler(0f, faceYaws[i], 0f);
-            faceAnchor.localPosition = faceAnchor.localRotation * new Vector3(0f, 0f, 0.448f);
+            Quaternion faceRot = Quaternion.Euler(0f, faceYaws[i], 0f);
+            Matrix4x4 faceM = Matrix4x4.TRS(faceRot * new Vector3(0f, 0f, 0.448f), faceRot, Vector3.one);
 
-            // ドロップシャドウ「?」上部フック
-            var shHook = new GameObject("QShadowHook");
-            shHook.transform.SetParent(faceAnchor, false);
-            shHook.transform.localPosition = new Vector3(-0.018f, -0.022f, -0.004f);
-            shHook.transform.localScale = new Vector3(1.08f, 1.08f, 0.7f);
-            shHook.AddComponent<MeshFilter>().sharedMesh = qHookMesh;
-            var shHookR = shHook.AddComponent<MeshRenderer>();
-            shHookR.sharedMaterial = mat;
-            shHookR.SetPropertyBlock(shadowMpb);
+            sub2Shadow.Add(new CombineInstance
+            {
+                mesh = s_qHookMesh,
+                transform = faceM * Matrix4x4.TRS(new Vector3(-0.018f, -0.022f, -0.004f), Quaternion.identity, new Vector3(1.08f, 1.08f, 0.7f))
+            });
+            sub2Shadow.Add(new CombineInstance
+            {
+                mesh = sphereMesh,
+                transform = faceM * Matrix4x4.TRS(new Vector3(-0.018f, -0.228f, -0.004f), Quaternion.identity, new Vector3(0.112f, 0.112f, 0.040f))
+            });
 
-            // ドロップシャドウ「?」下部ドット
-            var shDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(shDot.GetComponent<Collider>());
-            shDot.transform.SetParent(faceAnchor, false);
-            shDot.transform.localPosition = new Vector3(-0.018f, -0.228f, -0.004f);
-            shDot.transform.localScale = new Vector3(0.112f, 0.112f, 0.040f);
-            var shDotR = shDot.GetComponent<Renderer>();
-            shDotR.sharedMaterial = mat;
-            shDotR.SetPropertyBlock(shadowMpb);
+            sub3White.Add(new CombineInstance
+            {
+                mesh = s_qHookMesh,
+                transform = faceM * Matrix4x4.TRS(new Vector3(0f, 0f, 0.008f), Quaternion.identity, Vector3.one)
+            });
+            sub3White.Add(new CombineInstance
+            {
+                mesh = sphereMesh,
+                transform = faceM * Matrix4x4.TRS(new Vector3(0f, -0.208f, 0.008f), Quaternion.identity, new Vector3(0.102f, 0.102f, 0.048f))
+            });
+        }
 
-            // メイン白「?」上部フック
-            var mHook = new GameObject("QMainHook");
-            mHook.transform.SetParent(faceAnchor, false);
-            mHook.transform.localPosition = new Vector3(0f, 0f, 0.008f);
-            mHook.AddComponent<MeshFilter>().sharedMesh = qHookMesh;
-            var mHookR = mHook.AddComponent<MeshRenderer>();
-            mHookR.sharedMaterial = mat;
-            mHookR.SetPropertyBlock(whiteMpb);
+        Mesh m0 = CombineGroup(sub0Core);
+        Mesh m1 = CombineGroup(sub1Gold);
+        Mesh m2 = CombineGroup(sub2Shadow);
+        Mesh m3 = CombineGroup(sub3White);
 
-            // メイン白「?」下部ドット
-            var mDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(mDot.GetComponent<Collider>());
-            mDot.transform.SetParent(faceAnchor, false);
-            mDot.transform.localPosition = new Vector3(0f, -0.208f, 0.008f);
-            mDot.transform.localScale = new Vector3(0.102f, 0.102f, 0.048f);
-            var mDotR = mDot.GetComponent<Renderer>();
-            mDotR.sharedMaterial = mat;
-            mDotR.SetPropertyBlock(whiteMpb);
+        var finalCombine = new[]
+        {
+            new CombineInstance { mesh = m0, transform = Matrix4x4.identity },
+            new CombineInstance { mesh = m1, transform = Matrix4x4.identity },
+            new CombineInstance { mesh = m2, transform = Matrix4x4.identity },
+            new CombineInstance { mesh = m3, transform = Matrix4x4.identity }
+        };
+        s_staticBoxMesh = new Mesh { name = "ItemBoxStaticCombined" };
+        s_staticBoxMesh.CombineMeshes(finalCombine, false, false);
+        s_staticBoxMesh.RecalculateBounds();
+
+        DestroyImmediate(m0);
+        DestroyImmediate(m1);
+        DestroyImmediate(m2);
+        DestroyImmediate(m3);
+    }
+
+    static Material MakeSubMat(Material baseMat, Color col, Color emission)
+    {
+        var m = new Material(baseMat);
+        m.SetColor("_Color", col);
+        m.SetColor("_BaseColor", col);
+        m.SetColor("_EmissionColor", emission);
+        if (emission.maxColorComponent > 0f) m.EnableKeyword("_EMISSION");
+        return m;
+    }
+
+    static Material[] GetStaticBoxMaterials(Material baseMat)
+    {
+        if (s_staticBoxMats != null && s_staticBaseMat == baseMat) return s_staticBoxMats;
+        s_staticBaseMat = baseMat;
+        s_staticBoxMats = new[]
+        {
+            MakeSubMat(baseMat, new Color(0.10f, 0.14f, 0.26f, 1f), Color.black),
+            MakeSubMat(baseMat, new Color(1.00f, 0.82f, 0.14f, 1f), new Color(0.12f, 0.08f, 0.01f)),
+            MakeSubMat(baseMat, new Color(0.06f, 0.09f, 0.20f, 1f), Color.black),
+            MakeSubMat(baseMat, Color.white, new Color(0.22f, 0.22f, 0.22f))
+        };
+        return s_staticBoxMats;
+    }
+
+    public void Init(Vector3 pos, Material mat, Font font)
+    {
+        basePos = pos + Vector3.up * 1.1f;
+        transform.position = basePos;
+        phase = Random.value * 10f;
+
+        EnsureBoxMeshes();
+
+        var root = new GameObject("BoxRoot").transform;
+        root.SetParent(transform, false);
+        root.localScale = Vector3.one * 1.15f;
+        cube = root;
+
+        mpb = new MaterialPropertyBlock();
+
+        // 1 + 3 + 4. 結合済み静的メッシュ（コア + 12エッジ + 8キャップ + 4面?エンブレム = 1レンダラー）
+        var staticGo = new GameObject("StaticFrame");
+        staticGo.transform.SetParent(root, false);
+        staticGo.AddComponent<MeshFilter>().sharedMesh = s_staticBoxMesh;
+        var staticRend = staticGo.AddComponent<MeshRenderer>();
+        staticRend.sharedMaterials = GetStaticBoxMaterials(mat);
+
+        // 2. 6面のレインボーキャンディパネル（各面が異なる虹色に輝き、どの角度からもカラフルに見える）
+        Vector3[] faceNormals =
+        {
+            Vector3.forward, Vector3.back,
+            Vector3.right,   Vector3.left,
+            Vector3.up,      Vector3.down
+        };
+        faceRends = new Renderer[6];
+        for (int i = 0; i < 6; i++)
+        {
+            var panel = new GameObject("RainbowFace_" + i);
+            panel.transform.SetParent(root, false);
+            panel.transform.localPosition = faceNormals[i] * 0.425f;
+            panel.transform.localRotation = Quaternion.LookRotation(faceNormals[i]);
+            panel.transform.localScale = new Vector3(0.76f, 0.76f, 0.04f);
+            panel.AddComponent<MeshFilter>().sharedMesh = s_unitCubeMesh;
+            var pr = panel.AddComponent<MeshRenderer>();
+            pr.sharedMaterial = mat;
+            faceRends[i] = pr;
         }
 
         ApplyBoxColor(0f);
@@ -854,7 +878,9 @@ public class Missile : MonoBehaviour
         audio.maxDistance = 36f;
         audio.dopplerLevel = 1.0f;
         audio.loop = true;
-        var clip = Resources.Load<AudioClip>("Audio/sfx_missile");
+        var clip = RaceAudio.Instance != null && RaceAudio.Instance.MissileClip != null
+            ? RaceAudio.Instance.MissileClip
+            : ResourceCache.Load<AudioClip>("Audio/sfx_missile");
         if (clip != null)
         {
             audio.clip = clip;
@@ -898,7 +924,8 @@ public class Missile : MonoBehaviour
             if ((k.transform.position + Vector3.up * 0.6f - transform.position).magnitude < 1.9f)
             {
                 // オンライン時は被弾する側（ローカル操作者またはホストのCPU）がスピン判定を行い、ミサイル自体は全画面で即座に爆発消滅する
-                if (!k.IsRemote && !k.StarInvincible) k.Spin();
+                bool hit = k.IsRemote ? !k.StarInvincible : k.Spin();
+                if (hit) rm.AddBattleHit(Owner, k, ItemType.Missile);
                 Explode();
                 return;
             }
@@ -1319,10 +1346,8 @@ public class Bomb : MonoBehaviour
                 float d = Vector3.Distance(k.transform.position, pos);
                 if (d < 6.5f)
                 {
-                    if (!k.IsRemote && !k.StarInvincible)
-                    {
-                        k.Spin();
-                    }
+                    bool hit = k.IsRemote ? !k.StarInvincible : k.Spin();
+                    if (hit) rm.AddBattleHit(Owner, k, ItemType.Bomb);
                     // 衝撃ノックバック（爆心地から外側へ押し出す）
                     Vector3 toKart = k.transform.position - pos;
                     toKart.y = 0;
